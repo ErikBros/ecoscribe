@@ -703,6 +703,64 @@ class Api:
         (self._data_dir / "welcome_done").write_text(time.strftime("%Y-%m-%d"), encoding="utf-8")
         return {"ok": True}
 
+    # ---------------- first-run setup (dictado-zpz) ----------------
+    def setup_info(self, languages: str = "") -> dict:
+        """The speech models for these languages (required / recommended, downloaded or not) and,
+        on the Mac, the permissions dictation needs."""
+        from . import models
+        c = self._load()
+        langs = [x.strip() for x in str(languages).split(",") if x.strip()] or c.whisper.languages
+        rows = models.setup_models(c.whisper, langs)
+        for m in rows:
+            m["ready"] = models.is_ready(m["name"])
+        perms = []
+        if sys.platform == "darwin":
+            from .platform.macos import permissions
+            st = permissions.status()
+            perms = [{"key": k, "label": permissions.PANES[k][0], "granted": bool(st.get(k))} for k in permissions.DICTATION]
+        return {"models": rows, "permissions": perms}
+
+    def open_permission(self, key: str) -> dict:
+        if sys.platform == "darwin":
+            from .platform.macos import permissions
+            if key in permissions.PANES:
+                permissions.open_pane(key)
+                return {"ok": True}
+        return {"ok": False}
+
+    def setup_models_start(self, names: list) -> dict:
+        """Download `names` one after another in the background; poll setup_models_progress()."""
+        import threading
+        from . import models
+        dl = getattr(self, "_dl", None)
+        if dl and dl["running"]:
+            return self.setup_models_progress()
+        dl = self._dl = {"running": True, "error": None,
+                         "models": {n: {"done": 0, "total": None, "ready": models.is_ready(n)} for n in names}}
+
+        def run():
+            try:
+                for n in names:
+                    row = dl["models"][n]
+                    if row["ready"]:
+                        continue
+
+                    def progress(done, total, row=row):
+                        row["done"], row["total"] = done, total
+                    models.prepare(n, progress=progress)
+                    row["ready"] = True
+            except Exception as e:
+                log.exception("setup model download failed")
+                dl["error"] = str(e) or type(e).__name__
+            finally:
+                dl["running"] = False
+        threading.Thread(target=run, name="ecoscribe-setup-models", daemon=True).start()
+        return self.setup_models_progress()
+
+    def setup_models_progress(self) -> dict:
+        dl = getattr(self, "_dl", None) or {"running": False, "error": None, "models": {}}
+        return {"running": dl["running"], "error": dl["error"], "models": {k: dict(v) for k, v in dl["models"].items()}}
+
 
 def _listen_for_focus(win) -> None:
     import threading

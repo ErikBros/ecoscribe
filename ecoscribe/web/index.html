@@ -386,6 +386,9 @@
 
         <div class="card group">
           <div class="group-head"><h3>Troubleshooting</h3><p class="muted">When something goes wrong: hand Claude what it needs to find the cause.</p></div>
+          <div class="row"><span class="row-text"><span class="row-label">Setup</span>
+            <span class="muted small">Languages, speech models, mic and key, step by step, like the first time.</span></span>
+            <button type="button" class="btn btn-ghost btn-sm" id="setup-again">Run setup again</button></div>
           <div class="row"><span class="row-text"><span class="row-label">Debug info</span>
             <span class="muted small">Version, settings (calendar link removed), the end of every log, recent crashes and freezes. Paste it to Claude.</span></span>
             <button type="button" class="btn btn-ghost btn-sm" id="dbg-copy">Copy debug info for Claude</button></div>
@@ -408,42 +411,116 @@
   </main>
 </div>
 
-<!-- BIENVENIDA -->
-<div class="welcome" id="welcome" hidden>
-  <div class="welcome-card" role="dialog" aria-modal="true" aria-labelledby="w-title">
-    <div class="steps" id="steps"><span class="step-dot"></span><span class="step-dot"></span><span class="step-dot"></span></div>
+<!-- SETUP (dictado-zpz): the first run, full window. Steps are shown or skipped per platform. -->
+<div class="setup" id="setup" hidden>
+  <div class="s-bar" id="s-bar" aria-hidden="true"></div>
+  <div class="s-body">
 
-    <div class="wstep" data-step="0">
-      <div class="w-visual">
-        <kbd class="key key-xl" id="w-key">Ctrl</kbd>
-        <div class="w-caption">right</div>
+    <section class="sstep" data-step="permissions" data-mac-only>
+      <div class="s-text">
+        <div class="s-eyebrow">Set up</div>
+        <h1 id="s-title">Let Ecoscribe listen and type</h1>
+        <p class="s-sub">Three switches in System Settings. Ecoscribe only listens while you dictate.</p>
+        <p class="s-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/></svg>
+          Turned one on? It ticks here by itself within a few seconds.</p>
       </div>
-      <h2 id="w-title">Ecoscribe is ready</h2>
-      <p>Tap <strong>Right Ctrl</strong> once and talk. Keep using the computer as usual. Tap it again and the text appears wherever your cursor is.</p>
-    </div>
+      <div class="s-card"><div class="s-rows" id="s-perms"></div></div>
+    </section>
 
-    <div class="wstep" data-step="1">
-      <div class="w-visual">
-        <div class="meter meter-xl"><div class="meter-fill" id="w-meter-fill"></div></div>
-        <div class="w-caption" id="w-mic-name">Looking for the mic…</div>
+    <section class="sstep" data-step="languages">
+      <div class="s-text">
+        <div class="s-eyebrow">Set up</div>
+        <h1>Which languages do you speak?</h1>
+        <p class="s-sub">Tick the ones you'll dictate in. It decides which speech models you need.</p>
+        <p class="s-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/></svg>
+          Nothing to switch: Ecoscribe hears which one you speak, even two in one dictation.</p>
       </div>
-      <h2>Test the mic</h2>
-      <p>Say something at a normal volume. The bar should move. If it doesn't, pick another mic in Settings.</p>
-    </div>
-
-    <div class="wstep" data-step="2">
-      <div class="w-visual w-tips">
-        <div class="tip"><span class="keys"><kbd class="key">Ctrl</kbd><span class="plus">+</span><kbd class="key">Esc</kbd></span><span>Cancel</span></div>
-        <div class="tip"><svg viewBox="0 0 24 24" class="tip-ico" aria-hidden="true"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="8"/></svg><span>History</span></div>
+      <div class="s-card">
+        <div class="s-chips" id="s-langs" role="group" aria-label="Languages you dictate in"></div>
+        <select id="s-lang-more" aria-label="More languages"></select>
       </div>
-      <h2>All set</h2>
-      <p>Ecoscribe stays in the system tray, next to the clock, and starts with Windows. Open it any time from the Start menu.</p>
-    </div>
+    </section>
 
-    <div class="w-actions">
-      <button class="btn btn-ghost" id="w-skip">Skip</button>
-      <button class="btn btn-primary" id="w-next">Next</button>
-    </div>
+    <section class="sstep" data-step="models">
+      <div class="s-text">
+        <div class="s-eyebrow">Set up</div>
+        <h1>Getting your speech models ready</h1>
+        <p class="s-sub">A one-time download. After that, everything runs on this computer, offline.</p>
+        <p class="s-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/></svg>
+          We recommend both: meetings and files use both, and a language you add later won't wait for a download.</p>
+      </div>
+      <div class="s-card">
+        <div class="s-rows" id="s-models"></div>
+        <div class="s-card-foot"><span class="muted small" id="s-models-note"></span>
+          <button type="button" class="btn btn-primary btn-sm" id="s-download">Download</button></div>
+      </div>
+    </section>
+
+    <section class="sstep" data-step="mic">
+      <div class="s-text">
+        <div class="s-eyebrow">Configure</div>
+        <h1>Test your microphone</h1>
+        <p class="s-sub">Say a few words at your normal volume.</p>
+        <p class="s-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/></svg>
+          Headset connected? The bars follow the mic you pick.</p>
+      </div>
+      <div class="s-card s-card-center">
+        <div class="s-bars" id="s-bars" aria-hidden="true"></div>
+        <div class="s-caption"><span class="s-dot"></span>Your mic works if the bars light up</div>
+        <select id="s-mic" aria-label="Microphone"></select>
+      </div>
+    </section>
+
+    <section class="sstep" data-step="shortcut">
+      <div class="s-text">
+        <div class="s-eyebrow">Configure</div>
+        <h1>Your dictation key</h1>
+        <p class="s-sub">One key starts and stops dictation, in any app.</p>
+        <p class="s-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/></svg>
+          Esc while you hold it cancels a dictation. You can change all of this in Settings.</p>
+      </div>
+      <div class="s-card s-card-center">
+        <kbd class="key key-xl" id="s-key">Right Ctrl</kbd>
+        <button type="button" class="btn btn-ghost btn-sm" id="s-key-change">Change key</button>
+        <p class="muted small" id="s-key-hint" hidden></p>
+        <div class="s-modes" role="radiogroup" aria-label="How the key works">
+          <label class="s-mode"><input type="radio" name="s-mode" value="tap" checked>
+            <span><strong>Tap</strong><span class="muted small">Tap, talk, tap again. Hands free in between.</span></span></label>
+          <label class="s-mode"><input type="radio" name="s-mode" value="hold">
+            <span><strong>Hold</strong><span class="muted small">Hold while you talk, let go to stop. A tap still works too.</span></span></label>
+        </div>
+      </div>
+    </section>
+
+    <section class="sstep" data-step="try">
+      <div class="s-text">
+        <div class="s-eyebrow">Try it</div>
+        <h1>Try your first dictation</h1>
+        <p class="s-sub" id="s-try-sub">Tap <strong class="s-keyname">Right Ctrl</strong>, say something, and tap it again.</p>
+        <p class="s-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/></svg>
+          Speak as you would to a colleague. Ecoscribe adds the punctuation.</p>
+      </div>
+      <div class="s-card s-mock">
+        <div class="s-mock-head"><span class="s-mock-dots"><i></i><i></i><i></i></span>Notes</div>
+        <textarea id="s-try-box" spellcheck="false" placeholder="Your words appear here. Try: “Pick up milk, bread and coffee on the way home.”"></textarea>
+        <div class="s-try-ok" id="s-try-ok" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>It works</div>
+      </div>
+    </section>
+
+    <section class="sstep" data-step="done">
+      <div class="s-text">
+        <div class="s-eyebrow">Done</div>
+        <h1>You're all set</h1>
+        <p class="s-sub" id="s-done-sub">Ecoscribe stays in the system tray, next to the clock, and starts with Windows. Open this window any time from the Start menu.</p>
+      </div>
+      <div class="s-card"><div class="s-rows" id="s-summary"></div></div>
+    </section>
+
+  </div>
+  <div class="s-foot">
+    <button type="button" class="btn btn-link" id="s-back">← Back</button>
+    <button type="button" class="btn btn-link s-skip" id="s-skip">Skip setup</button>
+    <button type="button" class="btn btn-primary btn-lg" id="s-next">Continue →</button>
   </div>
 </div>
 
