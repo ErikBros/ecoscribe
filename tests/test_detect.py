@@ -140,3 +140,30 @@ def test_packaged_entries_not_checked_against_processes():
 def test_uses_from_entries_marks_nonpackaged():
     uses = {u.app: u for u in uses_from_entries([("MSTeams_8wekyb3d8bbwe", 5, 0, False), ("C:#x#zoom.exe", 5, 0, True)])}
     assert uses["zoom"].nonpackaged and not uses["msteams"].nonpackaged
+
+
+def test_meet_name_from_the_tab_title():
+    """dictado-4ar: no calendar link, the Meet tab still says which meeting it is."""
+    from ecoscribe.detect import meet_name
+    assert meet_name([("Meet - Sprint retro, week 41 - Google Chrome", "chrome")]) == "Sprint retro, week 41"
+    assert meet_name([("Inbox - Google Chrome", "chrome"), ("Meet - Ana / Johan 1:1 - Google Chrome", "chrome")]) == "Ana / Johan 1:1"
+    assert meet_name([("Meet – Design review — Mozilla Firefox", "firefox")]) == "Design review"
+    assert meet_name([("Meet - Planning and 2 more pages - Personal - Microsoft​ Edge", "msedge")]) == "Planning"
+    assert meet_name(["(1) Meet - Budget check"]) == "Budget check"  # bare titles, macOS without the suffix
+
+
+def test_meet_name_without_chromes_tab_state():
+    """In a live call Chrome adds the tab's state to the title, before the browser's name (or alone on the Mac)."""
+    from ecoscribe.detect import meet_name
+    for state in ("Camera and microphone recording", "Camera recording", "Microphone recording", "Audio playing",
+                  "Audio muted", "Sharing this tab", "Sharing this window", "Sharing this screen", "Network error"):
+        assert meet_name([(f"Meet - Sprint retro - {state} - Google Chrome", "chrome")]) == "Sprint retro", state
+        assert meet_name([f"Meet - Sprint retro - {state}"]) == "Sprint retro", state
+
+
+def test_meet_name_none_without_a_named_meet_tab():
+    from ecoscribe.detect import meet_name
+    assert meet_name([("Meet - abc-defg-hij - Google Chrome", "chrome")]) is None  # an instant meeting
+    assert meet_name([("Google Meet - Google Chrome", "chrome"), ("Calendar - Google Chrome", "chrome")]) is None
+    assert meet_name([("Meet - Sprint retro | Microsoft Teams", "ms-teams")]) is None  # not a browser
+    assert meet_name([]) is None
