@@ -40,10 +40,12 @@ SW_HIDE, SW_SHOWNOACTIVATE = 0, 4
 HWND_TOPMOST = w.HWND(-1)
 SWP_NOSIZE, SWP_NOACTIVATE = 0x1, 0x10
 W, H = 210, 44
-RW, RH = 230, 54  # the dictating pill: timer + how to cancel (t0u.36)
+RW, RH = 236, 38  # the dictating pill: dot, waveform, timer (dictado-3tl)
+WAVE_N = 24  # waveform bars: about the last second of the voice (one per 50 ms tick)
+WAVE_W = 130  # the waveform's width, the same with or without live text
 MW, MH = 380, 56  # the meeting pill opened by the mouse: label + latest live line
 CW, CH = 92, 30  # the meeting pill as it sits: a small chip, recording dot + timer (dictado-z4j)
-LW, LH = 460, 84  # the dictating pill with live text under it (dictado-live)
+LW, LH = 440, 66  # the dictating pill with one line of live text under it (dictado-live)
 KEY = "#010203"  # transparent color key, gives the pill round ends
 
 
@@ -77,6 +79,9 @@ class Overlay:
         self.meeting: dict | None = None  # meetui.meeting_view(); shown whenever dictation isn't
         self._drawn = None  # what the meeting layer last drew (no redraw, no flicker)
         self.live_text = ""  # what the live transcript has heard so far (this recording)
+        self._levels: list[float] = []  # the waveform: voice level per tick, newest last
+        import tkinter.font as tkf
+        self._live_font = tkf.Font(family="Segoe UI", size=10)
         self.open = False  # the meeting chip is opened by the mouse over it (dictado-z4j)
 
     def ex_style(self) -> int:
@@ -116,8 +121,11 @@ class Overlay:
                       font=("Segoe UI", 11), anchor="w" if dot else "center")
 
     def _dictating_pill(self, secs: int, level: float) -> None:
-        """The timer and how to cancel, level bars on the right; with live text, a wider box
-        whose second part is what it has heard so far (two lines, the newest words)."""
+        """A slim ink pill (dictado-3tl, the user picked it): the recording dot, a waveform of the
+        last second or so of the voice, the timer. How to cancel shows in the waveform's place
+        for the first 2 s. With live text, a second line under it: the newest words."""
+        self._levels.append(level)
+        del self._levels[:-WAVE_N]
         live = self.live_text
         w_, h_ = (LW, LH) if live else (RW, RH)
         grew = (w_, h_) != (self.w, self.h)
@@ -127,33 +135,38 @@ class Overlay:
         self._drawn = None
         c = self.c
         c.delete("all")
-        bg = P.INK
+        bg, r = P.INK, min(h_, 2 * RH) // 2 if not live else 18
+        c.create_oval(0, 0, 2 * r, 2 * r, fill=bg, outline=bg)
+        c.create_oval(w_ - 2 * r, 0, w_, 2 * r, fill=bg, outline=bg)
+        c.create_oval(0, h_ - 2 * r, 2 * r, h_, fill=bg, outline=bg)
+        c.create_oval(w_ - 2 * r, h_ - 2 * r, w_, h_, fill=bg, outline=bg)
+        c.create_rectangle(r, 0, w_ - r, h_, fill=bg, outline=bg)
+        c.create_rectangle(0, r, w_, h_ - r, fill=bg, outline=bg)
+        mid = RH // 2
+        on = int(time.monotonic() * 2) % 2 == 0 or level > 0.05  # the dot breathes while it's quiet
+        c.create_oval(16, mid - 5, 26, mid + 5, fill=P.TILE if on else P.TILE_DIM, outline="")
+        c.create_text(w_ - 16, mid, text=f"{secs // 60}:{secs % 60:02d}", fill=P.PAPER,
+                      font=("Segoe UI", 10, "bold"), anchor="e")
+        x0 = 38
+        x1 = x0 + WAVE_W
+        if secs < 2:
+            c.create_text(x0, mid, text=self.hint, fill=P.LINE, font=("Segoe UI", 8), anchor="w")
+        else:  # the waveform: newest on the right, each bar from the middle line
+            step = (x1 - x0) / WAVE_N
+            pad = [0.0] * (WAVE_N - len(self._levels)) + self._levels
+            for i, lv in enumerate(pad):
+                hh = 2 + (lv ** 1.5) * (RH - 18)
+                x = x0 + i * step + step / 2
+                c.create_line(x, mid - hh / 2, x, mid + hh / 2, fill=P.PAPER if lv > 0.04 else P.PILL_OFF,
+                              width=2, capstyle="round")
         if live:
-            r = 22
-            c.create_oval(0, 0, 2 * r, 2 * r, fill=bg, outline=bg)
-            c.create_oval(w_ - 2 * r, 0, w_, 2 * r, fill=bg, outline=bg)
-            c.create_oval(0, h_ - 2 * r, 2 * r, h_, fill=bg, outline=bg)
-            c.create_oval(w_ - 2 * r, h_ - 2 * r, w_, h_, fill=bg, outline=bg)
-            c.create_rectangle(r, 0, w_ - r, h_, fill=bg, outline=bg)
-            c.create_rectangle(0, r, w_, h_ - r, fill=bg, outline=bg)
-        else:
-            r = h_ // 2
-            c.create_oval(0, 0, h_, h_, fill=bg, outline=bg)
-            c.create_oval(w_ - h_, 0, w_, h_, fill=bg, outline=bg)
-            c.create_rectangle(r, 0, w_ - r, h_, fill=bg, outline=bg)
-        c.create_oval(17, 13, 29, 25, fill=P.TILE, outline=P.TILE)
-        c.create_text(40, 19, text=f"Dictating {secs // 60}:{secs % 60:02d}", fill=P.PAPER,
-                      font=("Segoe UI", 11), anchor="w")
-        if live:
-            c.create_text(150, 19, text=self.hint, fill=P.LINE, font=("Segoe UI", 9), anchor="w")
-            c.create_text(18, 36, text=live, fill=P.PAPER, font=("Segoe UI", 10), anchor="nw", width=w_ - 36)
-        else:
-            c.create_text(40, 38, text=self.hint, fill=P.LINE, font=("Segoe UI", 9), anchor="w")
-        for i in range(5):
-            on = level > (i + 0.5) / 5
-            x = w_ - 62 + i * 9
-            hgt = 6 + i * 3
-            c.create_rectangle(x, 19 + hgt // 2, x + 5, 19 - hgt // 2, fill=P.PAPER if on else P.PILL_OFF, outline="")
+            f = self._live_font
+            text, room = " ".join(live.split()), w_ - 32
+            if f.measure(text) > room:  # one line: the newest words, cut on the left
+                while text and f.measure("…" + text) > room:
+                    text = text.split(" ", 1)[1] if " " in text else text[1:]
+                text = "…" + text
+            c.create_text(16, RH + 6, text=text, fill=P.PAPER, font=f, anchor="w")
 
     def _hover(self) -> bool:
         pt, rc = w.POINT(), w.RECT()
@@ -220,6 +233,7 @@ class Overlay:
     def recording(self, t0: float) -> None:
         self.mode, self._t0 = "recording", t0
         self.live_text = ""
+        self._levels = []
         self._place_and_show()
         self.tick()
 
