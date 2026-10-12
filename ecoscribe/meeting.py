@@ -103,7 +103,8 @@ def _label(d: Path) -> None:
 
 def run(session_dir: Path, cfg: TranscribeCfg, recorder_factory=_default_recorder, stop_check=None,
         poll_s: float = 0.25, factory=transcribe._default_factory, resolve=None,
-        clock=time.monotonic, prompt: str | None = None, speech=transcribe._speech) -> int:
+        clock=time.monotonic, prompt: str | None = None, speech=transcribe._speech,
+        replacements: dict | None = None) -> int:
     d = Path(session_dir)
     stop_check = stop_check or stop_checker(d)
     cache: dict = {}
@@ -171,7 +172,8 @@ def run(session_dir: Path, cfg: TranscribeCfg, recorder_factory=_default_recorde
             log.warning("live chunk still running after 120 s; final pass waits for it")
             worker.join()
         sessions.write_meta(d, status="finalizing", recorded_s=durations.get("mix"))
-        rc = transcribe.run(d, cfg, factory=factory, resolve=resolve, cache=cache, prompt=prompt, speech=speech)
+        rc = transcribe.run(d, cfg, factory=factory, resolve=resolve, cache=cache, prompt=prompt, speech=speech,
+                            replacements=replacements)
         if rc == 0:
             _label(d)
         return rc
@@ -195,4 +197,5 @@ def main(session_dir: str) -> int:
     full = config.load(paths.config_path())
     from .calendar_ics import session_words
     from .text import vocab_prompt
-    return run(d, full.transcribe, prompt=vocab_prompt(session_words(d, full.text.vocabulary)))
+    return run(d, full.transcribe, prompt=vocab_prompt(session_words(d, full.text.vocabulary)),
+               replacements=dict(full.text.replacements))

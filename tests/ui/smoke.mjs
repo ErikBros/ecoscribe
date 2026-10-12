@@ -53,6 +53,23 @@ async function load(query) {
   doc.querySelector("#save").click(); await sleep(100);
   check(sent && sent.vocabulary === "Göteborg\npyannote\nKristineberg" && Object.keys(sent).length === 1, "saves only the word list, trimmed: " + JSON.stringify(sent));
 }
+{ // ajustes: Replace, heard -> write (dictado-b7u)
+  const { window, doc } = await load("page=ajustes");
+  const rows = () => [...doc.querySelectorAll("#reps .rep")];
+  check(rows().length === 1 && rows()[0].querySelector(".rep-heard").value === "poll request"
+    && rows()[0].querySelector(".rep-write").value === "pull request", "Replace shows the saved pair");
+  doc.querySelector("#rep-add").click();
+  const r = rows()[1];
+  r.querySelector(".rep-heard").value = "eco scribe"; r.querySelector(".rep-write").value = "Ecoscribe";
+  r.querySelector(".rep-write").dispatchEvent(new window.Event("input", { bubbles: true }));
+  check(!doc.querySelector("#savebar").hidden, "typing a replacement shows the savebar");
+  let sent = null;
+  const api = window.__ecoscribe.api, orig = api.save_settings;
+  api.save_settings = async (x) => { sent = x; return orig(x); };
+  doc.querySelector("#save").click(); await sleep(100);
+  check(sent && JSON.stringify(sent.replacements) === JSON.stringify([{ heard: "poll request", write: "pull request" }, { heard: "eco scribe", write: "Ecoscribe" }])
+    && Object.keys(sent).length === 1, "saves the replacements: " + JSON.stringify(sent));
+}
 { // ajustes: voice memory (t0u.32)
   const { window, doc } = await load("page=ajustes");
   await sleep(50);
@@ -112,6 +129,9 @@ async function load(query) {
   check(wpm && wpm.value === "40", "typing speed shows 40 until set (dictado-d8e)");
   wpm.value = "80"; wpm.dispatchEvent(new window.Event("change", { bubbles: true })); await sleep(80);
   check(window.__wpm === 80 && doc.querySelector("#i-wpm").value === "80" && doc.querySelector("#i-saved-how").textContent.includes("type at 80"), "a new typing speed is saved and used");
+  check(/ words · \d+%$/.test(doc.querySelector("#i-langs .i-hbar-val").textContent)
+    && / dictations?$/.test(doc.querySelector("#i-apps .i-hbar-val").textContent), "languages count words, apps dictations (dictado-7qo)");
+  check(/^The dark bar is your busiest hour, \d\d:00-\d\d:00\.$/.test(doc.querySelector("#i-hours-note").textContent), "the dark hour is explained (dictado-7qo)");
   check(doc.querySelector("#i-habits").textContent.includes("3.1"), "filler words per 100");
   check(doc.querySelector("#i-clarity").textContent === "91%" && doc.querySelector("#i-clarity-empty").hidden
     && doc.querySelectorAll("#i-clarity-weeks path.bar").length === 4, "clarity: score and the weeks that have one (9jc.1)");
@@ -375,6 +395,18 @@ async function load(query) {
   items[0].querySelectorAll(".h-menu-item")[0].click(); await sleep(150);
   check(items[0].querySelector(".h-text").textContent.startsWith("Could you"), "the new text replaces the old one");
   check(!doc.querySelector("#toast").hidden && doc.querySelector("#toast").textContent.includes("copied"), "says it's copied");
+}
+{ // History > Delete with Undo (dictado-vfo)
+  const { window, doc } = await load("page=historial&undo_ms=200");
+  await sleep(200);
+  const dicts = () => [...doc.querySelectorAll("#history .h-item")].filter((li) => !li.classList.contains("h-meeting"));
+  const before = dicts().length, first = dicts()[0];
+  first.querySelector(".h-del").click(); await sleep(30);
+  check(first.hidden && doc.querySelector("#toast .toast-btn").textContent === "Undo", "Delete hides the row and offers Undo");
+  doc.querySelector("#toast .toast-btn").click(); await sleep(300);
+  check(!first.hidden && !window.__deletedDictation, "Undo brings it back, nothing deleted");
+  first.querySelector(".h-del").click(); await sleep(450);
+  check(window.__deletedDictation && dicts().length === before - 1, "without Undo it's deleted for good");
 }
 { // Settings > Speech models (dictado-z4q)
   const { window, doc } = await load("page=ajustes");

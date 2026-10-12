@@ -220,7 +220,7 @@ def _load(name, cfg, start, factory, resolve, d, cache=None):
 
 def run(session_dir: Path, cfg: TranscribeCfg, factory=_default_factory, resolve=None,
         decode=_decode, clock=time.monotonic, cache: dict | None = None, prompt: str | None = None,
-        speech=_speech) -> int:
+        speech=_speech, replacements: dict | None = None) -> int:
     d = Path(session_dir)
     resolve = resolve or _resolve_for(factory)
     cache = {} if cache is None else cache
@@ -267,6 +267,9 @@ def run(session_dir: Path, cfg: TranscribeCfg, factory=_default_factory, resolve
                 log.error("GPU error at %.1f s (%s); reloading with the next fallback", offset, e)
                 model, step = _load(name, cfg, step + 1, factory, resolve, d, cache)
         segs = segclean.clean_segments(segs)
+        if replacements:  # the Replace list (dictado-b7u)
+            from .text import replacements as replace_all
+            segs = [{**s, "text": replace_all(s["text"], replacements)} for s in segs]
         _write_json(d / "transcript.json", {"segments": segs, "lang": lang, "model": name})
         sessions.write_meta(d, status="done", duration_s=round(total, 2), lang_used=lang)
         export.write_all(d)
@@ -307,4 +310,5 @@ def main(session_dir: str) -> int:
     full = config.load(paths.config_path())
     from .calendar_ics import session_words
     from .text import vocab_prompt
-    return run_session(d, full.transcribe, prompt=vocab_prompt(session_words(d, full.text.vocabulary)))
+    return run_session(d, full.transcribe, prompt=vocab_prompt(session_words(d, full.text.vocabulary)),
+                       replacements=dict(full.text.replacements))

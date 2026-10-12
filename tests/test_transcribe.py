@@ -255,3 +255,13 @@ def test_meeting_session_without_mix_refuses_to_guess(tmp_path):
         (d / "audio" / name).write_bytes(b"")
     with pytest.raises(FileNotFoundError):
         transcribe.audio_file(d)
+
+
+def test_the_replace_list_reaches_the_transcript(tmp_path):
+    """dictado-b7u: meetings and files get the Replace list too."""
+    d, audio = make_session(tmp_path, "sv")
+    t = iter(range(0, 10_000, 2))
+    assert transcribe.run(d, TranscribeCfg(compute_type="float16"), factory=Factory(), resolve=resolve,
+                          decode=lambda p: audio, clock=lambda: next(t), replacements={"hola": "Hej"}) == 0
+    segs = json.loads((d / "transcript.json").read_text(encoding="utf-8"))["segments"]
+    assert segs and all(s["text"] == "Hej" for s in segs)

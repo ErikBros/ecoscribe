@@ -62,7 +62,7 @@ function demoApi() {
   let settings = {
     values: { hotkey: "rctrl", mic: "Anker PowerConf", languages: "en", sounds: true, overlay: true, live_text: true, insights: params.get("insights") === "1", speech_feedback: false, unmute: true, startup: true,
       meet_mode: "prompt", meet_lang: "sv", on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: false, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true,
-      snippets: [{ trigger: "my email", text: "alex@example.com" }] },
+      snippets: [{ trigger: "my email", text: "alex@example.com" }], replacements: [{ heard: "poll request", write: "pull request" }] },
     options: {
       hotkeys: [{ value: "rctrl", label: "Right Ctrl (recommended)" }, { value: "scrolllock", label: "Scroll Lock" }, { value: "pause", label: "Pause" }, { value: "f13", label: "F13" }],
       mics: [{ value: "", label: DEFAULT_MIC }, { value: "Headset (Zone Vibe 100)", label: "Zone Vibe 100" }, { value: "Anker PowerConf", label: "Anker PowerConf C20" }],
@@ -164,6 +164,12 @@ function demoApi() {
     copy_text: async () => ({ ok: true }),
     get_insights: async (days) => { const d = demoInsights(days); if (window.__wpm) d.totals.typing_wpm = window.__wpm; return d; },
     set_typing_wpm: async (n) => { window.__wpm = Math.max(10, Math.min(200, Math.round(n) || 40)); return { ok: true, typing_wpm: window.__wpm }; },
+    delete_dictation: async (id, ts) => {
+      const i = history.findIndex((x) => (id ? x.id === id : x.ts === ts));
+      if (i >= 0) history.splice(i, 1);
+      window.__deletedDictation = id || ts;
+      return { ok: true, gone: i >= 0 };
+    },
     add_word: async (w) => { settings.values.vocabulary += "\n" + w; window.__added = w; return { ok: true }; },
     insights_for_claude: async () => ({ ok: true, chars: 5120 }),
     coach_me: async () => ({ ok: true, chars: 3900 }),
@@ -218,6 +224,20 @@ function toast(msg, ms = 2600) {
   el.hidden = false;
   clearTimeout(toast._t);
   toast._t = setTimeout(() => (el.hidden = true), ms);
+}
+const UNDO_MS = Number(params.get("undo_ms")) || 5000;  // smoke tests wait less
+function toastUndo(msg, onUndo, ms = UNDO_MS) {  // a toast with Undo (dictado-vfo); false when it times out
+  const el = $("#toast");
+  el.textContent = msg + " ";
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "toast-btn"; b.textContent = "Undo";
+  el.append(b);
+  el.hidden = false;
+  clearTimeout(toast._t);
+  return new Promise((done) => {
+    b.onclick = () => { clearTimeout(toast._t); el.hidden = true; onUndo(); done(true); };
+    toast._t = setTimeout(() => { el.hidden = true; done(false); }, ms);
+  });
 }
 function prettyMic(n) {
   const m = /^[^(]*\((.+?)\)?$/.exec(n || "");
@@ -457,6 +477,8 @@ async function renderInsights() {
   columns($("#i-hours"), d.rhythm.hours.map((v, h) => ({ value: v, label: String(h).padStart(2, "0"), dim: v < peak,
     tipValue: `${v} ${v === 1 ? "dictation" : "dictations"}`, tipLabel: `${String(h).padStart(2, "0")}:00-${String((h + 1) % 24).padStart(2, "0")}:00` })),
     (i) => i % 6 === 0);
+  const busy = d.rhythm.hours.indexOf(peak), hh = (h) => `${String(h % 24).padStart(2, "0")}:00`;  // dictado-7qo
+  $("#i-hours-note").textContent = `The dark bar is your busiest hour, ${hh(busy)}-${hh(busy + 1)}.`;
   const n = d.rhythm.days.length;
   columns($("#i-days"), d.rhythm.days.map((x, i) => {
     const dt = new Date(x.date + "T12:00:00");
@@ -466,8 +488,9 @@ async function renderInsights() {
   }), (i) => i === 0 || i === n - 1 || i === Math.floor((n - 1) / 2));
   const lw = d.languages.reduce((a, x) => a + x.words, 0) || 1;
   hbars($("#i-langs"), d.languages.map((x) => ({ name: langName(x.lang), value: x.words,
-    label: `${fmtNum(x.words)} · ${Math.round(100 * x.words / lw)}%` })));
-  hbars($("#i-apps"), d.apps.map((x) => ({ name: appName(x.app), value: x.dictations, label: fmtNum(x.dictations) })));
+    label: `${fmtNum(x.words)} ${x.words === 1 ? "word" : "words"} · ${Math.round(100 * x.words / lw)}%` })));
+  hbars($("#i-apps"), d.apps.map((x) => ({ name: appName(x.app), value: x.dictations,
+    label: `${fmtNum(x.dictations)} ${x.dictations === 1 ? "dictation" : "dictations"}` })));
   const hab = $("#i-habits"); hab.textContent = "";
   for (const h of d.habits) {
     const row = document.createElement("div"); row.className = "i-habit";
@@ -993,6 +1016,10 @@ async function renderHistory() {
     btn.className = "btn btn-ghost btn-sm h-copy"; btn.textContent = "Copy";
     btn.onclick = () => copy(r.text, btn);
     btns.append(btn);
+    const del = document.createElement("button");  // dictado-vfo
+    del.className = "btn btn-ghost btn-sm h-copy h-del"; del.textContent = "Delete"; del.title = "Delete this dictation";
+    del.onclick = () => deleteDictation(r, li);
+    btns.append(del);
     li.append(t, p, btns, meta);
     group.append(li);
   }
@@ -1003,6 +1030,16 @@ async function renderHistory() {
   $("#history-count").textContent = count;
   $("#history-sub").textContent = count ? count + " · kept on this computer" : "";
   $("#history-clear").hidden = !h.stats.total;
+}
+
+/* History > Delete (dictado-vfo): the row goes at once; the line and its audio after a few seconds to Undo. */
+async function deleteDictation(r, li) {
+  li.hidden = true;
+  const undone = await toastUndo("Dictation deleted.", () => { li.hidden = false; });
+  if (undone) return;
+  const res = await api.delete_dictation(r.id || "", r.id ? "" : r.ts);
+  if (!res.ok) { li.hidden = false; toast(res.error || "Couldn't delete it."); return; }
+  renderHistory();
 }
 
 /* History > Retry (dictado-a2r): transcribe a recent dictation again, by itself or in a language.
@@ -1091,6 +1128,8 @@ function formValues() {
     snippets: $$(".snip").map((r) => ({ trigger: $(".snip-trigger", r).value.trim().toLowerCase().replace(/\s+/g, " "),
                                        text: $(".snip-text", r).value }))
       .filter((x) => x.trigger && x.text.trim()),
+    replacements: $$(".rep").map((r) => ({ heard: $(".rep-heard", r).value.trim(), write: $(".rep-write", r).value.trim() }))
+      .filter((x) => x.heard && x.write),
   };
 }
 // Languages you dictate in (dictado-ehs): English + Swedish built in; "Add a language" for the rest.
@@ -1138,6 +1177,18 @@ function snipRow(trigger = "", text = "") {
   $(".snip-trigger", row).value = trigger; $(".snip-text", row).value = text;
   $(".snip-del", row).onclick = () => { row.remove(); dirty(); };
   $("#snips").append(row);
+  return row;
+}
+function repRow(heard = "", write = "") {  // Replace: heard -> write (dictado-b7u)
+  const row = document.createElement("div");
+  row.className = "rep";
+  row.innerHTML = `<input class="rep-heard rep-input" placeholder="poll request" maxlength="60" spellcheck="false" aria-label="When it writes">
+    <span class="rep-arrow" aria-hidden="true">→</span>
+    <input class="rep-write rep-input" placeholder="pull request" maxlength="200" spellcheck="false" aria-label="Write instead">
+    <button type="button" class="btn btn-ghost btn-sm snip-del" title="Remove this replacement">Remove</button>`;
+  $(".rep-heard", row).value = heard; $(".rep-write", row).value = write;
+  $(".snip-del", row).onclick = () => { row.remove(); dirty(); };
+  $("#reps").append(row);
   return row;
 }
 function fillSelect(sel, options, value) {
@@ -1222,6 +1273,9 @@ async function renderSettings() {
   $("#snips").innerHTML = "";
   for (const x of s.values.snippets || []) snipRow(x.trigger, x.text);
   $("#snip-add").onclick = () => { $(".snip-trigger", snipRow()).focus(); };
+  $("#reps").innerHTML = "";
+  for (const x of s.values.replacements || []) repRow(x.heard, x.write);
+  $("#rep-add").onclick = () => { $(".rep-heard", repRow()).focus(); };
   $("#f-speakers").checked = s.values.speakers && s.speakers_addon;
   $("#f-speakers").disabled = !s.speakers_addon;
   $("#f-speakers-help").textContent = s.speakers_addon
@@ -1693,7 +1747,7 @@ async function boot() {
   secShow(store("ecoscribe.set-sec") || "dictation");
   window.__secShow = secShow;
   $("#settings").addEventListener("change", dirty);
-  $("#settings").addEventListener("input", (e) => { if (e.target.id === "f-vocabulary" || e.target.id === "f-calendar" || e.target.closest(".snip")) dirty(); });  // savebar while typing words
+  $("#settings").addEventListener("input", (e) => { if (e.target.id === "f-vocabulary" || e.target.id === "f-calendar" || e.target.closest(".snip") || e.target.closest(".rep")) dirty(); });  // savebar while typing words
   $("#settings").addEventListener("submit", (e) => e.preventDefault());
   $("#save").onclick = save;
   $("#discard").onclick = renderSettings;

@@ -75,6 +75,7 @@ class TextCfg:
     # names on the window you dictate into go in that dictation's prompt (t0u.27: names right
     # 77 % -> 87 % on real speech, no time cost; read locally through UI Automation)
     screen_names: bool = True
+    replacements: dict = field(default_factory=dict)  # dictado-b7u: heard -> written, anywhere ("poll request" -> "pull request")
     snippets: dict = field(default_factory=dict)  # t0u.29: spoken trigger -> saved text ("my email" -> ...)
 
 
