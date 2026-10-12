@@ -1374,7 +1374,9 @@ async function paintSummary() {
     ["Dictation key", `${sx.hold ? "Hold" : "Tap"} <kbd class="key">${sKey()}</kbd>`],
     ["Microphone", micLabel],
   ];
-  $("#s-summary").innerHTML = rows.map(([k, v]) => `<div class="s-row"><div class="s-row-text"><strong>${k}</strong><span class="muted small">${v}</span></div><span class="s-ok">✓</span></div>`).join("");
+  const off = info.permissions.filter((x) => !x.granted).map((x) => x.label);  // Mac: the key stays dead without them
+  if (off.length) rows.push(["Permissions", `Still off: ${off.join(", ")}. Turn them on in System Settings.`, false]);
+  $("#s-summary").innerHTML = rows.map(([k, v, ok = true]) => `<div class="s-row"><div class="s-row-text"><strong>${k}</strong><span class="muted small">${v}</span></div>${ok ? '<span class="s-ok">✓</span>' : ""}</div>`).join("");
 }
 
 async function leaveStep(step) {  // save what this step changed; false keeps you on it

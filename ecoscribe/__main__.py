@@ -442,7 +442,10 @@ def main(argv=None) -> int:
                 log.info("macOS permission granted: %s (still missing: %s)", ", ".join(got) or "-",
                          ", ".join(missing) or "none")
                 if not hook.ok and st.get("accessibility") and st.get("input"):
-                    ui.flash("Permissions on: quit and reopen Ecoscribe to use the key")  # a key tap starts only at launch
+                    # a key tap starts only at launch: come back with one, so the first-run setup's "Try your first
+                    # dictation" works right after the switches go on (dictado-zpz Mac run)
+                    log.info("dictation permissions on without a key tap: restarting to install it")
+                    root.after(0, restart)
             permissions.watch(changed)
         threading.Thread(target=_permissions, name="ecoscribe-permissions", daemon=True).start()
 
