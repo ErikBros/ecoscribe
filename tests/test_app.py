@@ -195,9 +195,20 @@ def test_no_speech_flashes(tmp_path):
             return Result(text="", lang="en", speech_s=0.0, ms=5)
     app, out = make(tmp_path, eng=Silent())
     app.on_action("toggle"); app.on_action("toggle")
-    assert wait(lambda: "Didn't hear you" in flashes(app))
+    assert wait(lambda: any(f.startswith("Didn't hear you") for f in flashes(app)))
     assert out == []
+    assert not [e for e in app.ui.events if e[0] == "prompt"]  # once: just the pill
+    app.on_action("toggle"); app.on_action("toggle")
+    assert wait(lambda: [e for e in app.ui.events if e[0] == "prompt"])  # twice in a row: the box with a fix
+    kind, mic = [e for e in app.ui.events if e[0] == "prompt"][0][1:3]
+    assert kind == "nomic" and mic
     app.shutdown()
+
+
+def test_mic_label():
+    from ecoscribe.app import _mic_label
+    assert _mic_label("Microphone (Anker PowerConf C20") == "Anker PowerConf C20"
+    assert _mic_label("Built-in Microphone") == "Built-in Microphone" and _mic_label("") == ""
 
 
 def test_short_flashes(tmp_path):
