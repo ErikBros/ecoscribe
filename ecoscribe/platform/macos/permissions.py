@@ -60,6 +60,55 @@ def watch(on_change, interval: float = 15.0, stop=None, check=status) -> None:
             return
 
 
+_asked: set[str] = set()
+
+
+def _mic_status() -> int | None:
+    """AVAuthorizationStatus: 0 not determined, 1 restricted, 2 denied, 3 authorized."""
+    try:
+        import AVFoundation as AV
+        return int(AV.AVCaptureDevice.authorizationStatusForMediaType_(AV.AVMediaTypeAudio))
+    except Exception:
+        return None
+
+
+def can_ask(key: str) -> bool:
+    """True while macOS can still show its own prompt for `key`. Until an app has asked, it isn't
+    listed in that Settings pane at all, so "Open settings" would lead nowhere (dictado-zpz)."""
+    if key == "microphone":
+        return _mic_status() == 0  # not determined
+    return key in PANES and key not in _asked
+
+
+def ask(key: str) -> None:
+    """macOS's own prompt for `key`; it also adds Ecoscribe to that Settings pane."""
+    _asked.add(key)
+    if key == "microphone":
+        import AVFoundation as AV
+        AV.AVCaptureDevice.requestAccessForMediaType_completionHandler_(AV.AVMediaTypeAudio, lambda ok: None)
+    elif key == "accessibility":
+        from ApplicationServices import AXIsProcessTrustedWithOptions, kAXTrustedCheckOptionPrompt
+        AXIsProcessTrustedWithOptions({kAXTrustedCheckOptionPrompt: True})
+    elif key == "input":
+        import Quartz
+        Quartz.CGRequestListenEventAccess()
+    elif key == "audio":
+        import Quartz
+        Quartz.CGRequestScreenCaptureAccess()
+
+
+def ask_or_open(key: str) -> str:
+    """The setup's button: macOS's prompt the first time, the Settings pane after that."""
+    if can_ask(key):
+        try:
+            ask(key)
+            return "asked"
+        except Exception:
+            pass
+    open_pane(key)
+    return "opened"
+
+
 def open_pane(key: str) -> None:
     import subprocess
     subprocess.Popen(["open", PANES[key][1]])
