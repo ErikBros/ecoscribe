@@ -724,15 +724,15 @@ class Api:
         if sys.platform == "darwin":
             from .platform.macos import permissions
             st = permissions.status()
-            perms = [{"key": k, "label": permissions.PANES[k][0], "granted": bool(st.get(k))} for k in permissions.DICTATION]
+            perms = [{"key": k, "label": permissions.PANES[k][0], "granted": bool(st.get(k)),
+                      "ask": not st.get(k) and permissions.can_ask(k)} for k in permissions.DICTATION]
         return {"models": rows, "permissions": perms}
 
     def open_permission(self, key: str) -> dict:
         if sys.platform == "darwin":
             from .platform.macos import permissions
             if key in permissions.PANES:
-                permissions.open_pane(key)
-                return {"ok": True}
+                return {"ok": True, "did": permissions.ask_or_open(key)}
         return {"ok": False}
 
     def setup_models_start(self, names: list) -> dict:

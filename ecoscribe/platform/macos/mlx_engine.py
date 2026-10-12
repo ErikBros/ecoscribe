@@ -94,9 +94,38 @@ def _repo_total(repo: str) -> int | None:
         return None
 
 
-def _hf_snapshot(repo: str, cache_dir=None) -> str:
+def _hf_snapshot(repo: str, cache_dir=None, on_bytes=None) -> str:
     from huggingface_hub import snapshot_download
-    return snapshot_download(repo, cache_dir=cache_dir)
+    if on_bytes is None:
+        return snapshot_download(repo, cache_dir=cache_dir)
+    return snapshot_download(repo, cache_dir=cache_dir, tqdm_class=_byte_counter(on_bytes))
+
+
+# snapshot_download's own byte bars (huggingface_hub 1.x): bytes off the network (xet) and bytes written
+_BYTE_BARS = ("huggingface_hub.snapshot_download.transfer", "huggingface_hub.snapshot_download")
+
+
+def _byte_counter(on_bytes):
+    """A silent tqdm for snapshot_download(tqdm_class=...) that reports its byte bars as they move.
+    Xet keeps a file's bytes off disk until it reconstructs it, so the disk alone sat at 0 MB for ~2 min
+    on the 3 GB model while the network was busy (dictado-zpz Mac run)."""
+    import io
+
+    from huggingface_hub.utils import tqdm as hf_tqdm
+
+    class Counter(hf_tqdm):
+        def __init__(self, *args, **kw):
+            self._eco_bar = kw.get("name") if kw.get("unit") == "B" and kw.get("name") in _BYTE_BARS else None
+            self._eco_n = 0
+            kw["file"] = io.StringIO()
+            super().__init__(*args, **kw)
+
+        def update(self, n=1):
+            if self._eco_bar:
+                self._eco_n += int(n or 0)
+                on_bytes(self._eco_bar, self._eco_n)
+            return super().update(n)
+    return Counter
 
 
 def ensure_mlx(repo: str, local_files_only: bool = False, progress=None, download=_hf_snapshot,
@@ -121,15 +150,20 @@ def ensure_mlx(repo: str, local_files_only: bool = False, progress=None, downloa
     size = total(repo)
     blobs = _blobs(repo, cache_dir)
     stop = threading.Event()
+    bars: dict[str, int] = {}
 
-    def poll():  # finished blobs + the .incomplete ones being written
+    def done() -> int:  # the furthest of: files on disk, bytes off the network, bytes written
+        n = max([_bytes(blobs), *bars.values()])
+        return min(n, size - 1) if size else n  # the end is reported by finish(), with the real size
+
+    def poll():
         while not stop.wait(1.0):
-            progress(_bytes(blobs), size)
-    progress(_bytes(blobs), size)
+            progress(done(), size)
+    progress(done(), size)
     t = threading.Thread(target=poll, name="mlx-model-progress", daemon=True)
     t.start()
     try:
-        path = download(repo, cache_dir=cache_dir)
+        path = download(repo, cache_dir=cache_dir, on_bytes=bars.__setitem__)
     finally:
         stop.set()
         t.join()
