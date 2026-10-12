@@ -1,8 +1,9 @@
-"""No personal data in the repo: nothing the user dictated may appear in a file here or in an
-unpushed commit message (the repo is public; tickets in .beads/issues.jsonl too).
+"""No personal data in the repo: nothing the user dictated or said in a recorded meeting may appear
+in a file here or in an unpushed commit message (the repo is public; tickets in .beads/issues.jsonl too).
 
-Runs where a real dictation history exists (the developer's computer) and checks every 6-word piece
-of every dictation against the working tree. The scripted sentences of the test recordings
+Runs where a real dictation history or meeting transcripts exist (the developer's computer) and checks
+every 6-word piece of them against the working tree. Short meeting lines are checked joined, the way
+they read in an export (dictado-ay2: lines of a real call once went into a test). The scripted sentences of the test recordings
 (tools/make_fixtures.py, tests/fixtures) are allowed: test runs dictate them. In CI there is no
 history, so it skips.
 """
@@ -49,6 +50,19 @@ def _history() -> list[str]:
     return [t for t in texts if t.strip()]
 
 
+def _transcripts() -> list[str]:
+    """Meeting and file transcripts, one text per recording (lines joined: a test may quote a turn)."""
+    d = Path(os.environ.get("ECOSCRIBE_PERSONAL_DIR") or paths.data_dir()) / "transcripts"
+    out = []
+    for f in d.glob("*/transcript.json"):
+        try:
+            segs = json.loads(f.read_text(encoding="utf-8")).get("segments", [])
+            out.append(" ".join(str(x.get("text", "")) for x in segs))
+        except (OSError, ValueError, AttributeError):
+            pass
+    return [t for t in out if t.strip()]
+
+
 def _repo_text() -> str:
     out = []
     for root, dirs, files in os.walk(REPO):
@@ -70,14 +84,14 @@ def _repo_text() -> str:
     return _norm("\n".join(out))
 
 
-def test_no_dictation_text_in_the_repo():
-    texts = _history()
+def test_no_dictation_or_meeting_text_in_the_repo():
+    texts = _history() + _transcripts()
     if not texts:
-        pytest.skip("no dictation history on this computer (CI): nothing to compare")
+        pytest.skip("no dictation history or transcripts on this computer (CI): nothing to compare")
     allowed = set()
     for f in [REPO / "tools" / "make_fixtures.py", *(REPO / "tests" / "fixtures").glob("*.txt")]:
         allowed |= _pieces(f.read_text(encoding="utf-8", errors="ignore"))
     mine = set().union(*(_pieces(t) for t in texts)) - allowed
     repo = _repo_text()
     leaked = sorted(p for p in mine if p in repo)
-    assert not leaked, f"{len(leaked)} piece(s) of real dictations are in the repo (first: {leaked[0]!r}): remove them"
+    assert not leaked, f"{len(leaked)} piece(s) of real dictations or meetings are in the repo (first: {leaked[0]!r}): remove them"
