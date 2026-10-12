@@ -60,11 +60,25 @@ def meeting_view(state: dict, now: float, line: str | None, width: int = 44) -> 
     if not m:
         return None
     if m.get("status") in ("stopping", "finalizing"):
-        return {"label": "Saving…", "line": "", "busy": True}
+        return {"label": "Saving…", "short": "Saving…", "line": "", "busy": True}
     line = (line or "").strip()
     if len(line) > width:
         line = "…" + line[-(width - 1):].lstrip()
-    return {"label": f"Taking notes {_elapsed(m.get('started'), now)}", "line": line, "busy": False}
+    t = _elapsed(m.get("started"), now)
+    return {"label": f"Taking notes {t}", "short": t, "line": line, "busy": False}
+
+
+HOVER_MARGIN = 8
+
+
+def hovering(cursor, rect, margin: int = HOVER_MARGIN) -> bool:
+    """Is the mouse over the pill? The meeting pill is a small chip (dot + timer) that opens to the
+    live line while the mouse is on it (dictado-z4j). `rect` is the pill as drawn now: the open pill
+    stays open while the mouse is anywhere on it, so it doesn't flicker at the chip's edge."""
+    if not cursor or not rect:
+        return False
+    (x, y), (l, t, r, b) = cursor, rect
+    return l - margin <= x <= r + margin and t - margin <= y <= b + margin
 
 
 def pill_layer(dictation_mode: str, view: dict | None) -> str:
