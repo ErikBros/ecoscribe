@@ -91,8 +91,10 @@ def _copy(text: str) -> None:
 
 class Api:
     def __init__(self, data_dir: Path | None = None, config_path: Path | None = None, startup_mod=None,
-                 signal_reload=None, list_mic_names=None, copy=None, send_command=None, downloads=None):
+                 signal_reload=None, list_mic_names=None, copy=None, send_command=None, downloads=None,
+                 page: str | None = None):
         from . import startup as _startup
+        self._page = page
         self._data_dir = Path(data_dir) if data_dir else paths.data_dir()
         self._config_path = Path(config_path) if config_path else paths.config_path()
         self._startup = startup_mod or _startup
@@ -104,6 +106,11 @@ class Api:
         self._mic = None  # (recorder, gate) during the mic check
         import threading
         self._mic_lock = threading.Lock()
+
+    def initial_page(self) -> str | None:
+        """The page to open on. Not a ?page= query: WebView2 on Windows takes index.html?page=x for a
+        missing file ("File not found"), which is how the first-run window used to open."""
+        return self._page
 
     # ---------------- status ----------------
     def get_status(self) -> dict:
@@ -798,8 +805,8 @@ def main(page: str | None = None) -> int:
         ipc.focus_ui()
         return 0
     import webview
-    api = Api()
-    url = (web_dir() / "index.html").as_uri() + (f"?page={page}" if page else "")
+    api = Api(page=page)
+    url = (web_dir() / "index.html").as_uri()
     win = webview.create_window(ipc.UI_TITLE, url, js_api=api, width=980, height=720, min_size=(820, 560),
                                 background_color=P.PAPER, text_select=True)
     win.events.closed += lambda: api.mic_test_stop()

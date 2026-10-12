@@ -218,3 +218,14 @@ def test_tree_bytes_follows_links_once(tmp_path):
     except OSError:
         pytest.skip("no symlink privilege")
     assert models._tree_bytes(blobs) == 520
+
+
+def test_mac_model_without_mlx_conversion_uses_the_ct2_mirror(tmp_path, monkeypatch):
+    import types
+    monkeypatch.setattr(models.sys, "platform", "darwin")
+    fake = types.SimpleNamespace(mlx_repo=lambda name: None, ensure_mlx=lambda *a, **k: pytest.fail("no mlx path"))
+    monkeypatch.setattr(models, "_mlx", lambda: fake)
+    src = make_src(tmp_path)
+    out = models.prepare("KBLab/kb-whisper-large", root=tmp_path / "models", download=lambda name, **kw: str(src))
+    assert (out / "model.bin").exists()
+    assert models.is_ready("KBLab/kb-whisper-large", root=tmp_path / "models")
