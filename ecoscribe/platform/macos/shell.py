@@ -604,16 +604,27 @@ def menu_icon(state: str):
 
 
 def _template_mic():
-    """Black mic glyph on transparent (the circle's mic, without the disc)."""
-    from ...icon import mic_image
-    img = mic_image(64, bg=P.INK, fg=P.PAPER, shape="circle").convert("RGBA")
+    """The logo as a menu-bar template: black on transparent, cropped to the mark so it fills the
+    18 pt slot like other menu-bar icons (dictado-6oe.1). The three lines and the clay dot all become
+    the glyph; uncropped, the circle's padding left a tiny "≡" that read as a generic menu button."""
+    from PIL import Image
+
+    from ...icon import mark_image
+    img = mark_image(192, bg=P.INK, fg=P.PAPER, shape="circle", dot=True).convert("RGBA")
+    ink = P.rgb(P.INK)
     px = img.load()
     for y in range(img.size[1]):
         for x in range(img.size[0]):
             r, g, b, a = px[x, y]
-            light = (r + g + b) / 3 > 160  # the paper-coloured glyph
-            px[x, y] = (0, 0, 0, a if light else 0)
-    return img
+            far = abs(r - ink[0]) + abs(g - ink[1]) + abs(b - ink[2])  # anything that isn't the disc
+            px[x, y] = (0, 0, 0, int(255 * min(1, max(0, far - 40) / 100)) if a == 255 else 0)  # not the disc or its rim
+    box = img.getbbox()
+    glyph = img.crop(box)
+    side = max(glyph.size)
+    pad = int(side * 0.06)
+    out = Image.new("RGBA", (side + 2 * pad, side + 2 * pad), (0, 0, 0, 0))
+    out.paste(glyph, (pad + (side - glyph.size[0]) // 2, pad + (side - glyph.size[1]) // 2))
+    return out.resize((72, 72), Image.LANCZOS)
 
 
 class _MenuDelegate(NSObject):
