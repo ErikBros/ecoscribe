@@ -173,3 +173,59 @@ def test_models_root_reuses_existing_default_mirror(tmp_path, monkeypatch):
     out = models.for_transcribe("large-v3-turbo", TranscribeCfg(models_root=str(tmp_path / "E")),
                                 download=lambda n, cache_dir=None: pytest.fail("downloaded again"))
     assert out == default
+
+
+def test_setup_models_needed_one_is_required_by_the_languages():
+    from ecoscribe.config import WhisperCfg
+    w = WhisperCfg()
+    fast, big = models.setup_models(w, ["en"])
+    assert (fast["name"], fast["required"]) == (w.model, True)
+    assert (big["name"], big["required"]) == (w.sv_model, False)
+    fast, big = models.setup_models(w, ["en", "sv"])  # Swedish runs dictation on large-v3
+    assert (fast["required"], big["required"]) == (False, True)
+    assert fast["size"] < big["size"]
+
+
+def test_prepare_reports_progress_and_finishes(tmp_path, monkeypatch):
+    monkeypatch.setattr(models.sys, "platform", "win32")
+    src = make_src(tmp_path)
+    seen = []
+    out = models.prepare("large-v3-turbo", progress=lambda d, t: seen.append((d, t)),
+                         root=tmp_path / "models", download=lambda name, **kw: str(src))
+    assert (out / "model.bin").exists()
+    assert seen[-1][0] == seen[-1][1] > 0
+    assert models.is_ready("large-v3-turbo", root=tmp_path / "models")
+    assert not models.is_ready("Systran/faster-whisper-large-v3", root=tmp_path / "models")
+
+
+def test_short_names_download_with_progress_through_the_repo(monkeypatch):
+    calls = []
+    monkeypatch.setattr(models, "_snapshot", lambda repo, progress=None, cache_dir=None: calls.append(repo) or "/x")
+    assert models._hf_download("large-v3-turbo", progress=lambda d, t: None) == "/x"
+    assert calls and "turbo" in calls[0]
+
+
+def test_tree_bytes_follows_links_once(tmp_path):
+    shared = tmp_path / "shared"
+    shared.mkdir()
+    (shared / "big").write_bytes(b"x" * 500)
+    blobs = tmp_path / "blobs"
+    blobs.mkdir()
+    (blobs / "small").write_bytes(b"y" * 20)
+    try:
+        (blobs / "big").symlink_to(shared / "big")  # huggingface_hub 1.x: a finished file moves, a link stays
+        (blobs / "big2").symlink_to(shared / "big")
+    except OSError:
+        pytest.skip("no symlink privilege")
+    assert models._tree_bytes(blobs) == 520
+
+
+def test_mac_model_without_mlx_conversion_uses_the_ct2_mirror(tmp_path, monkeypatch):
+    import types
+    monkeypatch.setattr(models.sys, "platform", "darwin")
+    fake = types.SimpleNamespace(mlx_repo=lambda name: None, ensure_mlx=lambda *a, **k: pytest.fail("no mlx path"))
+    monkeypatch.setattr(models, "_mlx", lambda: fake)
+    src = make_src(tmp_path)
+    out = models.prepare("KBLab/kb-whisper-large", root=tmp_path / "models", download=lambda name, **kw: str(src))
+    assert (out / "model.bin").exists()
+    assert models.is_ready("KBLab/kb-whisper-large", root=tmp_path / "models")

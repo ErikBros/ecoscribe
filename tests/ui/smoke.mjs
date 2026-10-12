@@ -134,7 +134,7 @@ async function load(query) {
   check(doc.querySelector("#stat-today").textContent === "152", "today stat");
   check(doc.querySelector("#last-text").textContent.startsWith("Can you check"), "last dictation shown");
   check(doc.querySelector(".nav-item.active").dataset.page === "inicio", "nav highlights inicio");
-  check(doc.querySelector("#welcome").hidden, "no welcome when done");
+  check(doc.querySelector("#setup").hidden, "no setup when done");
   check(errors.length === 0, "no JS errors: " + errors.join("; "));
 }
 { // stopped
@@ -292,18 +292,54 @@ async function load(query) {
   check(window.__notes?.["2026-10-05_1400_retro"]?.endsWith("- budget") && doc.querySelector("#r-notes-state").textContent === "Saved.", "typing saves the notes");
   check(box.value.endsWith("- budget"), "a live poll doesn't overwrite the notes");
 }
-{ // bienvenida
+{ // setup (dictado-zpz): every step on Windows, then the summary
   const { window, doc } = await load("page=bienvenida&welcome=1");
-  check(!doc.querySelector("#welcome").hidden, "welcome opens on first run");
-  const next = doc.querySelector("#w-next");
-  check(doc.querySelector('.wstep.on').dataset.step === "0", "step 1");
+  const on = () => doc.querySelector(".sstep.on")?.dataset.step;
+  const next = doc.querySelector("#s-next");
+  check(!doc.querySelector("#setup").hidden, "setup opens on first run");
+  check(on() === "languages", "Windows skips the permissions step");
+  check(doc.querySelectorAll("#s-bar span").length === 6, "progress bar has a segment per step");
+  doc.querySelector('#s-langs input[value="sv"]').click(); await sleep(20);
+  next.click(); await sleep(150);
+  check(on() === "models", "languages -> models");
+  const rows = doc.querySelectorAll("#s-models .s-row");
+  check(rows.length === 2 && rows[1].textContent.includes("Needed for your languages"), "Swedish makes the accurate model required");
+  check(rows[0].textContent.includes("Recommended"), "the other model is recommended");
+  check(next.disabled, "can't go on before the required model is there");
+  check(doc.querySelector("#s-download").textContent.includes("4.7 GB"), "download offers both models (4.7 GB)");
+  doc.querySelector("#s-download").click();
+  for (let i = 0; i < 40 && next.disabled; i++) await sleep(100);
+  check(!next.disabled && doc.querySelectorAll("#s-models .s-model.ready").length === 2, "both models download, then Continue");
   next.click(); await sleep(250);
-  check(doc.querySelector('.wstep.on').dataset.step === "1" && doc.querySelector("#w-mic-name").textContent.includes("Anker"), "step 2 shows the mic");
-  next.click(); await sleep(100);
-  check(next.textContent === "Start", "last step button says Start");
-  check(window.__ecoscribe && true, "api reachable");
-  next.click(); await sleep(100);
-  check(doc.querySelector("#welcome").hidden && !doc.querySelector("#page-inicio").hidden, "welcome closes to inicio");
+  check(on() === "mic" && doc.querySelector("#s-mic").options.length > 1, "mic step lists the mics");
+  await sleep(400);
+  check(doc.querySelectorAll("#s-bars i.on").length > 0, "mic bars light up");
+  next.click(); await sleep(150);
+  check(on() === "shortcut" && doc.querySelector("#s-key").textContent === "Right Ctrl", "key step shows the key");
+  doc.querySelector('input[name="s-mode"][value="hold"]').click();
+  next.click(); await sleep(150);
+  check(on() === "try" && doc.querySelector("#s-try-sub").textContent.startsWith("Hold Right Ctrl"), "try step uses the chosen mode");
+  const box = doc.querySelector("#s-try-box");
+  box.value = "Testing one two three."; box.dispatchEvent(new window.Event("input", { bubbles: true }));
+  check(!doc.querySelector("#s-try-ok").hidden, "text in the box says it works");
+  next.click(); await sleep(150);
+  const sum = doc.querySelector("#s-summary").textContent;
+  check(on() === "done" && sum.includes("Swedish") && sum.includes("Hold") && sum.includes("Most accurate"), "summary lists languages, key and models");
+  check(next.textContent === "Start using Ecoscribe", "last button");
+  next.click(); await sleep(150);
+  check(doc.querySelector("#setup").hidden && !doc.querySelector("#page-inicio").hidden, "setup closes to Home");
+  doc.querySelector("#setup-again").click(); await sleep(200);
+  check(!doc.querySelector("#setup").hidden && on() === "languages", "Run setup again reopens it");
+}
+{ // setup on the Mac starts with the permissions
+  const { window, doc } = await load("page=bienvenida&welcome=1&mac=1");
+  check(doc.querySelector(".sstep.on")?.dataset.step === "permissions", "Mac starts with permissions");
+  check(doc.querySelectorAll("#s-perms .s-row").length === 3 && doc.querySelector("#s-perms").textContent.includes("✓ On"), "three permissions, granted ones ticked");
+  doc.querySelector("#s-perms [data-perm]").click(); await sleep(20);
+  check(window.__perm === "accessibility", "Open settings opens that pane");
+  check(doc.querySelector("#s-done-sub").textContent.includes("menu bar"), "Mac wording on the last step");
+  doc.querySelector("#s-skip").click(); await sleep(100);
+  check(doc.querySelector("#setup").hidden, "Skip setup closes it");
 }
 console.log(failed ? `\n${failed} FAILED` : "\nall ok");
 process.exit(failed ? 1 : 0);
