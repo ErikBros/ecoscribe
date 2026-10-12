@@ -324,10 +324,10 @@ select:hover { border-color: #d6d2c6; }
 .switch:checked::after { transform: translateX(18px); }
 .switch:disabled { opacity: .45; cursor: default; }
 .toggle-row { cursor: pointer; }
-.segmented { display: inline-flex; padding: 3px; margin: 4px 0 14px; border-radius: 10px; background: var(--paper); border: 1px solid var(--line); gap: 3px; }
-.seg { border: 0; background: none; padding: 7px 16px; border-radius: 7px; font-weight: 600; color: var(--ink-soft); cursor: pointer; }
+.segmented { display: inline-flex; padding: 4px; border-radius: 999px; background: #eeece6; gap: 2px; }
+.seg { border: 0; background: none; padding: 6px 14px; border-radius: 999px; font-weight: 600; color: var(--ink-soft); cursor: pointer; }
 .seg:hover { color: var(--ink); }
-.seg[aria-checked="true"] { background: var(--card); color: var(--aegean); box-shadow: 0 1px 3px rgba(35, 42, 51, .12); }
+.seg[aria-checked="true"] { background: var(--card); color: var(--ink); font-weight: 700; box-shadow: 0 1px 2px rgba(24, 33, 43, .08); }
 .savebar {
   position: fixed; left: calc(216px + 50% - 108px); bottom: 22px; transform: translateX(-50%);
   width: min(700px, calc(100vw - 216px - 48px)); display: flex; align-items: center; justify-content: space-between; gap: 16px;
@@ -467,14 +467,19 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border: 1px solid var(--
 .lang-add-row select { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); }
 
 /* ---------- insights (dictado-3je) ---------- */
-.i-hero { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; padding: 22px 24px; margin-bottom: 16px; }
-.i-hero-num { font: 600 52px/1 var(--font-display); letter-spacing: -.03em; color: var(--aegean); }
-.i-hero-label { font-weight: 600; margin-top: 4px; }
-.i-hero-main p { margin: 8px 0 0; max-width: 34ch; }
-.i-tiles { display: grid; grid-template-columns: repeat(2, minmax(110px, auto)); gap: 14px 28px; }
+.i-hero { display: grid; grid-template-columns: 1fr auto; gap: 28px; align-items: center; padding: 24px 28px; margin-bottom: 14px;
+  background: var(--ink); border-color: var(--ink); color: #f6f5f1; border-radius: 20px; }  /* dictado-6oe.6 */
+.i-hero-num { font: 800 52px/1 var(--font-display); letter-spacing: -.03em; color: #fff; }
+.i-hero-label { font-weight: 700; margin-top: 6px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #9db7cc; order: -1; }
+.i-hero-main { display: flex; flex-direction: column; }
+.i-hero-main p { margin: 10px 0 0; max-width: 40ch; color: #c9d2db !important; }
+.i-tiles { display: grid; grid-template-columns: repeat(2, minmax(110px, auto)); gap: 16px 32px; }
 .i-tile { display: flex; flex-direction: column; }
-.i-tile-label { font-size: 12.5px; color: var(--ink-soft); }
-.i-tile-value { font: 600 22px/1.2 var(--font-display); font-variant-numeric: tabular-nums; }
+.i-tile-label { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #9db7cc; }
+.i-tile-value { font: 800 24px/1.2 var(--font-display); font-variant-numeric: tabular-nums; color: #fff; }
+.i-week { display: flex; align-items: center; gap: 14px; padding: 14px 18px; margin-bottom: 14px; border-radius: 16px; background: var(--aegean-soft); color: #18405e; }
+.i-week svg { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.i-week > span { flex: 1; line-height: 1.5; }
 .i-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
 .i-card { padding: 18px 20px; margin-bottom: 16px; }
 .i-grid .i-card { margin-bottom: 0; min-width: 0; }

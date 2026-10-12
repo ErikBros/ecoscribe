@@ -105,6 +105,7 @@ async function load(query) {
   await sleep(50);
   check(!doc.querySelector("#nav-insights").hidden && !doc.querySelector("#page-insights").hidden, "Insights tab shown when switched on");
   check(doc.querySelector("#i-saved").textContent === "3 h 22 min", "time saved: " + doc.querySelector("#i-saved").textContent);
+  check(!doc.querySelector("#i-week").hidden && doc.querySelector("#i-week-text").textContent.includes("2.2 → 1.8"), "this week: hedges went down (dictado-6oe.6)");
   check(doc.querySelectorAll("#i-hours path.bar").length > 5 && doc.querySelectorAll("#i-days .tick").length === 3, "hour and day charts drawn");
   check(doc.querySelectorAll("#i-langs .i-hbar").length === 4 && doc.querySelector("#i-langs .i-hbar-name").textContent === "English", "languages by name");
   check(doc.querySelector("#i-habits").textContent.includes("3.1"), "filler words per 100");

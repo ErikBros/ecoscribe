@@ -416,6 +416,19 @@ function renderClarity(c) {  // dictado-9jc.1
   }
   if (!c.words.length) box.textContent = "None so far: every word came through clearly.";
 }
+function iWeek(m, coach) {  // the one-line "this week" from the hedges per week (dictado-6oe.6)
+  const box = $("#i-week");
+  const weeks = ((m && m.weeks) || []).filter((w) => w.hedges_per_100 != null);
+  box.hidden = weeks.length < 2;
+  if (box.hidden) return;
+  const [prev, last] = weeks.slice(-2), a = prev.hedges_per_100, b = last.hedges_per_100;
+  const top = (m.top_hedges || [])[0];
+  const dir = b < a ? "less" : b > a ? "more" : "as much as before";
+  $("#i-week-text").innerHTML = `<b>This week:</b> you hedged ${dir === "as much as before" ? dir : dir + ` in messages to people, ${a} → ${b} per 100 words`}.`
+    + (top ? ` <span></span>` : "");
+  if (top) $("#i-week-text span").textContent = `"${top.word}" is still the one you use most.`;
+  $("#i-week-coach").disabled = !(coach && coach.people);
+}
 async function renderInsights() {
   for (const b of $$("#i-range .seg")) b.setAttribute("aria-checked", String((b.dataset.days || null) === iDays));
   const d = await api.get_insights(iDays ? Number(iDays) : null);
@@ -460,6 +473,7 @@ async function renderInsights() {
   renderMarkers(d.markers);
   renderPace(d.pace);
   renderMeetings(d.meetings);
+  iWeek(d.markers, d.coach);
   const people = d.coach ? d.coach.people : 0;  // dictado-9jc.2
   $("#i-coach").disabled = !people;
   $("#i-coach").title = people ? `${people} ${people === 1 ? "message" : "messages"} to people in the last ${d.coach.days} days`
@@ -1637,6 +1651,7 @@ async function boot() {
   for (const b of $$(".nav-item")) b.onclick = () => { if (b.dataset.page === "reuniones") r.open = null; show(b.dataset.page); };
   try { $("#nav-insights").hidden = !(await api.get_settings()).values.insights; } catch {}
   for (const b of $$("#i-range .seg")) b.onclick = () => { iDays = b.dataset.days || null; renderInsights(); };
+  $("#i-week-coach").onclick = () => $("#i-coach").click();
   $("#i-coach").onclick = async () => {
     const r = await api.coach_me();
     toast(r.ok ? "Copied: paste it into Claude." : "Nothing dictated to people in the last two weeks yet.");
