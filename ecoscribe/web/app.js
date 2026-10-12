@@ -1474,7 +1474,8 @@ async function boot() {
   $("#f-mic").addEventListener("change", async () => { if (mic.on) { await micStop(); startMicTest(); } });
   setupWire();
 
-  const page = params.get("page");
+  let page = params.get("page");  // demo and screenshots; the real window asks Python (no query: see Api.initial_page)
+  if (!page && api.initial_page) { try { page = await api.initial_page(); } catch {} }
   await show(page === "bienvenida" ? "inicio" : page || "inicio");
   const w = await api.get_welcome();
   if (page === "bienvenida" || !w.done) openSetup();

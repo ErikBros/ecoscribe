@@ -316,3 +316,8 @@ def test_setup_models_error_is_reported(api, monkeypatch):
             break
         time.sleep(0.02)
     assert "no network" in p["error"]
+
+
+def test_initial_page_comes_from_python_not_the_url(tmp_path):
+    assert Api(data_dir=tmp_path, page="bienvenida").initial_page() == "bienvenida"
+    assert Api(data_dir=tmp_path).initial_page() is None

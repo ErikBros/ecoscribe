@@ -218,9 +218,9 @@ def _mlx():
 
 def is_ready(name: str, root: Path | None = None) -> bool:
     """True when `name` needs no download on this platform."""
-    if sys.platform == "darwin":
+    repo = _mlx().mlx_repo(name) if sys.platform == "darwin" else None
+    if repo:  # Mac: the mlx conversion; a model without one runs faster-whisper there too (mlx_engine.factory)
         m = _mlx()
-        repo = m.mlx_repo(name) or name
         if hasattr(m, "is_cached_mlx"):  # dictado-kuu
             return bool(m.is_cached_mlx(repo))
         try:
@@ -234,14 +234,13 @@ def is_ready(name: str, root: Path | None = None) -> bool:
 
 def prepare(name: str, progress=None, root: Path | None = None, download=_hf_download) -> Path:
     """Download `name` for this platform (once), calling progress(done_bytes, total_bytes | None)."""
-    if sys.platform == "darwin":
+    repo = _mlx().mlx_repo(name) if sys.platform == "darwin" else None
+    if repo:
         m = _mlx()
-        repo = m.mlx_repo(name) or name
-        try:
-            out = m.ensure_mlx(repo, progress=progress)  # dictado-kuu
-        except TypeError:  # before dictado-kuu: no progress on the Mac, only the end
-            out = m.ensure_mlx(repo)
-            if progress:
-                progress(1, 1)
+        if "is_cached_mlx" in vars(m):  # dictado-kuu: ensure_mlx reports progress
+            return Path(m.ensure_mlx(repo, progress=progress))
+        out = m.ensure_mlx(repo)  # before it: only the end
+        if progress:
+            progress(1, 1)
         return Path(out)
     return ensure_local(name, root=root, download=download, progress=progress)
