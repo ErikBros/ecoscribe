@@ -448,6 +448,8 @@ async function renderInsights() {
   columns($("#i-hours"), d.rhythm.hours.map((v, h) => ({ value: v, label: String(h).padStart(2, "0"), dim: v < peak,
     tipValue: `${v} ${v === 1 ? "dictation" : "dictations"}`, tipLabel: `${String(h).padStart(2, "0")}:00-${String((h + 1) % 24).padStart(2, "0")}:00` })),
     (i) => i % 6 === 0);
+  const busy = d.rhythm.hours.indexOf(peak), hh = (h) => `${String(h % 24).padStart(2, "0")}:00`;  // dictado-7qo
+  $("#i-hours-note").textContent = `The dark bar is your busiest hour, ${hh(busy)}-${hh(busy + 1)}.`;
   const n = d.rhythm.days.length;
   columns($("#i-days"), d.rhythm.days.map((x, i) => {
     const dt = new Date(x.date + "T12:00:00");
@@ -457,8 +459,9 @@ async function renderInsights() {
   }), (i) => i === 0 || i === n - 1 || i === Math.floor((n - 1) / 2));
   const lw = d.languages.reduce((a, x) => a + x.words, 0) || 1;
   hbars($("#i-langs"), d.languages.map((x) => ({ name: langName(x.lang), value: x.words,
-    label: `${fmtNum(x.words)} · ${Math.round(100 * x.words / lw)}%` })));
-  hbars($("#i-apps"), d.apps.map((x) => ({ name: appName(x.app), value: x.dictations, label: fmtNum(x.dictations) })));
+    label: `${fmtNum(x.words)} ${x.words === 1 ? "word" : "words"} · ${Math.round(100 * x.words / lw)}%` })));
+  hbars($("#i-apps"), d.apps.map((x) => ({ name: appName(x.app), value: x.dictations,
+    label: `${fmtNum(x.dictations)} ${x.dictations === 1 ? "dictation" : "dictations"}` })));
   const hab = $("#i-habits"); hab.textContent = "";
   for (const h of d.habits) {
     const row = document.createElement("div"); row.className = "i-habit";
