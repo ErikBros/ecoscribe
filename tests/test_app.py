@@ -307,8 +307,10 @@ def test_a_much_too_short_result_keeps_its_audio(tmp_path):
     app.on_action("toggle")
     app.on_action("toggle")
     assert wait(lambda: out)
+    full = 30 * SR * 4  # written just after the paste: wait for it, don't race it
+    assert wait(lambda: [f for f in (tmp_path / "suspect").glob("*-es.f32") if f.stat().st_size == full])
     kept = list((tmp_path / "suspect").glob("*-es.f32"))
-    assert len(kept) == 1 and kept[0].stat().st_size == 30 * SR * 4
+    assert len(kept) == 1 and kept[0].stat().st_size == full
 
 
 def test_no_live_text_when_the_pill_cannot_show_it(tmp_path, monkeypatch):
