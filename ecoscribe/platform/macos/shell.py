@@ -23,8 +23,8 @@ from pathlib import Path
 
 import objc
 from AppKit import (NSApplication, NSApplicationActivationPolicyAccessory, NSBackingStoreBuffered, NSBezierPath,
-                    NSButton, NSColor, NSFont, NSFontAttributeName, NSForegroundColorAttributeName, NSImage,
-                    NSMakeRect, NSMenu, NSMenuItem, NSPanel, NSPopUpButton, NSScreen, NSSound, NSStatusBar,
+                    NSColor, NSFont, NSFontAttributeName, NSForegroundColorAttributeName, NSImage,
+                    NSMakeRect, NSMenu, NSMenuItem, NSPanel, NSScreen, NSSound, NSStatusBar,
                     NSString, NSTextField, NSVariableStatusItemLength, NSView, NSWindowCollectionBehaviorCanJoinAllSpaces,
                     NSWindowCollectionBehaviorFullScreenAuxiliary, NSWindowCollectionBehaviorStationary,
                     NSWindowStyleMaskBorderless, NSWindowStyleMaskNonactivatingPanel)
@@ -36,7 +36,8 @@ from ... import palette as P
 
 log = logging.getLogger(__name__)
 W, H = 210, 44
-MW, MH = 380, 56
+MW, MH = 380, 56  # the meeting pill opened by the mouse: label + latest live line
+CW, CH = 92, 30  # the meeting pill as it sits: a small chip, recording dot + timer (dictado-f6o)
 LW, LH = 460, 84  # the dictating pill with live text under it (dictado-ayq, like Windows)
 NSStatusWindowLevel = 25
 BOTTOM_GAP = 80
@@ -120,6 +121,12 @@ def _active_screen():
     return NSScreen.mainScreen()
 
 
+def _mouse():
+    """The mouse in AppKit's screen coordinates (origin bottom-left)."""
+    from AppKit import NSEvent
+    return NSEvent.mouseLocation()
+
+
 def _bottom_center(w: int, h: int, lift: int = 0) -> tuple[float, float]:
     vf = _active_screen().visibleFrame()
     return vf.origin.x + (vf.size.width - w) / 2, vf.origin.y + BOTTOM_GAP + lift
@@ -186,6 +193,7 @@ class Overlay:
         self.visible = False
         self.cancel_hint = hint or "Tap ⌘ again to finish · Hold ⌘ + Esc to cancel"  # cancel_hint() below
         self.live_text = ""  # what the live transcript has heard so far (dictado-ayq)
+        self.open = False  # the meeting chip is opened by the mouse over it (dictado-f6o)
 
     # drawing primitives
     def _size(self, w: int, h: int) -> None:
@@ -216,9 +224,30 @@ class Overlay:
         texts = [(label, 40 if dot else 0, H / 2, 13, False, P.PAPER, not dot)]
         self._set({"w": w, "h": H, "dot": dot, "texts": texts, "bars": bars or []})
 
+    def _hover(self) -> bool:
+        """Is the mouse on the pill? The panel stays click-through: the mouse is polled, never caught."""
+        if not self.visible:
+            return False
+        loc, f = _mouse(), self.panel.frame()
+        # AppKit's screen y grows upward; meetui's rect is (left, top, right, bottom) with y growing down
+        top, bottom = -(f.origin.y + f.size.height), -f.origin.y
+        return meetui.hovering((loc.x, -loc.y), (f.origin.x, top, f.origin.x + f.size.width, bottom))
+
+    def _meeting_chip(self, view: dict) -> None:
+        """The meeting as it sits: a small dark chip, recording dot + timer."""
+        self._size(CW, CH)
+        dot = P.AEGEAN_SOFT if view["busy"] else P.TILE
+        self._set({"w": CW, "h": CH, "dot": dot, "dot_x": 11,
+                   "texts": [(view.get("short") or view["label"], 30, CH / 2, 12, False, P.PAPER, False)]})
+
     def _meeting_pill(self, view: dict) -> None:
-        key = (view["label"], view["line"], view["busy"])
+        key = (view["label"], view["line"], view["busy"], self.open)
         if key == self._drawn:
+            return
+        if not self.open:
+            self._meeting_chip(view)
+            self._place_and_show()
+            self._drawn = key
             return
         self._size(MW, MH)
         dot = P.AEGEAN_SOFT if view["busy"] else P.TILE
@@ -319,6 +348,11 @@ class Overlay:
         elif self.mode == "hidden" and self._flash_until and now >= self._flash_until:
             self._flash_until = 0.0
             self._show_layer()
+        elif self.mode == "hidden" and self.meeting and not self._flash_until:
+            hover = self._hover()  # the chip opens to the live line while the mouse is on it
+            if hover != self.open:
+                self.open = hover
+                self._show_layer()
         elif self.mode == "busy" and self._flash_until and now >= self._flash_until:
             self._flash_until = 0.0
             self.busy()
@@ -349,10 +383,69 @@ def _label(text: str, size: float, bold: bool, col: str):
     return t
 
 
-class PromptWindow:
-    """ui.PromptWindow for the Mac (same placement rules, countdown and answers)."""
+class _Pressable(NSView):
+    """A rounded button drawn on the dark prompt card: fill, hover fill, bold label (dictado-jfz). Takes the
+    first click on the non-activating panel, so answering never pulls focus from the call."""
 
-    PAD = 16
+    def isFlipped(self):
+        return True
+
+    def acceptsFirstMouse_(self, event):
+        return True
+
+    @objc.python_method
+    def setup(self, title: str, fill: str, hover: str, fn, chevron: bool = False, size: float = 12, bold: bool = True):
+        self._title, self._fill, self._hoverc, self._fn = title, fill, hover, fn
+        self._chev, self._fsize, self._bold, self._over = chevron, size, bold, False
+        from AppKit import NSTrackingActiveAlways, NSTrackingArea, NSTrackingInVisibleRect, NSTrackingMouseEnteredAndExited
+        self.addTrackingArea_(NSTrackingArea.alloc().initWithRect_options_owner_userInfo_(
+            self.bounds(), NSTrackingMouseEnteredAndExited | NSTrackingActiveAlways | NSTrackingInVisibleRect, self, None))
+        return self
+
+    def title(self) -> str:
+        return self._title
+
+    def setTitle_(self, text: str) -> None:
+        self._title = text
+        self.setNeedsDisplay_(True)
+
+    def mouseEntered_(self, event):
+        self._over = True
+        self.setNeedsDisplay_(True)
+
+    def mouseExited_(self, event):
+        self._over = False
+        self.setNeedsDisplay_(True)
+
+    def mouseDown_(self, event):
+        self._fn(self)
+
+    def drawRect_(self, rect):
+        b = self.bounds()
+        r = b.size.height / 2
+        color(self._hoverc if self._over else self._fill).setFill()
+        NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(b, r, r).fill()
+        attrs = {NSFontAttributeName: font(self._fsize, self._bold), NSForegroundColorAttributeName: color(P.PAPER)}
+        t = NSString.stringWithString_(self._title)
+        sz = t.sizeWithAttributes_(attrs)
+        x = 12 if self._chev else (b.size.width - sz.width) / 2
+        t.drawAtPoint_withAttributes_((x, (b.size.height - sz.height) / 2), attrs)
+        if self._chev:
+            attrs[NSForegroundColorAttributeName] = color(P.LINE)
+            c = NSString.stringWithString_("▾")
+            cs = c.sizeWithAttributes_(attrs)
+            c.drawAtPoint_withAttributes_((b.size.width - 12 - cs.width, (b.size.height - cs.height) / 2), attrs)
+
+
+def _text_width(text: str, size: float, bold: bool) -> float:
+    return NSString.stringWithString_(text).sizeWithAttributes_({NSFontAttributeName: font(size, bold)}).width
+
+
+class PromptWindow:
+    """ui.PromptWindow for the Mac (same placement rules, countdown and answers): a rounded ink card
+    like the pill, with rounded buttons and the language as a chip with a menu (dictado-jfz)."""
+
+    PAD, BH, GAP, PW = 18, 30, 8, 340
 
     def __init__(self, root, on_answer):
         self.root, self.on_answer = root, on_answer
@@ -361,7 +454,8 @@ class PromptWindow:
         self._later: list[meetui.Prompt] = []
         self._btns: dict = {}
         self._targets: list = []
-        self.lang_menu = None
+        self.lang = None  # the chosen language's name (a start prompt)
+        self.lang_chip = None
 
     def show(self, prompt: meetui.Prompt) -> None:
         if meetui.placement(self.prompt, prompt) == "queue":
@@ -369,72 +463,74 @@ class PromptWindow:
             return
         self._close()
         self.prompt = prompt
-        title = _label(prompt.title, 13, True, P.INK)
-        rows = [title]
-        self.lang_menu = None
-        if prompt.kind == "start":
-            q = _label(prompt.question, 12, False, P.INK)
-            pop = NSPopUpButton.alloc().initWithFrame_pullsDown_(NSMakeRect(0, 0, 110, 24), False)
-            for _, name in meetui.LANGS:
-                pop.addItemWithTitle_(name)
-            pop.selectItemWithTitle_(dict(meetui.LANGS).get(prompt.lang or "sv", "Swedish"))
-            self.lang_menu = pop
-            rows.append((q, pop))
-        elif prompt.question:
-            rows.append(_label(prompt.question, 12, False, P.INK_SOFT))
-        self._btns, self._targets = {}, []
-        buttons = []
-        for i, (label, choice) in enumerate(prompt.buttons):
-            b = NSButton.buttonWithTitle_target_action_(prompt.button_text(choice, time.monotonic()), None, None)
-            t = _Target.alloc().initWithFn_(lambda c=choice: self._answer(c))
-            b.setTarget_(t)
-            b.setAction_("fire:")
-            if i == 0:
-                b.setKeyEquivalent_("")
-                b.setBezelColor_(color(P.AEGEAN))
-            self._targets.append(t)
-            self._btns[choice] = b
-            buttons.append(b)
-        # layout (flipped coordinates computed by hand: AppKit's origin is bottom-left)
-        width = max(320, title.frame().size.width + 2 * self.PAD)
-        if prompt.kind == "start":
-            q, pop = rows[1]
-            width = max(width, q.frame().size.width + 120 + 2 * self.PAD)
-        for b in buttons:
-            b.sizeToFit()
-        bh = buttons[0].frame().size.height
-        height = self.PAD + title.frame().size.height + 8 + (26 if len(rows) > 1 else 0) + 12 + bh + self.PAD
-        panel = _panel(int(width), int(height), clickable=True)
-        content = _Box.alloc().initWithFrame_(NSMakeRect(0, 0, width, height))
-        panel.setContentView_(content)
-        y = height - self.PAD - title.frame().size.height
-        title.setFrameOrigin_((self.PAD, y))
+        pad, bh, gap = self.PAD, self.BH, self.GAP
+        now = time.monotonic()
+        labels = [(prompt.button_text(c, now), c) for _l, c in prompt.buttons]  # "Not now (10)": the widest
+        bws = [int(_text_width(t, 12, True)) + 32 for t, _c in labels]
+        title = _label(prompt.title, 14, True, P.PAPER)
+        width = int(max(self.PW, sum(bws) + gap * (len(bws) - 1) + 2 * pad, title.frame().size.width + 2 * pad))
+        # layout top-down (the content view is flipped)
+        content = _Box.alloc().initWithFrame_(NSMakeRect(0, 0, width, 10))
+        y = pad
+        title.setFrameOrigin_((pad - 2, y))
         content.addSubview_(title)
-        if len(rows) > 1:
-            y -= 8 + 24
-            if prompt.kind == "start":
-                q, pop = rows[1]
-                q.setFrameOrigin_((self.PAD, y + 3))
-                pop.setFrameOrigin_((self.PAD + q.frame().size.width + 6, y))
-                content.addSubview_(q)
-                content.addSubview_(pop)
-            else:
-                rows[1].setFrameOrigin_((self.PAD, y + 3))
-                content.addSubview_(rows[1])
-        x = width - self.PAD
-        for b in reversed(buttons):
-            x -= b.frame().size.width
-            b.setFrameOrigin_((x, self.PAD))
+        y += title.frame().size.height + 4
+        if prompt.question:
+            q = NSTextField.wrappingLabelWithString_(prompt.question)
+            q.setFont_(font(12))
+            q.setTextColor_(color(P.LINE))
+            q.setPreferredMaxLayoutWidth_(width - 2 * pad)
+            q.setFrameSize_(q.fittingSize())
+            q.setFrameOrigin_((pad - 2, y))
+            content.addSubview_(q)
+            y += q.frame().size.height + 4
+        self.lang, self.lang_chip = None, None
+        if prompt.kind == "start":  # the language: a rounded chip that opens a menu
+            self.lang = dict(meetui.LANGS).get(prompt.lang or "sv", "Swedish")
+            cw = int(max(_text_width(n, 12, False) for _, n in meetui.LANGS)) + 44
+            chip = _Pressable.alloc().initWithFrame_(NSMakeRect(pad, y + 4, cw, 28)).setup(
+                self.lang, P.INK_2, P.PILL_OFF, self._lang_menu, chevron=True, bold=False)
+            content.addSubview_(chip)
+            self.lang_chip = chip
+            y += 28 + 12
+        y += 10
+        self._btns = {}
+        x = width - pad
+        for i, ((text, choice), bw) in reversed(list(enumerate(zip(labels, bws)))):
+            fill, hover = (P.AEGEAN_BRIGHT, P.AEGEAN) if i == 0 else (P.PILL_OFF, P.INK_2)
+            b = _Pressable.alloc().initWithFrame_(NSMakeRect(x - bw, y, bw, bh)).setup(
+                text, fill, hover, lambda _v, c=choice: self._answer(c))
             content.addSubview_(b)
-            x -= 8
-        px, py = _bottom_center(int(width), int(height), lift=MH + 12)
+            self._btns[choice] = b
+            x -= bw + gap
+        height = int(y + bh + pad)
+        content.setFrameSize_((width, height))
+        panel = _panel(width, height, clickable=True)
+        panel.setContentView_(content)
+        px, py = _bottom_center(width, height, lift=MH + 12)
         panel.setFrameOrigin_((px, py))
         panel.orderFrontRegardless()
         self.panel = panel
 
+    def _lang_menu(self, chip) -> None:
+        menu = NSMenu.alloc().init()
+        self._targets = []  # the menu's targets: kept alive while it is open
+        for _code, name in meetui.LANGS:
+            t = _Target.alloc().initWithFn_(lambda n=name: self._pick_lang(n))
+            item = menu.addItemWithTitle_action_keyEquivalent_(name, "fire:", "")
+            item.setTarget_(t)
+            item.setState_(1 if name == self.lang else 0)
+            self._targets.append(t)
+        menu.popUpMenuPositioningItem_atLocation_inView_(None, (0, chip.bounds().size.height + 4), chip)
+
+    def _pick_lang(self, name: str) -> None:
+        self.lang = name
+        if self.lang_chip is not None:
+            self.lang_chip.setTitle_(name)
+
     def _lang_code(self) -> str:
         names = {n: c for c, n in meetui.LANGS}
-        return names.get(str(self.lang_menu.titleOfSelectedItem()) if self.lang_menu else "", "sv")
+        return names.get(self.lang or "", "sv")
 
     def _answer(self, choice: str) -> None:
         p = self.prompt
@@ -476,16 +572,14 @@ class PromptWindow:
 
 
 class _Box(NSView):
-    """The prompt's card: paper background, ink hairline, rounded."""
+    """The prompt's card: rounded ink, like the pill (dictado-jfz). Flipped: laid out top-down."""
+
+    def isFlipped(self):
+        return True
 
     def drawRect_(self, rect):
-        b = self.bounds()
-        path = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(b, 10, 10)
-        color(P.PAPER).setFill()
-        path.fill()
-        color(P.LINE).setStroke()
-        path.setLineWidth_(1)
-        path.stroke()
+        color(P.INK, 0.97).setFill()
+        NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(self.bounds(), 16, 16).fill()
 
 
 # ---------------------------------------------------------------------------------------------------------------
