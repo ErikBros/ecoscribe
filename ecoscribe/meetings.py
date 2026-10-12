@@ -69,6 +69,7 @@ class Controller:
             speakers_ok = lambda: diarize.available(cfg)  # noqa: E731  (checked each time: the add-on may be installed later)
         self.speakers_ok = speakers_ok
         self.calendar = None  # calendar_ics.CalendarFeed: names a meeting from the event happening now (t0u.35)
+        self.name_now = None  # () -> str | None: the Meet tab's event name, when the calendar has none (dictado-4ar)
         self._stop_ev = stop_event if stop_event is not None else _StopEvent()
         self._lock = threading.RLock()
         self.meeting: dict | None = None  # dir, app, lang, started, proc, stopping
@@ -122,6 +123,20 @@ class Controller:
             log.exception("calendar lookup failed; default title")
             return None
 
+    def _name_now(self, app: str | None) -> str | None:
+        """A browser call's name from its Meet tab, or None. Never fails a meeting."""
+        from .detect import BROWSERS
+        if self.name_now is None or (app is not None and app not in BROWSERS):
+            return None
+        try:
+            name = self.name_now()
+        except Exception:
+            log.exception("Meet tab name failed; default title")
+            return None
+        if name:
+            log.info("meeting named from the Meet tab")
+        return name or None
+
     def _create(self, title: str, lang: str, ev) -> Path:
         d = sessions.create(ev.title if ev is not None else title, lang, "meeting", self.root)
         if ev is not None:
@@ -132,6 +147,8 @@ class Controller:
 
     def start_meeting(self, lang: str, title: str = "Meeting", app: str | None = None) -> Path:
         ev = self._event_now(app) if title == "Meeting" else None  # outside the lock: reads a file
+        if ev is None and title == "Meeting":
+            title = self._name_now(app) or title
         with self._lock:
             if self.meeting is not None and not self.meeting["stopping"]:
                 log.info("meeting already running: %s", self.meeting["dir"])

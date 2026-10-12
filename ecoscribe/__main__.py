@@ -168,6 +168,7 @@ def _start_meetings(cfg, data, ui, root, log, app=None):
             threading.Thread(target=feed.refresh, kwargs={"force": True}, name="ecoscribe-calendar", daemon=True).start()
         ui.prompt(kind, app, lang)
     watch = MeetWatch(ctl, cfg, ui_prompt=ui_prompt, data_dir=data)
+    ctl.name_now = watch.meet_name  # no calendar event: the Meet tab's name (dictado-4ar)
 
     def on_answer(prompt, choice, lang):
         if choice == "abrir":
