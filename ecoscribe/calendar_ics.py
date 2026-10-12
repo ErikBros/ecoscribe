@@ -42,6 +42,7 @@ class Event:
     attendees: list[str] = field(default_factory=list)
     conference: str = ""
     uid: str = ""
+    emails: list[str] = field(default_factory=list)  # the attendees' addresses (dictado-fnw: Email to participants)
 
 
 @dataclass
@@ -181,6 +182,20 @@ def _people(ev: _Raw, owner: str | None) -> tuple[list[str], bool]:
     return names, declined
 
 
+def _emails(ev: _Raw, owner: str | None) -> list[str]:
+    """The attendees' addresses, the same people as _people (no owner, no rooms)."""
+    out = []
+    for p, v in ev.all("ATTENDEE"):
+        email = re.sub(r"(?i)^mailto:", "", v).strip().lower()
+        if not email or "@" not in email or (owner and email == owner):
+            continue
+        if p.get("CUTYPE", "INDIVIDUAL").upper() in ("RESOURCE", "ROOM") or email.endswith("resource.calendar.google.com"):
+            continue
+        if email not in out:
+            out.append(email)
+    return out
+
+
 def _conference(ev: _Raw) -> str:
     return " ".join(v for n, _, v in ev.props
                     if n in ("LOCATION", "DESCRIPTION", "URL", "X-GOOGLE-CONFERENCE")).lower()
@@ -209,7 +224,7 @@ def _base(ev: _Raw, cal: Calendar):
         return None
     title = _text(ev.get("SUMMARY")[1] or "").strip()
     return Event(title=title, start=start, end=end, attendees=people, conference=_conference(ev),
-                 uid=(ev.get("UID")[1] or "").strip())
+                 uid=(ev.get("UID")[1] or "").strip(), emails=_emails(ev, cal.owner))
 
 
 def _key(dt: datetime) -> str:
@@ -268,7 +283,7 @@ def _expand(ev: _Raw, e: Event, rrule: str, lo, hi, moved, default_tz) -> list[E
         k = _key(s)
         if k in skip or (e.uid, k) in moved or not e.title:
             continue
-        out.append(Event(e.title, s, s + dur, list(e.attendees), e.conference, e.uid))
+        out.append(Event(e.title, s, s + dur, list(e.attendees), e.conference, e.uid, list(e.emails)))
     return out
 
 
@@ -288,7 +303,7 @@ def pick(events: list[Event], now: datetime, app: str | None = None, early_s: fl
 
 
 def meta_info(e: Event) -> dict:
-    return {"title": e.title, "attendees": list(e.attendees),
+    return {"title": e.title, "attendees": list(e.attendees), "emails": list(e.emails),
             "start": e.start.astimezone(UTC).isoformat(), "end": e.end.astimezone(UTC).isoformat()}
 
 

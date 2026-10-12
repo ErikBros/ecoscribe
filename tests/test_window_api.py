@@ -356,3 +356,39 @@ def test_delete_model_in_use_says_so(api, monkeypatch):
     monkeypatch.setattr("ecoscribe.models.delete", busy)
     r = api.delete_model("large-v3-turbo")
     assert r["ok"] is False and "in use" in r["error"]
+
+
+def _meeting_with(tmp_path, text, emails):
+    from ecoscribe import sessions as S
+    root = tmp_path / "transcripts"
+    d = S.create("Weekly planning", "en", "meeting", root)
+    S.write_meta(d, status="done", calendar={"title": "Weekly planning", "attendees": ["Ana Ruiz"], "emails": emails})
+    (d / "transcript.json").write_text(json.dumps({"segments": [{"t0": 0, "t1": 2, "text": text, "speaker": "Others"}]}),
+                                       encoding="utf-8")
+    return d
+
+
+def test_email_participants_short_transcript_goes_in_the_draft(tmp_path, monkeypatch):
+    opened, copied = [], []
+    d = _meeting_with(tmp_path, "The blue bicycle is mine.", ["ana@example.com", "bo@example.com"])
+    a = Api(data_dir=tmp_path, copy=copied.append, open_url=opened.append)
+    monkeypatch.setattr(a, "_session", lambda name: d)
+    monkeypatch.setattr(a, "get_session", lambda name: {"segments": json.loads((d / "transcript.json").read_text())["segments"], "notes": ""})
+    r = a.email_participants(d.name)
+    assert r["ok"] and r["to"] == ["ana@example.com", "bo@example.com"] and r["inline"]
+    url = opened[0]
+    assert url.startswith("mailto:ana@example.com,bo@example.com?subject=Transcript%3A%20Weekly%20planning")
+    assert "blue%20bicycle" in url and "automatically" in url  # says plainly it's an automatic transcript
+    assert "blue bicycle" in copied[0]
+
+
+def test_email_participants_long_transcript_is_copied_to_paste(tmp_path, monkeypatch):
+    opened, copied = [], []
+    d = _meeting_with(tmp_path, "word " * 2000, [])
+    a = Api(data_dir=tmp_path, copy=copied.append, open_url=opened.append)
+    monkeypatch.setattr(a, "_session", lambda name: d)
+    monkeypatch.setattr(a, "get_session", lambda name: {"segments": json.loads((d / "transcript.json").read_text())["segments"], "notes": ""})
+    r = a.email_participants(d.name)
+    assert r["ok"] and not r["inline"] and r["to"] == []
+    assert len(opened[0]) < 1800 and "paste%20it%20here" in opened[0]
+    assert copied[0].count("word") == 2000

@@ -30,6 +30,7 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Meeting prompt box: a rounded dark card that says which meeting, rounded buttons, language as a chip with a menu | done | done (dictado-jfz, checked on screen) |
 | History: Retry a recent dictation (again, or in a chosen language); the last 20 keep their audio on this computer | done | check on Mac |
 | Settings > Speech models: each model's use, size on disk, download with progress, delete to free space | done | check on Mac |
+| Email to participants: a draft in your own mail program, to the calendar invite's guests, the transcript in it or copied to paste | done | check on Mac |
 | Meeting names + attendees from a calendar (iCal link) | done | check on Mac (dictado-tjn) |
 | File transcription (drag and drop) | done | done (installed app: Greek file on the Apple GPU, 2.4% WER) |
 | First-run setup: languages, speech models (both recommended, with download progress), mic test, dictation key, a first dictation, summary; Settings > Run setup again | done | done (checked with a fresh data folder: both models downloaded with a moving bar, the first dictation pasted into the box) |

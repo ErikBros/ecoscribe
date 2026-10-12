@@ -144,6 +144,7 @@ function demoApi() {
     delete_session: async (n) => { sess.splice(sess.indexOf(find(n)), 1); return { ok: true }; },
     open_folder: async () => ({ ok: true }),
     copy_transcript: async () => ({ ok: true }),
+    email_participants: async (name) => { window.__emailed = name; return { ok: true, to: ["ana@example.com", "bo@example.com"], inline: false, chars: 9000 }; },
     save_export: async () => ({ ok: false, cancelled: true }),
     get_status: async () => (params.get("state") === "stopped" ? { state: "stopped", alive: false, version: "1.1.0" }
       : { state: params.get("state") || "ready", alive: true, device: "cuda", model: "large-v3-turbo", mic: "Microphone (Anker PowerConf C20", languages: settings.values.languages.split(","), hotkey: "rctrl", version: "1.1.0" }),
@@ -837,6 +838,12 @@ function rWire() {
   });
   $("#r-copy").onclick = async () => { await api.copy_transcript(r.open, "text"); toast("Copied."); };
   $("#r-copy-claude").onclick = async () => { await api.copy_transcript(r.open, "claude"); toast("Copied with date, app and language, ready to paste into Claude."); };
+  $("#r-email").onclick = async () => {  // dictado-fnw: the user's mail program sends, never Ecoscribe
+    const res = await api.email_participants(r.open);
+    if (!res.ok) { toast(res.error || "Couldn't open a draft."); return; }
+    const who = res.to.length ? `to ${res.to.length} ${res.to.length === 1 ? "person" : "people"}` : "with an empty To (no calendar invite)";
+    toast(res.inline ? `Draft opened ${who}. Check it and press Send.` : `Draft opened ${who}. The transcript is copied: paste it in, then Send.`, 5000);
+  };
   $("#r-copy-summary").onclick = async () => { await api.copy_transcript(r.open, "summary"); toast("Summary prompt copied: paste it into Claude."); };
   for (const b of $$("[data-fmt]")) b.onclick = async () => {
     const out = await api.save_export(r.open, b.dataset.fmt);
