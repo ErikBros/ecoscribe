@@ -73,6 +73,14 @@ class MeetWatch(threading.Thread):
             log.debug("no call app for a manual start", exc_info=True)
             return None
 
+    def meet_name(self) -> str | None:
+        """The Google Meet tab's event name right now (dictado-4ar): names a call the calendar doesn't know."""
+        try:
+            return detect.meet_name(self.read()[1])
+        except Exception:
+            log.debug("no Meet tab name", exc_info=True)
+            return None
+
     def lang_for(self, app: str | None) -> str:
         return self._langs().get(app or "", self.cfg.default_lang) if app else self.cfg.default_lang
 
