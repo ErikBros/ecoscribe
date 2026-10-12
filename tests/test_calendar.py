@@ -45,7 +45,9 @@ def test_parses_title_times_and_people():
     assert (e.start, e.end) == (at(8), at(8, 30))
     # folded line joined; the owner and the room left out; no CN -> name from the address
     assert e.attendees == ["Ana Ruiz", "Johan Lindqvist", "Maria K"]
+    assert e.emails == ["ana@example.com", "johan@example.com", "maria.k@example.com"]  # for Email to participants
     assert "meet.google.com" in e.conference
+    assert cal.meta_info(e)["emails"] == e.emails
 
 
 def test_all_day_cancelled_and_declined_are_skipped():
@@ -118,6 +120,7 @@ def test_meeting_info_for_meta():
     [e] = events(ics(RETRO))
     info = cal.meta_info(e)
     assert info == {"title": "Sprint retro, week 41", "attendees": ["Ana Ruiz", "Johan Lindqvist", "Maria K"],
+                    "emails": ["ana@example.com", "johan@example.com", "maria.k@example.com"],
                     "start": "2026-10-06T08:00:00+00:00", "end": "2026-10-06T08:30:00+00:00"}
     json.dumps(info)
 

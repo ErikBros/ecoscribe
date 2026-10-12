@@ -89,10 +89,22 @@ def _copy(text: str) -> None:
     set_clipboard_text(text, private=False)
 
 
+MAILTO_MAX = 1800  # longer mailto: links get cut by Windows and some mail programs: copy the transcript instead
+
+
+def _open_url(url: str) -> None:
+    """Hand a link (mailto:) to the system: the user's own mail program opens a draft."""
+    if sys.platform == "darwin":
+        import subprocess
+        subprocess.Popen(["open", url])
+    else:
+        os.startfile(url)  # noqa: S606  (the shell's handler for mailto:)
+
+
 class Api:
     def __init__(self, data_dir: Path | None = None, config_path: Path | None = None, startup_mod=None,
                  signal_reload=None, list_mic_names=None, copy=None, send_command=None, downloads=None,
-                 page: str | None = None):
+                 page: str | None = None, open_url=None):
         from . import startup as _startup
         self._page = page
         self._data_dir = Path(data_dir) if data_dir else paths.data_dir()
@@ -104,6 +116,7 @@ class Api:
         self._commands = send_command or commands.send
         self._downloads = Path(downloads) if downloads else Path(os.environ.get("USERPROFILE", Path.home())) / "Downloads"
         self._mic = None  # (recorder, gate) during the mic check
+        self._open_url = open_url or _open_url
         import threading
         self._mic_lock = threading.Lock()
 
@@ -603,6 +616,30 @@ class Api:
             else export.summary_prompt(meta, s["segments"], s["notes"]) if kind == "summary" else export.to_txt(s["segments"])
         self._copy(text)
         return {"ok": True, "chars": len(text)}
+
+    def email_participants(self, name: str) -> dict:
+        """Meetings > Email to participants (dictado-fnw): a draft in the user's own mail program,
+        To: the invite's guests, the transcript in the body when it fits, else copied to paste in.
+        Ecoscribe sends nothing itself."""
+        from urllib.parse import quote
+        s = self.get_session(name)
+        meta = sessions.read_meta(self._session(name))
+        info = meta.get("calendar") or {}
+        to = [e for e in info.get("emails") or [] if "@" in e]
+        title = info.get("title") or meta.get("title") or "our meeting"
+        day = str(meta.get("created") or "")[:10]
+        transcript = export.to_txt(s["segments"]).strip()
+        note = ("Hi,\n\nHere's the transcript of our call. It was made automatically by Ecoscribe from a "
+                "recording, so expect some mistakes.\n\n")
+        subject = f"Transcript: {title}" + (f" ({day})" if day else "")
+
+        def url(body: str) -> str:
+            return (f"mailto:{','.join(to)}?subject={quote(subject)}&body={quote(body)}")
+        full = url(note + transcript + "\n")
+        inline = len(full) <= MAILTO_MAX
+        self._copy(transcript)
+        self._open_url(full if inline else url(note + "(The transcript follows: paste it here.)\n"))
+        return {"ok": True, "to": to, "inline": inline, "chars": len(transcript)}
 
     def save_export(self, name: str, fmt: str) -> dict:
         if fmt not in ("txt", "md", "srt"):
