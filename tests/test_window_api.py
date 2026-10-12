@@ -337,3 +337,22 @@ def test_retry_goes_to_the_background_app(tmp_path):
     a = Api(data_dir=tmp_path, send_command=lambda d, cmd, args, **kw: sent.append((cmd, args, kw)) or {"ok": True})
     assert a.retry_dictation("b", "sv") == {"ok": True}
     assert sent == [("retry", {"id": "b", "lang": "sv"}, {"wait_s": 120.0})]
+
+
+def test_models_info_and_delete(api, monkeypatch):
+    monkeypatch.setattr("ecoscribe.models.is_ready", lambda name, root=None: name == "large-v3-turbo")
+    monkeypatch.setattr("ecoscribe.models.disk_size", lambda name, root=None: 1_600_000_000)
+    deleted = []
+    monkeypatch.setattr("ecoscribe.models.delete", lambda name, root=None: deleted.append(name) or True)
+    info = api.models_info()["models"]
+    assert [(m["label"], m["ready"], m["disk"]) for m in info] == [("Fast", True, 1_600_000_000), ("Most accurate", False, 0)]
+    assert api.delete_model("large-v3-turbo") == {"ok": True} and deleted == ["large-v3-turbo"]
+    assert api.delete_model("../../something")["ok"] is False
+
+
+def test_delete_model_in_use_says_so(api, monkeypatch):
+    def busy(name, root=None):
+        raise PermissionError("in use")
+    monkeypatch.setattr("ecoscribe.models.delete", busy)
+    r = api.delete_model("large-v3-turbo")
+    assert r["ok"] is False and "in use" in r["error"]
