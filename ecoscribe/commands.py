@@ -91,9 +91,13 @@ def run_pending(data_dir: Path, handler) -> int:
     return n
 
 
-def handler_for(ctl, watch=None, manual_key: str = "_manual"):
-    """The background app's command table over a meetings Controller."""
+def handler_for(ctl, watch=None, manual_key: str = "_manual", app=None):
+    """The background app's command table over a meetings Controller (and the dictation App)."""
     def handle(cmd: str, args: dict) -> dict:
+        if cmd == "retry":  # History > Retry (dictado-a2r)
+            if app is None:
+                return {"ok": False, "error": "Dictation isn't running"}
+            return app.retry(str(args.get("id") or ""), args.get("lang") or None)
         if cmd == "start_meeting":
             lang = args.get("lang") or (watch.lang_for(manual_key) if watch else "sv")
             if watch:

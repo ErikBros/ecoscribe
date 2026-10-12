@@ -84,7 +84,9 @@ def test_toggle_cycle_delivers(tmp_path):
     app.on_action("toggle"); assert app.state == "recording"
     app.on_action("toggle"); assert app.state == "idle"
     assert wait(lambda: out == ["text 1 "])
-    h = [json.loads(l) for l in (tmp_path / "h.jsonl").read_text(encoding="utf-8").splitlines()]
+    hist = tmp_path / "h.jsonl"  # written just after the paste: wait for it, don't race it
+    assert wait(lambda: hist.exists() and hist.read_text(encoding="utf-8").strip())
+    h = [json.loads(l) for l in hist.read_text(encoding="utf-8").splitlines()]
     assert h[0]["text"] == "text 1 " and h[0]["pasted"] is True
     assert app.gate.opened == 1 and app.gate.restored == 1
     app.shutdown()
@@ -450,3 +452,41 @@ def test_the_pill_notes_fillers_and_hedges_after_a_message_to_a_person_when_swit
 
     assert ("flash", "like · maybe · i think", 2.5) in run(True, "slack.exe")
     assert run(False, "slack.exe") == [] and run(True, "claude.exe") == []
+
+
+class LangEngine(FakeEngine):
+    """Says which language it was asked for (Retry in a given language, dictado-a2r)."""
+    def transcribe(self, audio, lang=None, **kw):
+        self.n += 1
+        return Result(text=f"take {self.n} in {lang or 'auto'} ", lang=lang or "en", speech_s=1.0, ms=5)
+
+
+def test_retry_a_dictation_from_its_kept_audio(tmp_path, monkeypatch):
+    copied = []
+    monkeypatch.setattr(app_mod, "set_clipboard_text", lambda s, **kw: copied.append(s))
+    app, out = make(tmp_path, eng=LangEngine())
+    app.on_action("toggle"); app.on_action("toggle")
+    hist = tmp_path / "h.jsonl"
+    assert wait(lambda: hist.exists() and hist.read_text(encoding="utf-8").strip())
+    rec = json.loads(hist.read_text(encoding="utf-8").splitlines()[-1])
+    assert rec["id"] and rec["audio"] is True
+    assert wait(lambda: (tmp_path / "recent" / f"{rec['id']}.wav").exists())
+    r = app.retry(rec["id"], "sv")
+    assert r["ok"] and r["text"] == "take 2 in sv " and r["lang"] == "sv"
+    again = json.loads(hist.read_text(encoding="utf-8").splitlines()[-1])
+    assert again["id"] == rec["id"] and again["text"] == "take 2 in sv " and again["retried"] is True
+    assert copied == ["take 2 in sv "]
+    assert app.retry("nope", None)["ok"] is False
+    app.shutdown()
+
+
+def test_only_the_last_dictations_keep_their_audio(tmp_path, monkeypatch):
+    monkeypatch.setattr(app_mod, "KEEP_AUDIO", 2)
+    app, out = make(tmp_path)
+    for i in range(3):
+        app.on_action("toggle"); app.on_action("toggle")
+        assert wait(lambda: len(out) == i + 1)
+        assert wait(lambda: (tmp_path / "h.jsonl").exists()
+                    and len((tmp_path / "h.jsonl").read_text(encoding="utf-8").splitlines()) == i + 1)
+    assert wait(lambda: len(list((tmp_path / "recent").glob("*.wav"))) == 2)
+    app.shutdown()

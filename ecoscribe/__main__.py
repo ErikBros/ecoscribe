@@ -147,7 +147,7 @@ def _calendar_feed(cfg, data, ctl, log):
     return feed
 
 
-def _start_meetings(cfg, data, ui, root, log):
+def _start_meetings(cfg, data, ui, root, log, app=None):
     """Controller (one worker at a time), detector thread, prompt box, 1 s poll on the tk thread."""
     from . import ipc, meetui
     from .meetings import Controller
@@ -180,7 +180,7 @@ def _start_meetings(cfg, data, ui, root, log):
     if cfg.meetings.mode != "off":
         watch.start()
     from . import commands
-    commands.Watcher(data, commands.handler_for(ctl, watch, MANUAL)).start()  # the window's buttons
+    commands.Watcher(data, commands.handler_for(ctl, watch, MANUAL, app=app)).start()  # the window's buttons
     tracker = meetui.Tracker()
 
     def poll():
@@ -347,7 +347,7 @@ def main(argv=None) -> int:
     app.ready = False
     app.start()
 
-    meet_ctl, watch = _start_meetings(cfg, data, ui, root, log) if not args.test else (None, None)
+    meet_ctl, watch = _start_meetings(cfg, data, ui, root, log, app=app) if not args.test else (None, None)
 
     def quit_app():
         log.info("quit requested")

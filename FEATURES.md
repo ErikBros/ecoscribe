@@ -28,6 +28,7 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Meeting / file languages incl. Greek + Spanish mixed | done | done (GPU test passes on mlx) |
 | Meeting pill: a small chip (dot + timer) that shows the live line when the mouse is on it | done | done (dictado-f6o: polls the mouse, stays click-through; checked on screen) |
 | Meeting prompt box: a rounded dark card that says which meeting, rounded buttons, language as a chip with a menu | done | done (dictado-jfz, checked on screen) |
+| History: Retry a recent dictation (again, or in a chosen language); the last 20 keep their audio on this computer | done | check on Mac |
 | Meeting names + attendees from a calendar (iCal link) | done | check on Mac (dictado-tjn) |
 | File transcription (drag and drop) | done | done (installed app: Greek file on the Apple GPU, 2.4% WER) |
 | First-run setup: languages, speech models (both recommended, with download progress), mic test, dictation key, a first dictation, summary; Settings > Run setup again | done | done (checked with a fresh data folder: both models downloaded with a moving bar, the first dictation pasted into the box) |
