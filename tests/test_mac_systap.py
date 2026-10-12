@@ -55,6 +55,27 @@ def voiced_blocks(x, sr=systap.SR, block_s=0.02):
     return [b for b in blocks if float(np.sqrt(np.mean(b * b))) > 0.05]
 
 
+def pitch_hz(blocks, sr=systap.SR) -> float:
+    """Frequency from the median period between upward zero crossings (times interpolated between
+    samples) inside the blocks that carry sound. Filled-in silence and the splice where late audio
+    lands on it only make a few odd periods, which the median ignores."""
+    periods = []
+    for b in blocks:
+        i = np.where((b[:-1] < 0) & (b[1:] >= 0))[0]
+        t = i + (-b[i] / (b[i + 1] - b[i]))  # where the line between the two samples crosses zero
+        periods.extend(np.diff(t))
+    return sr / float(np.median(periods)) if periods else 0.0
+
+
+def test_pitch_ignores_gaps_between_blocks():
+    sr = systap.SR
+    tone = 0.5 * np.sin(2 * np.pi * 440 * np.arange(sr) / sr).astype(np.float32)
+    gappy = np.concatenate([tone[:3000], np.zeros(1700, np.float32), tone[5000:9000], np.zeros(900, np.float32),
+                            tone[12000:]])
+    assert abs(pitch_hz(voiced_blocks(gappy)) - 440) < 2
+    assert abs(pitch_hz(voiced_blocks(tone[::3].copy(), sr=sr), sr) - 1320) < 6  # sped up 3x: caught
+
+
 def test_tone_comes_out_as_16k_mono_on_the_wall_clock(fake):
     lb = Loopback(command=fake("tone", 3.0), check_s=None)
     t0 = time.monotonic()
@@ -70,11 +91,11 @@ def test_tone_comes_out_as_16k_mono_on_the_wall_clock(fake):
     assert abs(len(x) / systap.SR - elapsed) < 0.35, (len(x) / systap.SR, elapsed)
     voiced = voiced_blocks(x)
     assert len(voiced) >= 5, "no tone came through"
-    # The pitch says it was resampled right (48 kHz stereo -> 16 kHz mono, not sped up or slowed down);
-    # silence a slow machine adds around the tone doesn't move the peak.
-    spectrum = np.abs(np.fft.rfft(x * np.hanning(len(x))))
-    peak_hz = float(np.argmax(spectrum[1:]) + 1) * systap.SR / len(x)
-    assert abs(peak_hz - 440) <= 15, peak_hz
+    # The pitch says it was resampled right (48 kHz stereo -> 16 kHz mono, not sped up or slowed down).
+    # Measured period by period: one FFT over the whole capture came out 19 Hz off on a slow CI runner,
+    # whose lag gets silence filled in and late audio spliced onto it (dictado-00k).
+    hz = pitch_hz(voiced)
+    assert abs(hz - 440) <= 15, hz
     # Level, loosely: a 0.5 sine is 0.354 RMS (stereo folded by averaging; summed would be 0.707)
     rms = float(np.median([np.sqrt(np.mean(b * b)) for b in voiced]))
     assert 0.15 < rms < 0.6, rms
