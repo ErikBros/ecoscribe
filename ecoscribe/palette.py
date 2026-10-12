@@ -1,13 +1,13 @@
 """The Ecoscribe palette. Every Ecoscribe surface uses only these."""
-PAPER = "#fbfaf6"
-INK = "#232a33"
-AEGEAN = "#2e6187"
-TILE = "#b3541e"
+PAPER = "#f6f5f1"
+INK = "#18212b"
+AEGEAN = "#23557a"
+TILE = "#b0491c"
 # derived tints
-INK_SOFT = "#5b6470"
-LINE = "#e4e1d8"
-AEGEAN_SOFT = "#dbe6ef"
-TILE_SOFT = "#f3e0d4"
+INK_SOFT = "#4f5966"
+LINE = "#e4e1da"
+AEGEAN_SOFT = "#e4edf4"
+TILE_SOFT = "#f6e3d9"
 CLAY_LIGHT = "#e58a5f"  # the logo's dot, on aegean (dictado-6oe.1)
 PILL_OFF = "#4a525c"   # unlit level bar on the ink pill; a quiet button on ink
 INK_2 = "#323a45"      # a raised surface on ink (the language menu, a pressed quiet button)
