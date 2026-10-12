@@ -300,8 +300,15 @@
     <!-- AJUSTES -->
     <section class="page" id="page-ajustes" hidden>
       <header class="page-head"><h1>Settings</h1></header>
+      <nav class="segs set-tabs" id="set-tabs" aria-label="Settings sections">  <!-- short sections instead of one long page (dictado-6oe.7) -->
+        <button type="button" class="seg active" data-sec="dictation">Dictation</button>
+        <button type="button" class="seg" data-sec="words">Languages and words</button>
+        <button type="button" class="seg" data-sec="meetings">Meetings</button>
+        <button type="button" class="seg" data-sec="models">Speech models</button>
+        <button type="button" class="seg" data-sec="help">Help and setup</button>
+      </nav>
       <form id="settings" class="settings" autocomplete="off">
-        <div class="card group">
+        <div class="card group" data-sec="dictation">
           <div class="group-head"><h3>Shortcut</h3><p class="muted">What starts and stops dictation. Click Change and press it.</p></div>
           <div class="row"><span class="row-label">Shortcut</span>
             <div class="hk">
@@ -316,7 +323,7 @@
             <input type="checkbox" class="switch" name="numpad_enter" id="f-numpad-enter"></label>
         </div>
 
-        <div class="card group">
+        <div class="card group" data-sec="dictation">
           <div class="group-head"><h3>Mic</h3><p class="muted">Ecoscribe finds it by name, so it isn't lost when you plug in other devices.</p></div>
           <label class="row"><span class="row-label">Mic</span>
             <select name="mic" id="f-mic"></select></label>
@@ -332,27 +339,27 @@
             <input type="checkbox" class="switch" name="unmute" id="f-unmute"></label>
         </div>
 
-        <div class="card group">
+        <div class="card group" data-sec="words">
           <div class="group-head"><h3>Languages you dictate in</h3><p class="muted">Each dictation, Ecoscribe picks among these by itself, and the pill shows which one it heard. Wrong guess? Hold <kbd id="lang-key">Right Ctrl</kbd> and press <kbd>L</kbd> to choose the next dictation's language (or the tray icon: Next dictation in). With Swedish (or most added languages) ticked, dictation uses the larger model: still under a second, about twice as slow.</p></div>
           <div class="lang-checks" id="f-languages" role="group" aria-label="Languages you dictate in"></div>
           <div class="lang-add-row"><select id="lang-add" aria-label="Add a language"></select>
             <span class="muted small">English and Swedish are built in. Added languages also appear for meetings and files; nothing is downloaded.</span></div>
         </div>
 
-        <div class="card group">
+        <div class="card group" data-sec="words">
           <div class="group-head"><h3>Your words</h3><p class="muted">Names and terms Ecoscribe should spell your way, one per line: people, places, products. Used for dictation and meetings.</p></div>
           <textarea name="vocabulary" id="f-vocabulary" class="vocab" rows="5" spellcheck="false" placeholder="Göteborg&#10;pyannote&#10;Kristineberg"></textarea>
           <label class="row toggle-row"><span class="row-text"><span class="row-label">Names on your screen</span><span class="muted small">When you start dictating, Ecoscribe reads the names in the window you're typing into (an email's sender, a chat's people) and spells them the same way. Read on this PC, never stored or sent.</span></span>
             <input type="checkbox" class="switch" name="screen_names" id="f-screen-names"></label>
         </div>
 
-        <div class="card group">
+        <div class="card group" data-sec="words">
           <div class="group-head"><h3>Snippets</h3><p class="muted">Say a snippet's name on its own ("my email.") and Ecoscribe types the saved text instead. Inside a sentence ("what's my email?") it stays as you said it.</p></div>
           <div id="snips" class="snips"></div>
           <button type="button" class="btn btn-ghost btn-sm" id="snip-add">Add snippet</button>
         </div>
 
-        <div class="card group">
+        <div class="card group" data-sec="meetings">
           <div class="group-head"><h3>Meetings</h3><p class="muted">When a call app (Teams, Slack, Zoom, Meet…) starts using the mic.</p></div>
           <label class="row"><span class="row-label">When a call starts</span>
             <select name="meet_mode" id="f-meet-mode"></select></label>
@@ -376,7 +383,7 @@
             <button type="button" class="btn btn-ghost btn-sm" id="claude-connect">Connect</button></div>
         </div>
 
-        <div class="card group">
+        <div class="card group" data-sec="dictation">
           <div class="group-head"><h3>Behaviour</h3></div>
           <label class="row toggle-row"><span class="row-text"><span class="row-label">Free the GPU when you're not dictating</span>
             <span class="muted small">The model loads when you tap the key (while you talk) and unloads after 10 minutes without dictating.</span></span>
@@ -402,11 +409,11 @@
             <input type="checkbox" class="switch" name="startup" id="f-startup"></label>
         </div>
 
-        <div class="card group">
+        <div class="card group" data-sec="models">
           <div class="group-head"><h3>Speech models</h3><p class="muted">Ecoscribe picks the model for each language by itself. Both are downloaded once and then run on this computer, offline. Delete one to free space: it downloads again when it's next needed.</p></div>
           <div class="m-rows" id="m-rows"></div>
         </div>
-        <div class="card group">
+        <div class="card group" data-sec="help">
           <div class="group-head"><h3>Troubleshooting</h3><p class="muted">When something goes wrong: hand Claude what it needs to find the cause.</p></div>
           <div class="row"><span class="row-text"><span class="row-label">Setup</span>
             <span class="muted small">Languages, speech models, mic and key, step by step, like the first time.</span></span>

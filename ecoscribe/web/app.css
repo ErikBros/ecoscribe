@@ -82,7 +82,7 @@ svg { display: block; }
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; min-height: 38px; }
 h1 { margin: 0; font: 800 30px/1.15 var(--font-display); letter-spacing: -.025em; }
 h2 { margin: 0; font: 600 21px/1.25 var(--font-display); letter-spacing: -.01em; }
-h3 { margin: 0; font: 600 15px/1.3 var(--font-display); }
+h3 { margin: 0; font: 700 16px/1.3 var(--font-display); letter-spacing: -.01em; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
 .card-title { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); letter-spacing: .02em; text-transform: uppercase; margin-bottom: 10px; }
 
@@ -548,3 +548,7 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border: 1px solid var(--
 .segs { display: inline-flex; padding: 4px; border-radius: 999px; background: #eeece6; gap: 2px; }
 .segs .seg { height: 30px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; font: 600 13.5px var(--font); color: var(--ink-soft); cursor: pointer; }
 .segs .seg.active { background: var(--card); color: var(--ink); font-weight: 700; box-shadow: 0 1px 2px rgba(24, 33, 43, .08); }
+
+/* ---------- ajustes (dictado-6oe.7): short sections ---------- */
+.set-tabs { margin: -6px 0 18px; flex-wrap: wrap; }
+.settings .group[hidden] { display: none !important; }

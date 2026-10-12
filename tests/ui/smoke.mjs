@@ -393,5 +393,13 @@ async function load(query) {
   check(window.__emailed === "2026-10-05_0915_planering" && doc.querySelector("#toast").textContent.includes("to 2 people")
     && doc.querySelector("#toast").textContent.includes("paste it in"), "opens a draft to the participants, says to paste");
 }
+{ // Settings in sections (dictado-6oe.7)
+  const { window, doc } = await load("page=ajustes");
+  await sleep(150);
+  const vis = () => [...doc.querySelectorAll("#settings .group")].filter((g) => !g.hidden).map((g) => g.dataset.sec);
+  check(vis().length > 0 && vis().every((k) => k === "dictation"), "Settings opens on one section");
+  doc.querySelector('#set-tabs [data-sec="meetings"]').click(); await sleep(50);
+  check(vis().length > 0 && vis().every((k) => k === "meetings"), "a tab shows only its section");
+}
 console.log(failed ? `\n${failed} FAILED` : "\nall ok");
 process.exit(failed ? 1 : 0);

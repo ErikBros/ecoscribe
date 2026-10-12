@@ -1671,6 +1671,14 @@ async function boot() {
     if (!confirm("Clear the whole history? A backup copy is kept in the Ecoscribe folder.")) return;
     await api.clear_history(); renderHistory(); toast("History cleared.");
   };
+  const secShow = (k) => {  // Settings in short sections (dictado-6oe.7); the save bar covers them all
+    $$("#set-tabs .seg").forEach((b) => b.classList.toggle("active", b.dataset.sec === k));
+    $$("#settings .group[data-sec]").forEach((g) => (g.hidden = g.dataset.sec !== k));
+    store("ecoscribe.set-sec", k);
+  };
+  for (const b of $$("#set-tabs .seg")) b.onclick = () => secShow(b.dataset.sec);
+  secShow(store("ecoscribe.set-sec") || "dictation");
+  window.__secShow = secShow;
   $("#settings").addEventListener("change", dirty);
   $("#settings").addEventListener("input", (e) => { if (e.target.id === "f-vocabulary" || e.target.id === "f-calendar" || e.target.closest(".snip")) dirty(); });  // savebar while typing words
   $("#settings").addEventListener("submit", (e) => e.preventDefault());
