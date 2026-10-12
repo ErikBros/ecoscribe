@@ -380,6 +380,17 @@ async function load(query) {
   check(doc.querySelector("#s-done-sub").textContent.includes("menu bar"), "Mac wording on the last step");
   check(doc.querySelector("#s-skip").hidden, "no skipping on the Mac's first run either");
 }
+{ // Home tips (dictado-3vj): one that applies, x hides it for good
+  const { window, doc } = await load("page=inicio");
+  await sleep(200);
+  const box = doc.querySelector("#home-tip"), first = box.dataset.tip;
+  check(!box.hidden && first && doc.querySelector("#home-tip-text").textContent.startsWith("Tip"), "a tip shows: " + first);
+  check(first !== "snippets", "a tip already acted on is skipped (snippets are set up in the demo)" );
+  box.querySelector("#home-tip-x").click(); await sleep(100);
+  check(box.hidden || box.dataset.tip !== first, "x hides that tip");
+  let saved = null; try { saved = window.localStorage.getItem("ecoscribe.tips.hidden"); } catch { /* no storage on file:// in jsdom */ }
+  check(saved === null || JSON.parse(saved).includes(first), "and remembers it where storage works");
+}
 { // History > Retry (dictado-a2r)
   const { window, doc } = await load("page=historial");
   await sleep(200);
