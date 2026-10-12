@@ -175,7 +175,7 @@ function demoApi() {
         { name: "large-v3-turbo", label: "Fast", use: "English, Spanish and similar; finds the language in meetings and files", size: 1.62e9, required: !big, ready: params.get("models") === "ready" },
         { name: "Systran/faster-whisper-large-v3", label: "Most accurate", use: "Swedish, Greek and other languages; meetings and files in them", size: 3.09e9, required: big, ready: false }],
       permissions: MAC ? [{ key: "microphone", label: "Microphone", granted: true }, { key: "accessibility", label: "Accessibility", granted: false },
-        { key: "input", label: "Input Monitoring", granted: false }] : [] };
+        { key: "input", label: "Input Monitoring", granted: false, ask: true }] : [] };
     },
     setup_models_start: async (names) => {
       dl.models = Object.fromEntries(names.map((n) => [n, { done: 0, total: n.includes("turbo") ? 1.62e9 : 3.09e9, ready: false }]));
@@ -1252,9 +1252,9 @@ async function paintPerms() {
     input: "So the dictation key works everywhere" };
   $("#s-perms").innerHTML = info.permissions.map((p) => `<div class="s-row">
       <div class="s-row-text"><strong>${p.label}</strong><span class="muted small">${why[p.key] || ""}</span></div>
-      ${p.granted ? '<span class="s-ok">✓ On</span>' : `<button type="button" class="btn btn-ghost btn-sm" data-perm="${p.key}">Open settings</button>`}
+      ${p.granted ? '<span class="s-ok">✓ On</span>' : `<button type="button" class="btn btn-ghost btn-sm" data-perm="${p.key}">${p.ask ? "Allow" : "Open settings"}</button>`}
     </div>`).join("");
-  $$("#s-perms [data-perm]").forEach((b) => (b.onclick = () => api.open_permission(b.dataset.perm)));
+  $$("#s-perms [data-perm]").forEach((b) => (b.onclick = async () => { await api.open_permission(b.dataset.perm); paintPerms(); }));
 }
 
 function paintLangs() {
@@ -1374,7 +1374,9 @@ async function paintSummary() {
     ["Dictation key", `${sx.hold ? "Hold" : "Tap"} <kbd class="key">${sKey()}</kbd>`],
     ["Microphone", micLabel],
   ];
-  $("#s-summary").innerHTML = rows.map(([k, v]) => `<div class="s-row"><div class="s-row-text"><strong>${k}</strong><span class="muted small">${v}</span></div><span class="s-ok">✓</span></div>`).join("");
+  const off = info.permissions.filter((x) => !x.granted).map((x) => x.label);  // Mac: the key stays dead without them
+  if (off.length) rows.push(["Permissions", `Still off: ${off.join(", ")}. Turn them on in System Settings.`, false]);
+  $("#s-summary").innerHTML = rows.map(([k, v, ok = true]) => `<div class="s-row"><div class="s-row-text"><strong>${k}</strong><span class="muted small">${v}</span></div>${ok ? '<span class="s-ok">✓</span>' : ""}</div>`).join("");
 }
 
 async function leaveStep(step) {  // save what this step changed; false keeps you on it

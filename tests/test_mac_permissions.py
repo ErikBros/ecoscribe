@@ -44,3 +44,35 @@ def test_stop_ends_the_watch():
     calls = []
     permissions.watch(lambda st, old: calls.append(st), interval=60, stop=stop, check=_seq(off))
     assert calls == [off]  # returned at once, no 60 s wait
+
+
+def test_setup_button_asks_macos_first_then_opens_the_pane(monkeypatch):
+    """Until an app has asked, macOS doesn't list it in the pane: the first click shows macOS's prompt."""
+    from ecoscribe.platform.macos import permissions
+    asked, opened = [], []
+    monkeypatch.setattr(permissions, "_asked", set())
+    monkeypatch.setattr(permissions, "open_pane", opened.append)
+    monkeypatch.setattr(permissions, "ask", lambda k: (asked.append(k), permissions._asked.add(k)))
+    assert permissions.can_ask("input")
+    assert permissions.ask_or_open("input") == "asked" and asked == ["input"] and opened == []
+    assert not permissions.can_ask("input")
+    assert permissions.ask_or_open("input") == "opened" and opened == ["input"]
+
+
+def test_ask_failure_falls_back_to_the_pane(monkeypatch):
+    from ecoscribe.platform.macos import permissions
+    opened = []
+    monkeypatch.setattr(permissions, "_asked", set())
+    monkeypatch.setattr(permissions, "open_pane", opened.append)
+
+    def boom(k):
+        raise RuntimeError("no prompt")
+    monkeypatch.setattr(permissions, "ask", boom)
+    assert permissions.ask_or_open("accessibility") == "opened" and opened == ["accessibility"]
+
+
+def test_microphone_can_ask_only_while_not_determined(monkeypatch):
+    from ecoscribe.platform.macos import permissions
+    for st, want in ((0, True), (2, False), (3, False), (None, False)):
+        monkeypatch.setattr(permissions, "_mic_status", lambda st=st: st)
+        assert permissions.can_ask("microphone") is want
