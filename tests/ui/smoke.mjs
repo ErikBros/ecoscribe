@@ -105,6 +105,7 @@ async function load(query) {
   await sleep(50);
   check(!doc.querySelector("#nav-insights").hidden && !doc.querySelector("#page-insights").hidden, "Insights tab shown when switched on");
   check(doc.querySelector("#i-saved").textContent === "3 h 22 min", "time saved: " + doc.querySelector("#i-saved").textContent);
+  check(!doc.querySelector("#i-week").hidden && doc.querySelector("#i-week-text").textContent.includes("2.2 → 1.8"), "this week: hedges went down (dictado-6oe.6)");
   check(doc.querySelectorAll("#i-hours path.bar").length > 5 && doc.querySelectorAll("#i-days .tick").length === 3, "hour and day charts drawn");
   check(doc.querySelectorAll("#i-langs .i-hbar").length === 4 && doc.querySelector("#i-langs .i-hbar-name").textContent === "English", "languages by name");
   check(doc.querySelector("#i-habits").textContent.includes("3.1"), "filler words per 100");
@@ -151,7 +152,11 @@ async function load(query) {
   done.querySelector("button").click(); await sleep(200);
   check(!doc.querySelector("#page-reuniones").hidden && !doc.querySelector("#r-detail-view").hidden, "Open jumps to the transcript");
   doc.querySelector('.nav-item[data-page="historial"]').click(); await sleep(150);
-  check(doc.querySelector(".badge")?.textContent === "didn't paste", "not-pasted badge");
+  check(doc.querySelector("#page-historial .h-tag-dark")?.textContent.startsWith("Not pasted"), "not-pasted chip");
+  check(doc.querySelectorAll("#history .h-group").length >= 1, "History: a card per day (dictado-6oe.5)");
+  doc.querySelector('#h-filter [data-kind="meet"]').click(); await sleep(150);
+  check([...doc.querySelectorAll("#history .h-item")].every((li) => li.classList.contains("h-meeting")), "the Meetings filter shows only meetings");
+  doc.querySelector('#h-filter [data-kind="all"]').click(); await sleep(150);
   const s = doc.querySelector("#search");
   s.value = "climbing"; s.dispatchEvent(new window.Event("input"));
   await sleep(250);
@@ -260,7 +265,9 @@ async function load(query) {
   [...doc.querySelectorAll(".r-row")].find((li) => li.dataset.name === "2026-10-05_0915_planering").click(); await sleep(150);
   check(!doc.querySelector("#r-d-done-actions").hidden && doc.querySelectorAll(".r-seg").length === 4, "done session: transcript + actions");
   check(doc.querySelector('.r-who[data-who="Others"]') !== null, "speaker labels shown");
-  check(doc.querySelector("#r-copy-summary")?.textContent === "Copy summary prompt", "done session offers a summary prompt");
+  check(doc.querySelector("#r-copy-summary")?.textContent.startsWith("Copy a summary prompt"), "done session offers a summary prompt (in the Copy menu)");
+  check(doc.querySelectorAll("#r-d-done-actions > .btn, #r-d-done-actions > details").length === 3, "three actions: Copy ▾, Email, ··· (dictado-6oe.4)");
+  check(doc.querySelectorAll("#r-list .r-day").length >= 1, "the list is grouped by day");
   { // t0u.22: several remote speakers, named and renamed
     doc.querySelector("#r-back").click(); await sleep(150);
     [...doc.querySelectorAll(".r-row")].find((li) => li.dataset.name === "2026-10-04_1600_kund").click(); await sleep(150);
@@ -298,7 +305,7 @@ async function load(query) {
   const next = doc.querySelector("#s-next");
   check(!doc.querySelector("#setup").hidden, "setup opens on first run");
   check(on() === "languages", "Windows skips the permissions step");
-  check(doc.querySelectorAll("#s-bar span").length === 6, "progress bar has a segment per step");
+  check(doc.querySelectorAll("#s-steps li").length === 6, "the side panel lists every step (dictado-6oe.8)");
   check(doc.querySelectorAll("#s-langs .s-lchip").length === 1 && doc.querySelector("#s-langs").textContent.includes("English")
     && !doc.querySelector("#s-langs [data-x]"), "starts with English only, which can't be removed");
   check(doc.querySelector("#s-skip").hidden, "the first run can't be skipped");
@@ -318,7 +325,7 @@ async function load(query) {
   check(next.disabled, "can't go on before the required model is there");
   check(doc.querySelector("#s-download").textContent.includes("4.7 GB"), "download offers both models (4.7 GB)");
   doc.querySelector("#s-download").click();
-  for (let i = 0; i < 40 && next.disabled; i++) await sleep(100);
+  for (let i = 0; i < 150 && next.disabled; i++) await sleep(100);  // the demo download takes ~4 s: don't race it
   check(!next.disabled && doc.querySelectorAll("#s-models .s-model.ready").length === 2, "both models download, then Continue");
   next.click(); await sleep(250);
   check(on() === "mic" && doc.querySelector("#s-mic").options.length > 1, "mic step lists the mics");
@@ -385,6 +392,14 @@ async function load(query) {
   b.click(); await sleep(150);
   check(window.__emailed === "2026-10-05_0915_planering" && doc.querySelector("#toast").textContent.includes("to 2 people")
     && doc.querySelector("#toast").textContent.includes("paste it in"), "opens a draft to the participants, says to paste");
+}
+{ // Settings in sections (dictado-6oe.7)
+  const { window, doc } = await load("page=ajustes");
+  await sleep(150);
+  const vis = () => [...doc.querySelectorAll("#settings .group")].filter((g) => !g.hidden).map((g) => g.dataset.sec);
+  check(vis().length > 0 && vis().every((k) => k === "dictation"), "Settings opens on one section");
+  doc.querySelector('#set-tabs [data-sec="meetings"]').click(); await sleep(50);
+  check(vis().length > 0 && vis().every((k) => k === "meetings"), "a tab shows only its section");
 }
 console.log(failed ? `\n${failed} FAILED` : "\nall ok");
 process.exit(failed ? 1 : 0);

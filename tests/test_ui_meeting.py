@@ -96,7 +96,8 @@ def test_prompt_texts_and_timeout():
     assert e.title == "Did the meeting end?"
     assert e.buttons == [("Stop", "parar"), ("Keep going", "seguir")]
     assert e.expired(59.0) is None and e.expired(61.0) == "hide"  # the watcher stops it by itself
-    assert e.countdown(10.0) is None and e.button_text("seguir", 10.0) == "Keep going"
+    assert e.countdown(10.0) == 50 and e.button_text("seguir", 10.0) == "Keep going"
+    assert e.button_text("parar", 10.0) == "Stop (50)"  # no answer stops it: the count is on Stop
     d = meetui.Prompt("done", "C:/x/2026-10-05_1400_reunion", None, opened_at=0.0)
     assert d.title == "Transcript ready" and d.buttons[0] == ("Open", "abrir")
     assert meetui.app_name("slack") == "Slack" and meetui.app_name("chrome") == "Chrome"
@@ -203,3 +204,10 @@ def test_nomic_prompt_names_the_mic():
     p = meetui.Prompt("nomic", "Zone Vibe 100", None, opened_at=0.0)
     assert "Zone Vibe 100" in p.question and [c for _l, c in p.buttons] == ["mic", "hide"]
     assert p.expired(1000.0) == "hide"
+
+
+def test_every_box_counts_down_on_what_its_timeout_does():
+    d = meetui.Prompt("done", "C:/x/none", None, opened_at=0.0)
+    assert d.button_text("hide", 3.2) == "Close (12)" and d.button_text("abrir", 3.2) == "Open"
+    n = meetui.Prompt("nomic", "Zone Vibe 100", None, opened_at=0.0)
+    assert n.button_text("hide", 0.0) == "Close (15)" and n.button_text("mic", 0.0) == "Check the mic"

@@ -416,6 +416,19 @@ function renderClarity(c) {  // dictado-9jc.1
   }
   if (!c.words.length) box.textContent = "None so far: every word came through clearly.";
 }
+function iWeek(m, coach) {  // the one-line "this week" from the hedges per week (dictado-6oe.6)
+  const box = $("#i-week");
+  const weeks = ((m && m.weeks) || []).filter((w) => w.hedges_per_100 != null);
+  box.hidden = weeks.length < 2;
+  if (box.hidden) return;
+  const [prev, last] = weeks.slice(-2), a = prev.hedges_per_100, b = last.hedges_per_100;
+  const top = (m.top_hedges || [])[0];
+  const dir = b < a ? "less" : b > a ? "more" : "as much as before";
+  $("#i-week-text").innerHTML = `<b>This week:</b> you hedged ${dir === "as much as before" ? dir : dir + ` in messages to people, ${a} → ${b} per 100 words`}.`
+    + (top ? ` <span></span>` : "");
+  if (top) $("#i-week-text span").textContent = `"${top.word}" is still the one you use most.`;
+  $("#i-week-coach").disabled = !(coach && coach.people);
+}
 async function renderInsights() {
   for (const b of $$("#i-range .seg")) b.setAttribute("aria-checked", String((b.dataset.days || null) === iDays));
   const d = await api.get_insights(iDays ? Number(iDays) : null);
@@ -460,6 +473,7 @@ async function renderInsights() {
   renderMarkers(d.markers);
   renderPace(d.pace);
   renderMeetings(d.meetings);
+  iWeek(d.markers, d.coach);
   const people = d.coach ? d.coach.people : 0;  // dictado-9jc.2
   $("#i-coach").disabled = !people;
   $("#i-coach").title = people ? `${people} ${people === 1 ? "message" : "messages"} to people in the last ${d.coach.days} days`
@@ -503,9 +517,21 @@ async function refreshStatus() {
   side.dataset.state = state;
   $(".side-status-text", side).textContent = state === "ready" ? `Ready · ${hotkeyLabel(s.hotkey)}` : short;
   $("#ver").textContent = `v${s.version || ""}`;
+  paintFacts(s, state);  // the sidebar card, on every page (dictado-6oe.3)
   if (current === "inicio") paintHero(s, state, short, long);
 }
+function paintFacts(s, state) {
+  const none = state === "stopped" ? "—" : "…";
+  $("#fact-mic").textContent = s.mic ? (s.fell_back ? DEFAULT_MIC : prettyMic(s.mic)) : none;
+  $("#fact-mic").title = s.mic || "";
+  const langs = s.languages || [];
+  $("#fact-lang").textContent = !langs.length ? none
+    : langs.length === 1 ? (DICT_LANGS[langs[0]] || langs[0]) : langs.map((l) => l.toUpperCase()).join(" · ") + ", detected";
+  $("#fact-lang").title = langs.map((l) => DICT_LANGS[l] || l).join(", ");
+  $("#fact-engine").textContent = s.device ? (s.device === "cuda" || s.device === "mlx" ? "GPU · fast" : "CPU · slow") : none;
+}
 function paintHero(s, state, short, long) {
+  $(".hero").dataset.state = state;
   $("#hero-badge").dataset.state = state;
   $("#hero-badge-text").textContent = short;
   $("#hero-title").textContent = long;
@@ -525,15 +551,11 @@ function paintHero(s, state, short, long) {
   if (s.hotkey && s.hotkey.includes("+")) {  // a combo: no tap, and no Esc cancel (tray > Cancel recording)
     $("#hero-how").textContent = `Press ${hotkeyLabel(s.hotkey)}, talk, and press it again. The text appears wherever the cursor is.`;
     $("#tip-cancel").hidden = true;
+  } else if (s.hotkey) {  // the user's own key, as a keycap
+    $("#hero-how").innerHTML = `Tap <kbd class="key key-wide"></kbd>, talk, and tap it again. The text appears wherever the cursor is.`;
+    $("#hero-how kbd").textContent = hotkeyLabel(s.hotkey);
+    $$(".tip-key").forEach((el) => (el.textContent = hotkeyLabel(s.hotkey)));
   }
-  const none = state === "stopped" ? "—" : "…";
-  $("#fact-mic").textContent = s.mic ? (s.fell_back ? DEFAULT_MIC : prettyMic(s.mic)) : none;
-  $("#fact-mic").title = s.mic || "";
-  const langs = s.languages || [];
-  $("#fact-lang").textContent = !langs.length ? none
-    : langs.length === 1 ? (DICT_LANGS[langs[0]] || langs[0]) : langs.map((l) => l.toUpperCase()).join(" · ") + " (auto)";
-  $("#fact-lang").title = langs.map((l) => DICT_LANGS[l] || l).join(", ");
-  $("#fact-engine").textContent = s.device ? (s.device === "cuda" ? "GPU · fast" : "CPU · slow") : none;
 }
 
 // dictation languages (dictado-bvf): any mix, auto-detected among them; set in Settings
@@ -554,25 +576,37 @@ async function crashCard() {  // t0u.37: a crash is never silent
   $("#crash-dismiss").onclick = async () => { for (const i of c.items) await api.dismiss_crash(i.name); crashCard(); };
 }
 
-async function renderInicio() {
+async function renderInicio() {  // the dictate banner, today's numbers, recent dictations (dictado-6oe.3)
   crashCard();
+  const hour = new Date().getHours();
+  $("#home-hello").textContent = hour < 5 ? "Good night" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  $("#home-date").textContent = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
   await refreshStatus();
-  const h = await api.get_history(1, "");
+  const h = await api.get_history(200, "");
+  const today = new Date().toISOString().slice(0, 10);
+  const todays = h.items.filter((x) => String(x.ts || "").startsWith(today));
   $("#stat-today").textContent = fmtNum(h.stats.today_words);
-  $("#stat-total").textContent = `${fmtNum(h.stats.total_words)} words in total`;
-  const last = h.items[0];
-  const copyBtn = $("#last-copy");
-  if (last) {
-    $("#last-text").textContent = last.text.trim();
-    $("#last-meta").textContent = [when(last.ts), last.pasted === false ? "not pasted: copy it from here" : appName(last.target)]
-      .filter(Boolean).join(" · ");  // dictado-bhe: no text box under the cursor at the stop
-    copyBtn.hidden = false;
-    copyBtn.onclick = () => copy(last.text, copyBtn);
-  } else {
-    $("#last-text").innerHTML = '<span class="muted">You haven\'t dictated anything yet.</span>';
-    $("#last-meta").textContent = "";
-    copyBtn.hidden = true;
+  $("#stat-saved").textContent = `${Math.max(0, Math.round(h.stats.today_words / 40))} min`;  // typing runs about 40 words a minute
+  $("#stat-count").textContent = fmtNum(todays.length);
+  $("#stat-total").textContent = h.stats.total_words ? `${fmtNum(h.stats.total_words)} words in total` : "";
+  const list = $("#recent-list");
+  list.innerHTML = "";
+  for (const [i, x] of h.items.slice(0, 3).entries()) {
+    const li = document.createElement("li"); li.className = "recent-item";
+    const p = document.createElement("p"); p.className = "last-text"; p.textContent = x.text.trim();
+    if (i === 0) p.id = "last-text";
+    const meta = document.createElement("span"); meta.className = "recent-meta";
+    meta.textContent = [when(x.ts), x.pasted === false ? "" : appName(x.target)].filter(Boolean).join(" · ");
+    li.append(p, meta);
+    if (x.pasted === false) {  // dictado-bhe: no text box under the cursor at the stop
+      const b = document.createElement("span"); b.className = "badge"; b.textContent = "Not pasted"; li.append(b);
+    }
+    const c = document.createElement("button"); c.type = "button"; c.className = "btn btn-ghost btn-sm"; c.textContent = "Copy";
+    c.onclick = () => copy(x.text, c);
+    li.append(c);
+    list.append(li);
   }
+  if (!h.items.length) list.innerHTML = '<li class="recent-item"><p class="last-text" id="last-text"><span class="muted">You haven\'t dictated anything yet. Tap the key and talk.</span></p></li>';
 }
 
 /* ---------------------------------------------------------------- reuniones */
@@ -615,17 +649,27 @@ async function renderReuniones() {
   paintNow(out.state);
   const list = $("#r-list");
   list.innerHTML = "";
+  let day = null;
   for (const row of out.items) {
+    const d = dayLabel(row.created);  // grouped by day (dictado-6oe.4)
+    if (d !== day) {
+      day = d;
+      const h = document.createElement("li"); h.className = "r-day"; h.textContent = d; list.append(h);
+    }
     const li = document.createElement("li");
     li.className = "h-item r-row"; li.tabIndex = 0; li.dataset.name = row.name;
+    li.insertAdjacentHTML("afterbegin", row.source === "import"
+      ? '<svg class="r-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7z"/><path d="M14 3v4h4"/></svg>'
+      : '<svg class="r-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg>');
     const title = document.createElement("p");
     title.className = "h-text r-row-title"; title.textContent = row.title || "Untitled";
     const st = document.createElement("span");
     st.className = "r-chip"; chip(st, row);
+    if (row.status === "done") { st.className = "r-dur"; st.textContent = fmtDur(row.duration_s); }  // finished: just how long
     const meta = document.createElement("div");
     meta.className = "h-meta";
-    meta.textContent = [when(row.created), row.lang_name, fmtDur(row.duration_s), row.source === "import" ? "file" : "meeting"]
-      .filter(Boolean).join(" · ");
+    meta.textContent = [timeOf(row.created), row.source === "import" ? "file" : appName((row.app || "") + ".exe") || "meeting", row.lang_name,
+      row.people && row.people.length ? row.people.slice(0, 3).join(", ") : ""].filter(Boolean).join(" · ");
     li.append(title, st, meta);
     li.onclick = () => openSession(row.name);
     li.onkeydown = (e) => { if (e.key === "Enter") openSession(row.name); };
@@ -635,6 +679,14 @@ async function renderReuniones() {
   $("#r-empty").hidden = out.items.length > 0;
   $("#r-empty-text").textContent = q ? `Nothing matches "${q}".` : "Your meetings and the audio you import will show up here.";
 }
+function dayLabel(iso) {
+  const d = new Date(iso || 0), t = new Date(), y = new Date(t); y.setDate(t.getDate() - 1);
+  if (isNaN(d)) return "Earlier";
+  if (d.toDateString() === t.toDateString()) return "Today";
+  if (d.toDateString() === y.toDateString()) return "Yesterday";
+  return d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+}
+function timeOf(iso) { const d = new Date(iso || 0); return isNaN(d) ? "" : d.toTimeString().slice(0, 5); }
 function paintNow(state) {
   const m = state && state.meeting;
   $("#r-now").hidden = !m;
@@ -694,7 +746,12 @@ function segLi(s, editable) {
   }
   const p = document.createElement("p");
   p.className = "r-text"; p.textContent = s.text;
-  li.append(t, who, p);
+  const av = document.createElement("span");  // a conversation, not a table (dictado-6oe.4)
+  av.className = "r-av"; av.dataset.who = who.dataset.who; av.setAttribute("aria-hidden", "true");
+  av.textContent = who.dataset.who === "Me" ? "Me" : (whoName(s.speaker) || "?").slice(0, 1).toUpperCase();
+  const head = document.createElement("span"); head.className = "r-seg-head";
+  head.append(who, t);
+  li.append(av, head, p);
   return li;
 }
 async function renderDetail(name) {
@@ -744,6 +801,15 @@ async function renderDetail(name) {
     $("#r-d-progress-fill").style.width = `${s.pct || 0}%`;
     $("#r-d-progress-text").textContent = s.status === "queued" || s.status === "new" ? "Queued: starts when the previous one finishes."
       : s.status === "downloading" ? "Downloading this language's model (first time only)." : `${s.pct || 0} %${s.slow ? " · on CPU, slow" : ""}`;
+  }
+  const people = s.people || [];
+  $("#r-people").hidden = !people.length;
+  $("#r-people-list").innerHTML = "";
+  for (const n of people) {
+    const li = document.createElement("li");
+    li.innerHTML = '<span class="r-av"></span><span></span>';
+    li.firstChild.textContent = n.slice(0, 1).toUpperCase(); li.lastChild.textContent = n;
+    $("#r-people-list").append(li);
   }
   if (segs && (changed || $("#r-segs").childElementCount !== segs.length)) {
     const list = $("#r-segs");
@@ -819,7 +885,13 @@ function rWire() {
   if (!sel.value) sel.value = R_LANGS[0][0];  // a stored language that was removed
   sel.onchange = () => store("ecoscribe.r-lang", sel.value);
   $("#r-start").onclick = rStart;
+  $("#home-record").onclick = async () => { await show("reuniones"); rStart(); };  // Home's quick actions (dictado-6oe.3)
+  $("#home-file").onclick = async () => { const out = await api.pick_files(); if (out.paths && out.paths.length) { await show("reuniones"); rImport(out.paths); } };
+  $("#recent-all").onclick = (e) => { e.preventDefault(); show("historial"); };
   $("#r-now-stop").onclick = rStop;
+  document.addEventListener("click", (e) => {  // the Copy and ··· menus: close after a choice or a click elsewhere
+    for (const m of $$("details.menu[open]")) if (!m.contains(e.target) || e.target.closest(".menu-item")) m.open = false;
+  });
   $("#r-d-stop").onclick = rStop;
   $("#r-segs").addEventListener("scroll", () => { if (atBottom($("#r-segs"))) $("#r-jump").hidden = true; });
   $("#r-jump").onclick = () => { const l = $("#r-segs"); l.scrollTop = l.scrollHeight; $("#r-jump").hidden = true; };
@@ -871,6 +943,7 @@ function rWire() {
 
 /* ---------------------------------------------------------------- historial */
 let searchTimer = null;
+let hKind = "all";  // History's filter: all | dict | meet (dictado-6oe.5)
 async function renderHistory() {
   const q = $("#search").value;
   const h = await api.get_history(200, q);
@@ -879,27 +952,31 @@ async function renderHistory() {
   const list = $("#history");
   list.innerHTML = "";
   const rows = [...h.items.map((x) => ({ kind: "dict", ts: x.ts, x })), ...meets.map((x) => ({ kind: "meet", ts: x.created, x }))]
+    .filter((row) => hKind === "all" || row.kind === hKind)
     .sort((a, b) => String(b.ts).localeCompare(String(a.ts)));
+  let day = null, group = null;
   for (const row of rows) {
-    if (row.kind === "meet") { list.append(meetingHistoryItem(row.x)); continue; }
+    const d = dayLabel(row.ts);  // grouped by day, a card each (dictado-6oe.5)
+    if (d !== day) {
+      day = d;
+      const hd = document.createElement("li"); hd.className = "r-day"; hd.textContent = d; list.append(hd);
+      const g = document.createElement("li"); g.className = "h-group"; group = document.createElement("ol"); group.className = "h-group-list";
+      g.append(group); list.append(g);
+    }
+    if (row.kind === "meet") { group.append(meetingHistoryItem(row.x)); continue; }
     const r = row.x;
     const li = document.createElement("li");
     li.className = "h-item";
+    const t = document.createElement("span"); t.className = "h-time"; t.textContent = timeOf(r.ts);
     const p = document.createElement("p");
     p.className = "h-text"; p.textContent = r.text.trim();
     const meta = document.createElement("div");
     meta.className = "h-meta";
-    meta.textContent = [when(r.ts), appName(r.target)].filter(Boolean).join(" · ");
-    if (r.pasted === false) {
-      const b = document.createElement("span");
-      b.className = "badge"; b.textContent = "didn't paste";
-      meta.append(b);
-    }
-    if (r.retried) {
-      const b = document.createElement("span");
-      b.className = "badge"; b.textContent = "retried";
-      meta.append(b);
-    }
+    const tag = (txt, cls = "") => { const b = document.createElement("span"); b.className = "h-tag " + cls; b.textContent = txt; meta.append(b); };
+    if (r.lang && !String(r.lang).includes("+")) tag(String(r.lang).toUpperCase(), "h-tag-line");
+    if (appName(r.target)) tag(appName(r.target));
+    if (r.pasted === false) tag("Not pasted: copy it here", "h-tag-dark");
+    if (r.retried) tag("Retried", "h-tag-blue");
     const btns = document.createElement("div");
     btns.className = "h-btns";
     if (r.audio && r.id) btns.append(retryButton(r, p));
@@ -907,13 +984,15 @@ async function renderHistory() {
     btn.className = "btn btn-ghost btn-sm h-copy"; btn.textContent = "Copy";
     btn.onclick = () => copy(r.text, btn);
     btns.append(btn);
-    li.append(p, btns, meta);
-    list.append(li);
+    li.append(t, p, btns, meta);
+    group.append(li);
   }
   const empty = rows.length === 0;
   $("#history-empty").hidden = !empty;
   $("#history-empty-text").textContent = q ? `Nothing matches "${q}".` : "Everything you dictate will show up here.";
-  $("#history-count").textContent = h.stats.total ? `${fmtNum(h.stats.total)} dictations · ${fmtNum(h.stats.total_words)} words` : "";
+  const count = h.stats.total ? `${fmtNum(h.stats.total)} dictations · ${fmtNum(h.stats.total_words)} words` : "";
+  $("#history-count").textContent = count;
+  $("#history-sub").textContent = count ? count + " · kept on this computer" : "";
   $("#history-clear").hidden = !h.stats.total;
 }
 
@@ -968,8 +1047,9 @@ function meetingHistoryItem(m) {  // a meeting transcript in History: opens in M
   const st = document.createElement("span"); st.className = "r-chip"; chip(st, m);
   const meta = document.createElement("div");
   meta.className = "h-meta";
-  meta.textContent = [when(m.created), m.source === "import" ? "Imported file" : "Meeting", m.lang_name, fmtDur(m.duration_s)].filter(Boolean).join(" · ");
-  meta.prepend(st);
+  meta.textContent = [m.source === "import" ? "Imported file" : "Meeting", m.lang_name, fmtDur(m.duration_s)].filter(Boolean).join(" · ");
+  if (m.status !== "done") meta.prepend(st);  // a finished one needs no chip (dictado-6oe.5)
+  const t = document.createElement("span"); t.className = "h-time"; t.textContent = timeOf(m.created);
   const btns = document.createElement("div");
   btns.className = "h-btns";
   const open = document.createElement("button");
@@ -982,7 +1062,7 @@ function meetingHistoryItem(m) {  // a meeting transcript in History: opens in M
     dl.onclick = async () => { const out = await api.save_export(m.name, "md"); toast(out.ok ? `In Downloads: ${out.name}` : out.error || "Couldn't export."); };
     btns.append(dl);
   }
-  li.append(p, btns, meta);
+  li.append(t, p, btns, meta);
   return li;
 }
 
@@ -1328,7 +1408,8 @@ async function openSetup(rerun = false) {  // the first run can't be skipped; Ru
   sx.hotkey = st.values.hotkey; sx.hold = !!st.values.hold_to_talk; sx.mic = st.values.mic || "";
   const info = await api.setup_info(sx.langs.join(","));
   sx.steps = $$(".sstep").map((el) => el.dataset.step).filter((k) => k !== "permissions" || info.permissions.length);
-  $("#s-bar").innerHTML = sx.steps.map(() => "<span></span>").join("");
+  const label = { permissions: "Permissions", languages: "Languages", models: "Speech models", mic: "Microphone", shortcut: "Dictation key", try: "Try it", done: "Done" };
+  $("#s-steps").innerHTML = sx.steps.map((k, i) => `<li data-step="${k}"><span class="s-num">${i + 1}</span>${label[k] || k}</li>`).join("");
   $("#s-bars").innerHTML = Array.from({ length: 12 }, (_, i) => `<i style="height:${18 + i * 4}px"></i>`).join("");
   sx.i = Math.max(0, sx.steps.indexOf(params.get("sstep")));  // ?sstep=models: screenshots of one step
   $("#setup").hidden = false;
@@ -1338,7 +1419,10 @@ async function openSetup(rerun = false) {  // the first run can't be skipped; Ru
 async function paintSetup() {
   const step = sx.steps[sx.i];
   $$(".sstep").forEach((el) => el.classList.toggle("on", el.dataset.step === step));
-  $$("#s-bar span").forEach((el, i) => el.classList.toggle("on", i <= sx.i));
+  $$("#s-steps li").forEach((el, i) => { el.classList.toggle("done", i < sx.i); el.classList.toggle("on", i === sx.i);
+    el.querySelector(".s-num").textContent = i < sx.i ? "✓" : String(i + 1); if (i === sx.i) el.setAttribute("aria-current", "step"); else el.removeAttribute("aria-current"); });
+  const eb = $(`.sstep[data-step="${step}"] .s-eyebrow`);
+  if (eb && step !== "done") eb.textContent = `Step ${sx.i + 1} of ${sx.steps.length - 1}`;
   $("#s-back").style.visibility = sx.i ? "visible" : "hidden";
   $("#s-skip").hidden = !sx.rerun || step === "done";
   $("#s-next").textContent = step === "done" ? "Start using Ecoscribe" : "Continue →";
@@ -1571,6 +1655,7 @@ async function boot() {
   for (const b of $$(".nav-item")) b.onclick = () => { if (b.dataset.page === "reuniones") r.open = null; show(b.dataset.page); };
   try { $("#nav-insights").hidden = !(await api.get_settings()).values.insights; } catch {}
   for (const b of $$("#i-range .seg")) b.onclick = () => { iDays = b.dataset.days || null; renderInsights(); };
+  $("#i-week-coach").onclick = () => $("#i-coach").click();
   $("#i-coach").onclick = async () => {
     const r = await api.coach_me();
     toast(r.ok ? "Copied: paste it into Claude." : "Nothing dictated to people in the last two weeks yet.");
@@ -1583,10 +1668,21 @@ async function boot() {
   notesWire();
   hkWire();
   $("#search").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(renderHistory, 120); });
+  for (const b of $$("#h-filter .seg")) b.onclick = () => {
+    hKind = b.dataset.kind; $$("#h-filter .seg").forEach((x) => x.classList.toggle("active", x === b)); renderHistory();
+  };
   $("#history-clear").onclick = async () => {
     if (!confirm("Clear the whole history? A backup copy is kept in the Ecoscribe folder.")) return;
     await api.clear_history(); renderHistory(); toast("History cleared.");
   };
+  const secShow = (k) => {  // Settings in short sections (dictado-6oe.7); the save bar covers them all
+    $$("#set-tabs .seg").forEach((b) => b.classList.toggle("active", b.dataset.sec === k));
+    $$("#settings .group[data-sec]").forEach((g) => (g.hidden = g.dataset.sec !== k));
+    store("ecoscribe.set-sec", k);
+  };
+  for (const b of $$("#set-tabs .seg")) b.onclick = () => secShow(b.dataset.sec);
+  secShow(store("ecoscribe.set-sec") || "dictation");
+  window.__secShow = secShow;
   $("#settings").addEventListener("change", dirty);
   $("#settings").addEventListener("input", (e) => { if (e.target.id === "f-vocabulary" || e.target.id === "f-calendar" || e.target.closest(".snip")) dirty(); });  // savebar while typing words
   $("#settings").addEventListener("submit", (e) => e.preventDefault());
@@ -1615,7 +1711,7 @@ async function boot() {
 function macify() {
   const set = (sel, html) => { const el = $(sel); if (el) el.innerHTML = html; };
   set("#hero-how", 'Tap <kbd class="key key-wide">⌘</kbd> <span class="key-side">(right Command)</span>, talk, and tap it again. The text appears wherever the cursor is.');
-  set("#tip-cancel", '<span class="keys"><kbd class="key">⌘</kbd><span class="plus">+</span><kbd class="key">Esc</kbd></span><span>Hold Right Command and press Esc to cancel.</span>');
+  set("#tip-cancel", '<strong>Tip</strong> · Hold <span class="tip-key">Right Command</span> and press Esc to cancel a dictation.');
   set("#hk-label", "Right Command");
   set("#hk-hint", HK_HINT);
   for (const el of $$(".tip .keys kbd.key")) if (el.textContent === "Ctrl") el.textContent = "⌘";

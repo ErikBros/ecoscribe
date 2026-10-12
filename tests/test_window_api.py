@@ -392,3 +392,11 @@ def test_email_participants_long_transcript_is_copied_to_paste(tmp_path, monkeyp
     assert r["ok"] and not r["inline"] and r["to"] == []
     assert len(opened[0]) < 1800 and "paste%20it%20here" in opened[0]
     assert copied[0].count("word") == 2000
+
+
+def test_session_rows_carry_people_and_app_for_the_meeting_page(tmp_path):
+    from ecoscribe import sessions as S
+    d = S.create("Weekly planning", "en", "meeting", tmp_path)
+    S.write_meta(d, app="msteams", calendar={"title": "Weekly planning", "attendees": ["Ana Ruiz", "Bo Lind"]})
+    row = Api._row(S.read_meta(d) | {"dir": str(d)})
+    assert row["people"] == ["Ana Ruiz", "Bo Lind"] and row["app"] == "msteams"

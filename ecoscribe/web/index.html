@@ -10,11 +10,10 @@
 <div class="shell">
   <aside class="side">
     <div class="brand">
-      <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
-        <rect width="64" height="64" rx="14" fill="var(--aegean)"/>
-        <rect x="25" y="12" width="14" height="25" rx="7" fill="var(--paper)"/>
-        <path d="M20.5 32.5a11.5 11.5 0 0 0 23 0" fill="none" stroke="var(--paper)" stroke-width="4.5" stroke-linecap="round"/>
-        <path d="M32 45v6M24 52h16" stroke="var(--paper)" stroke-width="4.5" stroke-linecap="round"/>
+      <svg class="mark" viewBox="0 0 48 48" aria-hidden="true"><!-- logo A, Lines (dictado-6oe.1) -->
+        <rect width="48" height="48" rx="11" fill="var(--aegean)"/>
+        <path d="M13 15h22M13 24h15M13 33h22" stroke="var(--paper)" stroke-width="4.2" stroke-linecap="round"/>
+        <circle cx="34" cy="24" r="2.6" fill="#e58a5f"/>
       </svg>
       <div>
         <div class="brand-name">Ecoscribe</div>
@@ -33,8 +32,13 @@
       <button class="nav-item" data-page="ajustes">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h8M17 7h2M5 17h2M11 17h8"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>Settings</button>
     </nav>
-    <div class="side-status" id="side-status">
-      <span class="dot"></span><span class="side-status-text">Checking…</span>
+    <div class="side-card">  <!-- what Home's facts were (dictado-6oe.3) -->
+      <div class="side-status" id="side-status"><span class="dot"></span><span class="side-status-text">Checking…</span></div>
+      <div class="side-facts">
+        <span title="Microphone"><span class="sr">Mic: </span><span id="fact-mic">…</span></span>
+        <span><span class="sr">Languages: </span><span id="fact-lang"></span></span>
+        <span><span class="sr">Engine: </span><span id="fact-engine">…</span></span>
+      </div>
     </div>
   </aside>
 
@@ -42,7 +46,7 @@
     <!-- INICIO -->
     <section class="page" id="page-inicio" hidden>
       <header class="page-head">
-        <h1>Home</h1>
+        <h1 id="home-hello">Home</h1><span class="muted" id="home-date"></span>
       </header>
       <div class="crash-card card" id="crash-card" hidden>
         <div class="crash-text"><strong id="crash-title">Ecoscribe crashed</strong>
@@ -51,64 +55,54 @@
           <button type="button" class="btn btn-sm" id="crash-copy">Copy crash report for Claude</button>
           <button type="button" class="btn btn-ghost btn-sm" id="crash-dismiss">Dismiss</button></div>
       </div>
-      <div class="hero card">
+      <div class="hero" data-state="ready">  <!-- the dictate banner (dictado-6oe.3) -->
         <div class="hero-state">
           <span class="state-badge" id="hero-badge"><span class="dot"></span><span id="hero-badge-text">…</span></span>
           <h2 id="hero-title">Checking Ecoscribe…</h2>
-          <p class="hero-how" id="hero-how">Tap <kbd class="key key-wide">Ctrl</kbd> <span class="key-side">(right)</span>, talk, and tap it again. The text appears wherever the cursor is.</p>
+          <p class="hero-how" id="hero-how">Tap <kbd class="key key-wide">Right Ctrl</kbd>, talk, and tap it again. The text appears wherever the cursor is.</p>
           <div class="hero-actions" id="hero-actions"></div>
         </div>
-        <div class="hero-facts">
-          <div class="fact"><span class="fact-label">Mic</span><span class="fact-value" id="fact-mic">…</span></div>
-          <div class="fact"><label class="fact-label" for="fact-lang">Language</label><span class="fact-value" id="fact-lang"></span></div>
-          <div class="fact"><span class="fact-label">Engine</span><span class="fact-value" id="fact-engine">…</span></div>
-        </div>
+        <svg class="hero-wave" viewBox="0 0 220 90" aria-hidden="true"><path d="M10 45v0M24 38v14M38 30v30M52 20v50M66 34v22M80 26v38M94 12v66M108 28v34M122 36v18M136 22v46M150 32v26M164 40v10M178 30v30M192 38v14M206 45v0"/><circle cx="94" cy="45" r="6"/></svg>
       </div>
 
-      <div class="grid2">
-        <div class="card stat-card">
-          <div class="card-title">Today</div>
-          <div class="stat"><span class="stat-num" id="stat-today">0</span><span class="stat-unit">words</span></div>
-          <div class="muted" id="stat-total">0 words in total</div>
-        </div>
-        <div class="card last-card">
-          <div class="card-title">Last dictation</div>
-          <p class="last-text" id="last-text"><span class="muted">You haven't dictated anything yet.</span></p>
-          <div class="last-meta">
-            <span class="muted small" id="last-meta"></span>
-            <button class="btn btn-ghost btn-sm" id="last-copy" hidden>Copy</button>
-          </div>
-        </div>
+      <div class="today">
+        <div class="card today-stat"><span class="card-title">Words today</span><span class="today-num" id="stat-today">0</span></div>
+        <div class="card today-stat"><span class="card-title">Typing saved</span><span class="today-num" id="stat-saved">0 min</span></div>
+        <div class="card today-stat"><span class="card-title">Dictations</span><span class="today-num" id="stat-count">0</span></div>
       </div>
 
-      <div class="card tips">
-        <div class="tip"><svg viewBox="0 0 24 24" class="tip-ico" aria-hidden="true"><rect x="3.5" y="5" width="12" height="9" rx="1.5"/><path d="M8.5 17.5V19a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 20.5 19v-6A1.5 1.5 0 0 0 19 11.5h-1"/></svg><span>While you talk you can switch apps, click or use shortcuts: nothing cuts the recording.</span></div>
-        <div class="tip" id="tip-cancel"><span class="keys"><kbd class="key">Ctrl</kbd><span class="plus">+</span><kbd class="key">Esc</kbd></span><span>Hold Right Ctrl and press Esc to cancel.</span></div>
-        <div class="tip"><svg viewBox="0 0 24 24" class="tip-ico" aria-hidden="true"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="8"/></svg><span>Text didn't show up? It's in History, ready to copy.</span></div>
+      <div class="home-row">
+        <div class="card recent">
+          <div class="recent-head"><strong>Recent</strong><span class="muted small" id="stat-total"></span><a href="#" id="recent-all">All in History</a></div>
+          <ul class="recent-list" id="recent-list"><li class="recent-item"><p class="last-text" id="last-text"><span class="muted">You haven't dictated anything yet.</span></p></li></ul>
+        </div>
+        <div class="home-actions">
+          <button type="button" class="action action-primary" id="home-record"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg><span><strong>Record a meeting</strong><span>Mic and the call's sound</span></span></button>
+          <button type="button" class="action" id="home-file"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span><strong>Transcribe a file</strong><span>Audio or video</span></span></button>
+          <p class="home-tip" id="tip-cancel"><strong>Tip</strong> · Hold <span class="tip-key">Right Ctrl</span> and press Esc to cancel a dictation.</p>
+        </div>
       </div>
     </section>
 
     <!-- REUNIONES -->
     <section class="page" id="page-reuniones" hidden>
       <div id="r-list-view">
-        <header class="page-head">
+        <header class="page-head r-head">  <!-- dictado-6oe.4: one primary action, the rest beside it -->
           <h1>Meetings</h1>
           <div class="search">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg>
-            <input id="r-search" type="search" placeholder="Search by title" autocomplete="off">
+            <input id="r-search" type="search" placeholder="Search meetings" autocomplete="off">
+          </div>
+          <div class="r-actions">
+            <button class="btn btn-ghost" id="r-import">Import file</button>
+            <label class="r-lang"><span class="sr">Language</span><select id="r-lang" aria-label="Language"></select></label>
+            <button class="btn btn-primary" id="r-start">Record meeting</button>
           </div>
         </header>
-        <div class="card r-actions">
-          <div class="r-actions-main">
-            <button class="btn btn-primary" id="r-start">Transcribe meeting now</button>
-            <label class="r-lang"><span class="muted small">Language</span>
-              <select id="r-lang" aria-label="Language"></select></label>
-          </div>
-          <button class="btn btn-ghost" id="r-import">Import file</button>
-        </div>
         <div class="card r-now" id="r-now" hidden>
           <span class="r-rec-dot"></span>
           <div class="r-now-text"><strong id="r-now-title">Recording</strong><span class="muted small" id="r-now-meta"></span></div>
+          <svg class="r-now-wave" viewBox="0 0 160 36" aria-hidden="true"><path d="M4 18v0M14 12v12M24 8v20M34 14v8M44 4v28M54 10v16M64 15v6M74 6v24M84 12v12M94 16v4M104 9v18M114 13v10M124 17v2M134 11v14M144 15v6M154 18v0"/></svg>
           <button class="btn btn-ghost btn-sm" id="r-now-open">Watch live</button>
           <button class="btn btn-sm r-stop" id="r-now-stop">Stop</button>
         </div>
@@ -122,7 +116,7 @@
 
       <div id="r-detail-view" hidden>
         <header class="page-head r-detail-head">
-          <button class="btn btn-ghost btn-sm" id="r-back">Back to Meetings</button>
+          <button class="btn-link r-back" id="r-back">← Meetings</button>
           <span class="r-chip" id="r-d-status"></span>
         </header>
         <input class="r-title" id="r-d-title" aria-label="Title" maxlength="120">
@@ -133,25 +127,38 @@
             <select id="r-d-lang" aria-label="Meeting language"></select></label>
           <button class="btn r-stop" id="r-d-stop">Stop</button>
         </div>
-        <div class="r-d-actions" id="r-d-done-actions" hidden>
-          <button class="btn btn-primary btn-sm" id="r-copy">Copy all</button>
-          <button class="btn btn-ghost btn-sm" id="r-copy-claude">Copy for Claude</button>
-            <button class="btn btn-ghost btn-sm" id="r-copy-summary" title="The transcript with a request for decisions and action items: paste it into Claude">Copy summary prompt</button>
-          <button class="btn btn-ghost btn-sm" id="r-email" title="A draft in your mail program, to the people in the calendar invite. You read it and press Send.">Email to participants</button>
-          <span class="r-export"><span class="muted small">Download</span>
-            <button class="btn btn-ghost btn-sm" data-fmt="txt">.txt</button>
-            <button class="btn btn-ghost btn-sm" data-fmt="md">.md</button>
-            <button class="btn btn-ghost btn-sm" data-fmt="srt">.srt</button></span>
-          <button class="btn btn-ghost btn-sm" id="r-folder">Open folder</button>
-          <button class="btn btn-ghost btn-sm danger r-delete" id="r-delete">Delete</button>
+        <div class="r-d-actions" id="r-d-done-actions" hidden>  <!-- eight buttons became three (dictado-6oe.4) -->
+          <details class="menu"><summary class="btn btn-primary btn-sm">Copy ▾</summary>
+            <div class="menu-pop">
+              <button type="button" class="menu-item" id="r-copy">Copy the transcript</button>
+              <button type="button" class="menu-item" id="r-copy-claude">Copy for Claude <span>with date, app and language</span></button>
+              <button type="button" class="menu-item" id="r-copy-summary">Copy a summary prompt <span>decisions and action items</span></button>
+            </div></details>
+          <button class="btn btn-ghost btn-sm" id="r-email" title="A draft in your mail program, to the people in the calendar invite. You read it and press Send.">Email participants</button>
+          <details class="menu"><summary class="btn btn-ghost btn-sm" aria-label="More: download, open folder, delete">···</summary>
+            <div class="menu-pop menu-right">
+              <span class="menu-label">Download</span>
+              <button type="button" class="menu-item" data-fmt="txt">Text (.txt)</button>
+              <button type="button" class="menu-item" data-fmt="md">Markdown (.md)</button>
+              <button type="button" class="menu-item" data-fmt="srt">Subtitles (.srt)</button>
+              <button type="button" class="menu-item" id="r-folder">Open folder</button>
+              <button type="button" class="menu-item danger" id="r-delete">Delete</button>
+            </div></details>
         </div>
         <div class="r-progress" id="r-d-progress" hidden><div class="meter"><div class="meter-fill" id="r-d-progress-fill"></div></div><span class="muted small" id="r-d-progress-text"></span></div>
-        <div class="r-notes" id="r-notes">
-          <div class="r-notes-head"><span class="row-label">Your notes</span><span class="muted small" id="r-notes-state">Saved with this meeting, and part of Copy for Claude and the summary prompt.</span></div>
-          <textarea class="vocab r-notes-text" id="r-notes-text" rows="3" placeholder="Type while you talk: what you want out of the call, things to check, decisions…"></textarea>
+        <div class="r-body">
+          <div class="r-main">
+          <div class="r-segs-wrap"><ol class="history r-segs" id="r-segs"></ol><button class="btn r-jump" id="r-jump" hidden>Jump to latest</button></div>
+          <div class="empty" id="r-segs-empty" hidden><p id="r-segs-empty-text">No text yet.</p></div>
+          </div>
+          <aside class="r-aside">
+          <div class="r-notes" id="r-notes">
+            <div class="r-notes-head"><span class="row-label">Your notes</span><span class="muted small" id="r-notes-state">Saved with this meeting, and part of Copy for Claude and the summary prompt.</span></div>
+            <textarea class="vocab r-notes-text" id="r-notes-text" rows="3" placeholder="Type while you talk: what you want out of the call, things to check, decisions…"></textarea>
+          </div>
+            <div class="card r-people" id="r-people" hidden><strong>People</strong><ul id="r-people-list"></ul></div>
+          </aside>
         </div>
-        <div class="r-segs-wrap"><ol class="history r-segs" id="r-segs"></ol><button class="btn r-jump" id="r-jump" hidden>Jump to latest</button></div>
-        <div class="empty" id="r-segs-empty" hidden><p id="r-segs-empty-text">No text yet.</p></div>
       </div>
 
       <div class="r-drop" id="r-drop" hidden><div class="r-drop-box">Drop audio or video to transcribe it</div></div>
@@ -181,6 +188,11 @@
             <div class="i-tile"><span class="i-tile-label">Talking</span><span class="i-tile-value" id="i-talk">0 min</span></div>
             <div class="i-tile"><span class="i-tile-label">Day streak</span><span class="i-tile-value" id="i-streak">0</span></div>
           </div>
+        </div>
+        <div class="i-week" id="i-week" hidden>  <!-- this week's change, in one line (dictado-6oe.6) -->
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16l5-5 4 4 7-7"/><path d="M15 8h5v5"/></svg>
+          <span id="i-week-text"></span>
+          <button type="button" class="btn btn-primary btn-sm" id="i-week-coach">Coach me in Claude</button>
         </div>
         <div class="i-grid">
           <div class="card i-card"><div class="card-title">When you dictate</div><div class="i-chart" id="i-hours"></div></div>
@@ -262,11 +274,16 @@
     </section>
 
     <section class="page" id="page-historial" hidden>
-      <header class="page-head">
-        <h1>History</h1>
+      <header class="page-head h-head">  <!-- dictado-6oe.5 -->
+        <div class="h-title"><h1>History</h1><span class="muted small" id="history-sub"></span></div>
+        <div class="segs" id="h-filter" role="group" aria-label="Show">
+          <button type="button" class="seg active" data-kind="all">All</button>
+          <button type="button" class="seg" data-kind="dict">Dictations</button>
+          <button type="button" class="seg" data-kind="meet">Meetings</button>
+        </div>
         <div class="search">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg>
-          <input id="search" type="search" placeholder="Search dictations and meetings" autocomplete="off">
+          <input id="search" type="search" placeholder="Search" autocomplete="off">
         </div>
       </header>
       <ol class="history" id="history"></ol>
@@ -283,8 +300,15 @@
     <!-- AJUSTES -->
     <section class="page" id="page-ajustes" hidden>
       <header class="page-head"><h1>Settings</h1></header>
+      <nav class="segs set-tabs" id="set-tabs" aria-label="Settings sections">  <!-- short sections instead of one long page (dictado-6oe.7) -->
+        <button type="button" class="seg active" data-sec="dictation">Dictation</button>
+        <button type="button" class="seg" data-sec="words">Languages and words</button>
+        <button type="button" class="seg" data-sec="meetings">Meetings</button>
+        <button type="button" class="seg" data-sec="models">Speech models</button>
+        <button type="button" class="seg" data-sec="help">Help and setup</button>
+      </nav>
       <form id="settings" class="settings" autocomplete="off">
-        <div class="card group">
+        <div class="card group" data-sec="dictation">
           <div class="group-head"><h3>Shortcut</h3><p class="muted">What starts and stops dictation. Click Change and press it.</p></div>
           <div class="row"><span class="row-label">Shortcut</span>
             <div class="hk">
@@ -299,7 +323,7 @@
             <input type="checkbox" class="switch" name="numpad_enter" id="f-numpad-enter"></label>
         </div>
 
-        <div class="card group">
+        <div class="card group" data-sec="dictation">
           <div class="group-head"><h3>Mic</h3><p class="muted">Ecoscribe finds it by name, so it isn't lost when you plug in other devices.</p></div>
           <label class="row"><span class="row-label">Mic</span>
             <select name="mic" id="f-mic"></select></label>
@@ -315,27 +339,27 @@
             <input type="checkbox" class="switch" name="unmute" id="f-unmute"></label>
         </div>
 
-        <div class="card group">
+        <div class="card group" data-sec="words">
           <div class="group-head"><h3>Languages you dictate in</h3><p class="muted">Each dictation, Ecoscribe picks among these by itself, and the pill shows which one it heard. Wrong guess? Hold <kbd id="lang-key">Right Ctrl</kbd> and press <kbd>L</kbd> to choose the next dictation's language (or the tray icon: Next dictation in). With Swedish (or most added languages) ticked, dictation uses the larger model: still under a second, about twice as slow.</p></div>
           <div class="lang-checks" id="f-languages" role="group" aria-label="Languages you dictate in"></div>
           <div class="lang-add-row"><select id="lang-add" aria-label="Add a language"></select>
             <span class="muted small">English and Swedish are built in. Added languages also appear for meetings and files; nothing is downloaded.</span></div>
         </div>
 
-        <div class="card group">
+        <div class="card group" data-sec="words">
           <div class="group-head"><h3>Your words</h3><p class="muted">Names and terms Ecoscribe should spell your way, one per line: people, places, products. Used for dictation and meetings.</p></div>
           <textarea name="vocabulary" id="f-vocabulary" class="vocab" rows="5" spellcheck="false" placeholder="Göteborg&#10;pyannote&#10;Kristineberg"></textarea>
           <label class="row toggle-row"><span class="row-text"><span class="row-label">Names on your screen</span><span class="muted small">When you start dictating, Ecoscribe reads the names in the window you're typing into (an email's sender, a chat's people) and spells them the same way. Read on this PC, never stored or sent.</span></span>
             <input type="checkbox" class="switch" name="screen_names" id="f-screen-names"></label>
         </div>
 
-        <div class="card group">
+        <div class="card group" data-sec="words">
           <div class="group-head"><h3>Snippets</h3><p class="muted">Say a snippet's name on its own ("my email.") and Ecoscribe types the saved text instead. Inside a sentence ("what's my email?") it stays as you said it.</p></div>
           <div id="snips" class="snips"></div>
           <button type="button" class="btn btn-ghost btn-sm" id="snip-add">Add snippet</button>
         </div>
 
-        <div class="card group">
+        <div class="card group" data-sec="meetings">
           <div class="group-head"><h3>Meetings</h3><p class="muted">When a call app (Teams, Slack, Zoom, Meet…) starts using the mic.</p></div>
           <label class="row"><span class="row-label">When a call starts</span>
             <select name="meet_mode" id="f-meet-mode"></select></label>
@@ -359,7 +383,7 @@
             <button type="button" class="btn btn-ghost btn-sm" id="claude-connect">Connect</button></div>
         </div>
 
-        <div class="card group">
+        <div class="card group" data-sec="dictation">
           <div class="group-head"><h3>Behaviour</h3></div>
           <label class="row toggle-row"><span class="row-text"><span class="row-label">Free the GPU when you're not dictating</span>
             <span class="muted small">The model loads when you tap the key (while you talk) and unloads after 10 minutes without dictating.</span></span>
@@ -385,11 +409,11 @@
             <input type="checkbox" class="switch" name="startup" id="f-startup"></label>
         </div>
 
-        <div class="card group">
+        <div class="card group" data-sec="models">
           <div class="group-head"><h3>Speech models</h3><p class="muted">Ecoscribe picks the model for each language by itself. Both are downloaded once and then run on this computer, offline. Delete one to free space: it downloads again when it's next needed.</p></div>
           <div class="m-rows" id="m-rows"></div>
         </div>
-        <div class="card group">
+        <div class="card group" data-sec="help">
           <div class="group-head"><h3>Troubleshooting</h3><p class="muted">When something goes wrong: hand Claude what it needs to find the cause.</p></div>
           <div class="row"><span class="row-text"><span class="row-label">Setup</span>
             <span class="muted small">Languages, speech models, mic and key, step by step, like the first time.</span></span>
@@ -418,7 +442,12 @@
 
 <!-- SETUP (dictado-zpz): the first run, full window. Steps are shown or skipped per platform. -->
 <div class="setup" id="setup" hidden>
-  <div class="s-bar" id="s-bar" aria-hidden="true"></div>
+  <aside class="s-side">  <!-- a dark side panel listing the steps (dictado-6oe.8) -->
+    <div class="s-brand"><svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="11" fill="#23557a"/><path d="M13 15h22M13 24h15M13 33h22" stroke="#f6f5f1" stroke-width="4.2" stroke-linecap="round"/><circle cx="34" cy="24" r="2.6" fill="#e58a5f"/></svg>Ecoscribe</div>
+    <ol class="s-steps" id="s-steps" aria-label="Setup steps"></ol>
+    <p class="s-side-note">Everything runs on this computer. Nothing you say leaves it.</p>
+  </aside>
+  <div class="s-main">
   <div class="s-body">
 
     <section class="sstep" data-step="permissions" data-mac-only>
@@ -526,6 +555,7 @@
     <button type="button" class="btn btn-link" id="s-back">← Back</button>
     <button type="button" class="btn btn-link s-skip" id="s-skip" hidden>Cancel</button>
     <button type="button" class="btn btn-primary btn-lg" id="s-next">Continue →</button>
+  </div>
   </div>
 </div>
 

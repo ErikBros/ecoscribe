@@ -201,16 +201,19 @@ class Prompt:
     def timeout_s(self) -> float:
         return START_PROMPT_S if self.kind == "start" else PROMPT_S if self.kind == "end?" else DONE_S
 
-    def countdown(self, now: float) -> int | None:
-        """Whole seconds left on a start prompt (10 .. 1), None for the others."""
-        if self.kind != "start":
-            return None
+    @property
+    def timeout_choice(self) -> str:
+        """What no answer means: start = Not now, end? = Stop (the watcher stops it), the notes = Close."""
+        return {"start": "ahora_no", "end?": "parar"}.get(self.kind, "hide")
+
+    def countdown(self, now: float) -> int:
+        """Whole seconds left before the box answers itself (every box shows it: the user wants to see it)."""
         return max(1, math.ceil(self.timeout_s - (now - self.opened_at)))
 
     def button_text(self, choice: str, now: float) -> str:
+        """The label, with the countdown on the button the timeout presses: "Not now (7)", "Close (12)"."""
         label = dict((c, l) for l, c in self.buttons)[choice]
-        n = self.countdown(now) if choice == "ahora_no" else None
-        return f"{label} ({n})" if n is not None else label
+        return f"{label} ({self.countdown(now)})" if choice == self.timeout_choice else label
 
     def expired(self, now: float) -> str | None:
         """None while open; else what the timeout means (start: Not now; others: just hide)."""

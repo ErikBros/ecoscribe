@@ -40,10 +40,12 @@ SW_HIDE, SW_SHOWNOACTIVATE = 0, 4
 HWND_TOPMOST = w.HWND(-1)
 SWP_NOSIZE, SWP_NOACTIVATE = 0x1, 0x10
 W, H = 210, 44
-RW, RH = 230, 54  # the dictating pill: timer + how to cancel (t0u.36)
+RW, RH = 236, 38  # the dictating pill: dot, waveform, timer (dictado-3tl)
+WAVE_N = 24  # waveform bars: about the last second of the voice (one per 50 ms tick)
+WAVE_W = 130  # the waveform's width, the same with or without live text
 MW, MH = 380, 56  # the meeting pill opened by the mouse: label + latest live line
 CW, CH = 92, 30  # the meeting pill as it sits: a small chip, recording dot + timer (dictado-z4j)
-LW, LH = 460, 84  # the dictating pill with live text under it (dictado-live)
+LW, LH = 440, 66  # the dictating pill with one line of live text under it (dictado-live)
 KEY = "#010203"  # transparent color key, gives the pill round ends
 
 
@@ -77,6 +79,9 @@ class Overlay:
         self.meeting: dict | None = None  # meetui.meeting_view(); shown whenever dictation isn't
         self._drawn = None  # what the meeting layer last drew (no redraw, no flicker)
         self.live_text = ""  # what the live transcript has heard so far (this recording)
+        self._levels: list[float] = []  # the waveform: voice level per tick, newest last
+        import tkinter.font as tkf
+        self._live_font = tkf.Font(family="Segoe UI", size=10)
         self.open = False  # the meeting chip is opened by the mouse over it (dictado-z4j)
 
     def ex_style(self) -> int:
@@ -116,8 +121,11 @@ class Overlay:
                       font=("Segoe UI", 11), anchor="w" if dot else "center")
 
     def _dictating_pill(self, secs: int, level: float) -> None:
-        """The timer and how to cancel, level bars on the right; with live text, a wider box
-        whose second part is what it has heard so far (two lines, the newest words)."""
+        """A slim ink pill (dictado-3tl, the user picked it): the recording dot, a waveform of the
+        last second or so of the voice, the timer. How to cancel shows in the waveform's place
+        for the first 2 s. With live text, a second line under it: the newest words."""
+        self._levels.append(level)
+        del self._levels[:-WAVE_N]
         live = self.live_text
         w_, h_ = (LW, LH) if live else (RW, RH)
         grew = (w_, h_) != (self.w, self.h)
@@ -127,33 +135,42 @@ class Overlay:
         self._drawn = None
         c = self.c
         c.delete("all")
-        bg = P.INK
+        bg, r = P.INK, min(h_, 2 * RH) // 2 if not live else 18
+        c.create_oval(0, 0, 2 * r, 2 * r, fill=bg, outline=bg)
+        c.create_oval(w_ - 2 * r, 0, w_, 2 * r, fill=bg, outline=bg)
+        c.create_oval(0, h_ - 2 * r, 2 * r, h_, fill=bg, outline=bg)
+        c.create_oval(w_ - 2 * r, h_ - 2 * r, w_, h_, fill=bg, outline=bg)
+        c.create_rectangle(r, 0, w_ - r, h_, fill=bg, outline=bg)
+        c.create_rectangle(0, r, w_, h_ - r, fill=bg, outline=bg)
+        mid = RH // 2
+        on = int(time.monotonic() * 2) % 2 == 0 or level > 0.05  # the dot breathes while it's quiet
+        if on:  # a soft halo while it's lit (dictado-6oe.9)
+            c.create_oval(12, mid - 9, 30, mid + 9, fill=P.TILE_HALO, outline="")
+        c.create_oval(16, mid - 5, 26, mid + 5, fill=P.TILE if on else P.TILE_DIM, outline="")
+        c.create_text(w_ - 16, mid, text=f"{secs // 60}:{secs % 60:02d}", fill=P.PAPER,
+                      font=("Segoe UI", 10, "bold"), anchor="e")
+        x0 = 38
+        x1 = x0 + WAVE_W
+        if secs < 2:  # how to cancel, drawn as the keys themselves (dictado-6oe.9)
+            keys = self.hint.split(" to ")[0].split(" + ")
+            x = _keycaps(c, x0, mid, keys)
+            c.create_text(x + 6, mid, text="cancels", fill=P.LINE, font=("Segoe UI", 9), anchor="w")
+        else:  # the waveform: newest on the right, each bar from the middle line
+            step = (x1 - x0) / WAVE_N
+            pad = [0.0] * (WAVE_N - len(self._levels)) + self._levels
+            for i, lv in enumerate(pad):
+                hh = 2 + (lv ** 1.5) * (RH - 18)
+                x = x0 + i * step + step / 2
+                c.create_line(x, mid - hh / 2, x, mid + hh / 2, fill=P.PAPER if lv > 0.04 else P.PILL_OFF,
+                              width=2, capstyle="round")
         if live:
-            r = 22
-            c.create_oval(0, 0, 2 * r, 2 * r, fill=bg, outline=bg)
-            c.create_oval(w_ - 2 * r, 0, w_, 2 * r, fill=bg, outline=bg)
-            c.create_oval(0, h_ - 2 * r, 2 * r, h_, fill=bg, outline=bg)
-            c.create_oval(w_ - 2 * r, h_ - 2 * r, w_, h_, fill=bg, outline=bg)
-            c.create_rectangle(r, 0, w_ - r, h_, fill=bg, outline=bg)
-            c.create_rectangle(0, r, w_, h_ - r, fill=bg, outline=bg)
-        else:
-            r = h_ // 2
-            c.create_oval(0, 0, h_, h_, fill=bg, outline=bg)
-            c.create_oval(w_ - h_, 0, w_, h_, fill=bg, outline=bg)
-            c.create_rectangle(r, 0, w_ - r, h_, fill=bg, outline=bg)
-        c.create_oval(17, 13, 29, 25, fill=P.TILE, outline=P.TILE)
-        c.create_text(40, 19, text=f"Dictating {secs // 60}:{secs % 60:02d}", fill=P.PAPER,
-                      font=("Segoe UI", 11), anchor="w")
-        if live:
-            c.create_text(150, 19, text=self.hint, fill=P.LINE, font=("Segoe UI", 9), anchor="w")
-            c.create_text(18, 36, text=live, fill=P.PAPER, font=("Segoe UI", 10), anchor="nw", width=w_ - 36)
-        else:
-            c.create_text(40, 38, text=self.hint, fill=P.LINE, font=("Segoe UI", 9), anchor="w")
-        for i in range(5):
-            on = level > (i + 0.5) / 5
-            x = w_ - 62 + i * 9
-            hgt = 6 + i * 3
-            c.create_rectangle(x, 19 + hgt // 2, x + 5, 19 - hgt // 2, fill=P.PAPER if on else P.PILL_OFF, outline="")
+            f = self._live_font
+            text, room = " ".join(live.split()), w_ - 32
+            if f.measure(text) > room:  # one line: the newest words, cut on the left
+                while text and f.measure("…" + text) > room:
+                    text = text.split(" ", 1)[1] if " " in text else text[1:]
+                text = "…" + text
+            c.create_text(16, RH + 6, text=text, fill=P.PAPER, font=f, anchor="w")
 
     def _hover(self) -> bool:
         pt, rc = w.POINT(), w.RECT()
@@ -220,13 +237,19 @@ class Overlay:
     def recording(self, t0: float) -> None:
         self.mode, self._t0 = "recording", t0
         self.live_text = ""
+        self._levels = []
         self._place_and_show()
         self.tick()
 
     def busy(self) -> None:
+        """Transcribing: three soft dots and what it's doing (dictado-6oe.9)."""
         self.mode = "busy"
         self.live_text = ""
-        self._pill(P.AEGEAN_SOFT, "Transcribing…")
+        self._pill("", "")
+        c, r = self.c, H // 2
+        for i, col in enumerate((P.AEGEAN_BRIGHT, "#7fa6c4", "#c9dcea")):
+            c.create_oval(22 + i * 11, r - 3, 28 + i * 11, r + 3, fill=col, outline="")
+        c.create_text(62, r, text="Writing it down", fill=P.PAPER, font=("Segoe UI", 10, "bold"), anchor="w")
         self._place_and_show()
 
     def idle(self) -> None:
@@ -260,14 +283,49 @@ class Overlay:
             self.busy()
 
 
-PW = 340  # the prompt box's least width
+PW = 360  # the prompt box's least width
+
+
+def _prompt_icon(c: tk.Canvas, x: float, y: float, kind: str) -> None:
+    """A 38 px tile with a glyph for the box's kind: a call (the clay dot), silence (a clock),
+    a transcript (a page), no sound (a mic, struck through)."""
+    _round_rect(c, x, y, x + 38, y + 38, 11, fill="#3a2a22" if kind == "start" else "#2a3542")
+    cx, cy, g = x + 19, y + 19, "#9db7cc"
+    if kind == "start":
+        c.create_oval(cx - 6, cy - 6, cx + 6, cy + 6, fill="#e06a35", outline="")
+    elif kind == "end?":
+        c.create_oval(cx - 8, cy - 8, cx + 8, cy + 8, outline=g, width=2)
+        c.create_line(cx, cy - 4, cx, cy, cx + 3, cy + 2, fill=g, width=2, capstyle="round")
+    elif kind == "nomic":
+        _round_rect(c, cx - 4, cy - 9, cx + 4, cy + 3, 4, fill="", outline=g, width=2)
+        c.create_line(cx - 9, cy - 9, cx + 9, cy + 9, fill=g, width=2, capstyle="round")
+    else:  # done / failed: a page with lines
+        c.create_rectangle(cx - 7, cy - 9, cx + 7, cy + 9, outline=g, width=2)
+        for dy in (-3, 1, 5):
+            c.create_line(cx - 3, cy + dy, cx + 4, cy + dy, fill=g, width=2)
+
+
+def _keycaps(c: tk.Canvas, x: float, mid: float, keys) -> float:
+    """Keys as small outlined caps on ink: [Right Ctrl] + [Esc]. Returns where they end."""
+    import tkinter.font as tkf
+    f = tkf.Font(family="Segoe UI", size=8, weight="bold")
+    for i, k in enumerate(keys):
+        if i:
+            c.create_text(x + 4, mid, text="+", fill=P.LINE, font=("Segoe UI", 8), anchor="w")
+            x += 14
+        w = f.measure(k) + 12
+        _round_rect(c, x, mid - 9, x + w, mid + 9, 5, fill="", outline="#4a5563", width=1)
+        c.create_text(x + w / 2, mid, text=k, fill=P.PAPER, font=f)
+        x += w
+    return x
 
 
 def _round_rect(c: tk.Canvas, x0, y0, x1, y1, r, **kw):
     """A filled rounded rectangle on a canvas (a smoothed polygon)."""
     pts = [x0 + r, y0, x1 - r, y0, x1, y0, x1, y0 + r, x1, y1 - r, x1, y1, x1 - r, y1, x0 + r, y1,
            x0, y1, x0, y1 - r, x0, y0 + r, x0, y0]
-    return c.create_polygon(pts, smooth=True, splinesteps=12, outline="", **kw)
+    kw.setdefault("outline", "")
+    return c.create_polygon(pts, smooth=True, splinesteps=12, **kw)
 
 
 class _CanvasText:
@@ -317,22 +375,25 @@ class PromptWindow:
         width = max(PW, sum(bws) + gap * (len(bws) - 1) + 2 * pad, f_title.measure(prompt.title) + 2 * pad)
         c = tk.Canvas(top, width=width, height=10, bg=KEY, highlightthickness=0, bd=0)
         c.pack()
-        y = pad
-        c.create_text(pad, y, text=prompt.title, fill=P.PAPER, font=f_title, anchor="nw")
+        _prompt_icon(c, pad, pad, prompt.kind)  # what it's about, at a glance (dictado-6oe.9)
+        tx = pad + 38 + 14
+        y = pad + 1
+        c.create_text(tx, y, text=prompt.title, fill=P.PAPER, font=f_title, anchor="nw")
         y += f_title.metrics("linespace") + 4
         self.lang = tk.StringVar(value=dict(meetui.LANGS).get(prompt.lang or "sv", "Swedish"))
         if prompt.question:
-            t = c.create_text(pad, y, text=prompt.question, fill=P.LINE, font=f_text, anchor="nw", width=width - 2 * pad)
+            t = c.create_text(tx, y, text=prompt.question, fill=P.LINE, font=f_text, anchor="nw", width=width - tx - pad)
             y = c.bbox(t)[3] + 4
+        y = max(y, pad + 38)
         if prompt.kind == "start":  # the language: a rounded chip that opens a menu
             menu = tk.Menu(c, tearoff=0, bg=P.PAPER, fg=P.INK, activebackground=P.AEGEAN, activeforeground=P.PAPER, font=f_text)
             for _code, name in meetui.LANGS:
                 menu.add_radiobutton(label=name, variable=self.lang, value=name)
             cw = max(f_text.measure(n) for _, n in meetui.LANGS) + 44
             ch = 28
-            _round_rect(c, pad, y + 4, pad + cw, y + 4 + ch, ch // 2, fill=P.INK_2, tags=("lang", "lang-bg"))
-            lt = c.create_text(pad + 12, y + 4 + ch / 2, text=self.lang.get(), fill=P.PAPER, font=f_text, anchor="w", tags=("lang",))
-            c.create_text(pad + cw - 14, y + 4 + ch / 2, text="▾", fill=P.LINE, font=f_text, tags=("lang",))
+            _round_rect(c, tx, y + 4, tx + cw, y + 4 + ch, ch // 2, fill=P.INK_2, tags=("lang", "lang-bg"))
+            lt = c.create_text(tx + 12, y + 4 + ch / 2, text=self.lang.get(), fill=P.PAPER, font=f_text, anchor="w", tags=("lang",))
+            c.create_text(tx + cw - 14, y + 4 + ch / 2, text="▾", fill=P.LINE, font=f_text, tags=("lang",))
             self.lang.trace_add("write", lambda *_a: c.itemconfig(lt, text=self.lang.get()))
             c.tag_bind("lang", "<Button-1>", lambda e: menu.tk_popup(e.x_root, e.y_root))
             c.tag_bind("lang", "<Enter>", lambda _e: (c.itemconfig("lang-bg", fill=P.PILL_OFF), c.config(cursor="hand2")))
@@ -343,19 +404,21 @@ class PromptWindow:
         x = width - pad
         for i, ((text, choice), bw) in reversed(list(enumerate(zip(labels, bws)))):
             primary = i == 0
-            fill, hover = (P.AEGEAN_BRIGHT, P.AEGEAN) if primary else (P.PILL_OFF, P.INK_2)
+            # the primary is light on dark, so it stands out (dictado-6oe.9)
+            fill, hover, ink = (P.PAPER, "#dfe5ea", P.INK) if primary else (P.PILL_OFF, P.INK_2, P.PAPER)
             tag = f"btn-{choice}"
             _round_rect(c, x - bw, y, x, y + bh, bh // 2, fill=fill, tags=(tag, tag + "-bg"))
-            item = c.create_text(x - bw / 2, y + bh / 2, text=text, fill=P.PAPER, font=f_btn, tags=(tag,))
+            item = c.create_text(x - bw / 2, y + bh / 2, text=text, fill=ink, font=f_btn, tags=(tag,))
             c.tag_bind(tag, "<Button-1>", lambda _e, ch=choice: self._answer(ch))
             c.tag_bind(tag, "<Enter>", lambda _e, t=tag, h=hover: (c.itemconfig(t + "-bg", fill=h), c.config(cursor="hand2")))
             c.tag_bind(tag, "<Leave>", lambda _e, t=tag, f=fill: (c.itemconfig(t + "-bg", fill=f), c.config(cursor="")))
             self._btns[choice] = _CanvasText(c, item)
             x -= bw + gap
-        height = y + bh + pad
+        height = y + bh + pad + 2
         c.config(height=height)
-        _round_rect(c, 0, 0, width, height, 16, fill=P.INK, tags=("card",))
+        _round_rect(c, 0, 0, width, height, 20, fill=P.INK, tags=("card",))
         c.tag_lower("card")
+        self._drain = (c, c.create_line(20, height - 2, width - 20, height - 2, fill="#7fa6c4", width=3, capstyle="round"), width)
         top.update_idletasks()
         hwnd = int(top.wm_frame(), 16)
         ex = u32.GetWindowLongW(hwnd, GWL_EXSTYLE)
@@ -412,6 +475,13 @@ class PromptWindow:
             if what is not None:
                 self._answer(what)
                 return
+            c, line, w = getattr(self, "_drain", (None, None, 0))
+            if c is not None:  # the countdown also drains along the bottom edge (dictado-6oe.9)
+                left = max(0.0, 1 - (now - self.prompt.opened_at) / self.prompt.timeout_s)
+                try:
+                    c.coords(line, 20, c.winfo_reqheight() - 2, 20 + (w - 40) * left, c.winfo_reqheight() - 2)
+                except tk.TclError:
+                    pass
             for choice, b in self._btns.items():  # "Not now (7)": the countdown
                 text = self.prompt.button_text(choice, now)
                 if b.cget("text") != text:
