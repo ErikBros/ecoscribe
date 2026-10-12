@@ -3,8 +3,9 @@
 Every 2 s it reads who holds the mic (ConsentStore), the window titles and the
 running exes, and feeds detect.Detector. A call start either asks near the pill
 ("prompt") or starts recording ("auto"); "Not now" ignores that call until its
-end. A call end stops the meeting only if the detector started it for that app (a
-meeting started by hand is the user's to stop). Backup for a missed end: both tracks
+end. A call end stops the meeting the detector started for that app, and one started
+by hand during that call (it records the call's app, dictado-2s7); a meeting started
+by hand with no call is the user's to stop. Backup for a missed end: both tracks
 silent for silence_stop_s asks "Did the meeting end?" and stops 60 s later unless
 the user says Keep going. Each app remembers its last language (meeting_langs.json). Every
 event and answer goes to detect.log, to audit the detector against real calls.
@@ -148,11 +149,14 @@ class MeetWatch(threading.Thread):
             self.ui_prompt("dismiss", ev.app, None)
         if self.suppressed == ev.app:
             self.suppressed = None
-        if self.auto_app == ev.app:
+        m = self._meeting()
+        mine = self.auto_app == ev.app
+        by_hand = m is not None and m.get("app") == ev.app and m.get("status") == "recording"  # dictado-2s7
+        if mine:
             self.auto_app = None
-            if self._meeting() is not None:
-                self._audit(f"stop {ev.app}: call ended")
-                self.ctl.stop_meeting()
+        if m is not None and (mine or by_hand):
+            self._audit(f"stop {ev.app}: call ended" + ("" if mine else " (started by hand)"))
+            self.ctl.stop_meeting()
         self.call = None
 
     def _silence(self, now: float) -> None:
