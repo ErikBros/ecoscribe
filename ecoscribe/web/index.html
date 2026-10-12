@@ -347,10 +347,16 @@
         </div>
 
         <div class="card group" data-sec="words">
-          <div class="group-head"><h3>Your words</h3><p class="muted">Names and terms Ecoscribe should spell your way, one per line: people, places, products. Used for dictation and meetings.</p></div>
+          <div class="group-head"><h3>Your words</h3><p class="muted">Names and terms Ecoscribe tends to get wrong, written the way you want them, one per line. It listens for them, so "Ecoscribe" comes out as Ecoscribe, not "eco scribe". For dictation and meetings.</p></div>
           <textarea name="vocabulary" id="f-vocabulary" class="vocab" rows="5" spellcheck="false" placeholder="Göteborg&#10;pyannote&#10;Kristineberg"></textarea>
           <label class="row toggle-row"><span class="row-text"><span class="row-label">Names on your screen</span><span class="muted small">When you start dictating, Ecoscribe reads the names in the window you're typing into (an email's sender, a chat's people) and spells them the same way. Read on this PC, never stored or sent.</span></span>
             <input type="checkbox" class="switch" name="screen_names" id="f-screen-names"></label>
+        </div>
+
+        <div class="card group" data-sec="words">
+          <div class="group-head"><h3>Replace</h3><p class="muted">When Ecoscribe writes the words on the left, it writes the ones on the right instead. In dictations and meeting transcripts, in any case, as whole words.</p></div>
+          <div id="reps" class="reps"></div>
+          <button type="button" class="btn btn-ghost btn-sm" id="rep-add">Add a replacement</button>
         </div>
 
         <div class="card group" data-sec="words">
