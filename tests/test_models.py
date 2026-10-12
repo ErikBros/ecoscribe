@@ -1,5 +1,6 @@
 import pytest
 import os
+import sys
 from pathlib import Path
 
 from ecoscribe import models
@@ -243,3 +244,30 @@ def test_disk_size_and_delete_free_the_mirror_and_the_cache(tmp_path, monkeypatc
     assert not (root / "large-v3-turbo").exists() and not cache.exists()
     assert models.disk_size("large-v3-turbo", root=root) == 0
     assert models.delete("large-v3-turbo", root=root) is False  # nothing left to delete
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="symlinks: the shared blob store needs them")
+def test_delete_frees_a_shared_blob_too(tmp_path, monkeypatch):
+    """huggingface_hub 1.x keeps a big file in the cache-wide blobs/ store with a link in the repo:
+    removing the repo folder alone left the weights on disk (seen on the Mac with 1.6 GB)."""
+    hub = tmp_path / "hub"
+    repo = hub / "models--org--m"
+    sha = "a" * 40
+    (repo / "refs").mkdir(parents=True)
+    (repo / "refs" / "main").write_text(sha)
+    (repo / "blobs").mkdir()
+    shared = hub / "blobs" / "ab"
+    shared.mkdir(parents=True)
+    (hub / "blobs" / ".huggingface-shared-blobs").write_text("1\n")  # huggingface_hub's store marker
+    big = shared / ("ab" + "0" * 62)
+    big.write_bytes(b"x" * 4096)
+    (shared / (big.name + ".refs")).write_text("models--org--m/blobs/etag1\n")
+    (repo / "blobs" / "etag1").symlink_to(Path("../../blobs/ab") / big.name)
+    snap = repo / "snapshots" / sha
+    snap.mkdir(parents=True)
+    (snap / "weights.safetensors").symlink_to(Path("../../blobs/etag1"))
+    monkeypatch.setattr(models, "_hf_cache_dir", lambda name: repo)
+    root = tmp_path / "models"
+    assert models.disk_size("m", root=root) >= 4096
+    assert models.delete("m", root=root) is True
+    assert not repo.exists() and not big.exists()

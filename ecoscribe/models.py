@@ -259,12 +259,30 @@ def disk_size(name: str, root: Path | None = None) -> int:
     return total
 
 
+def _drop_from_hf_cache(cache: Path) -> None:
+    """Delete a cached repo with huggingface_hub's own cache API. Since huggingface_hub 1.x a big file
+    lives in the cache-wide blobs/ store with only a link in the repo's folder, so removing the folder
+    alone left the 1.6 GB weights on disk while Settings said 0 MB (seen on the Mac)."""
+    try:
+        from huggingface_hub import scan_cache_dir
+        info = scan_cache_dir(cache.parent)
+        revs = [r.commit_hash for repo in info.repos if repo.repo_path == cache for r in repo.revisions]
+        if revs:
+            info.delete_revisions(*revs).execute()
+    except Exception:  # the folder itself still goes below; a shared blob may then stay behind
+        log.warning("cache API delete failed for %s", cache, exc_info=True)
+
+
 def delete(name: str, root: Path | None = None) -> bool:
     """Free the space: the mirror and the download. It downloads again the next time it's needed.
     False when there was nothing to delete; OSError when a file is in use (a dictation running)."""
     root = Path(root) if root else paths.data_dir() / "models"
     gone = False
-    for d in (root / safe_name(name), _hf_cache_dir(name)):
+    cache = _hf_cache_dir(name)
+    if cache is not None and cache.exists():
+        _drop_from_hf_cache(cache)
+        gone = True
+    for d in (root / safe_name(name), cache):
         if d is not None and d.exists():
             shutil.rmtree(d)
             gone = True
