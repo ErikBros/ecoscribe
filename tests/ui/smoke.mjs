@@ -365,5 +365,14 @@ async function load(query) {
   doc.querySelector("#m-rows [data-del='large-v3-turbo']").click(); await sleep(200);
   check(window.__deleted === "large-v3-turbo" && doc.querySelector("#toast").textContent.includes("free"), "delete frees the space");
 }
+{ // Meetings > Email to participants (dictado-fnw)
+  const { window, doc } = await load("page=reuniones/2026-10-05_0915_planering");
+  await sleep(300);
+  const b = doc.querySelector("#r-email");
+  check(b && !doc.querySelector("#r-d-done-actions").hidden, "a finished meeting offers Email to participants");
+  b.click(); await sleep(150);
+  check(window.__emailed === "2026-10-05_0915_planering" && doc.querySelector("#toast").textContent.includes("to 2 people")
+    && doc.querySelector("#toast").textContent.includes("paste it in"), "opens a draft to the participants, says to paste");
+}
 console.log(failed ? `\n${failed} FAILED` : "\nall ok");
 process.exit(failed ? 1 : 0);
