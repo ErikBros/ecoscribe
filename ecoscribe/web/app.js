@@ -929,6 +929,7 @@ function rWire() {
 
 /* ---------------------------------------------------------------- historial */
 let searchTimer = null;
+let hKind = "all";  // History's filter: all | dict | meet (dictado-6oe.5)
 async function renderHistory() {
   const q = $("#search").value;
   const h = await api.get_history(200, q);
@@ -937,27 +938,31 @@ async function renderHistory() {
   const list = $("#history");
   list.innerHTML = "";
   const rows = [...h.items.map((x) => ({ kind: "dict", ts: x.ts, x })), ...meets.map((x) => ({ kind: "meet", ts: x.created, x }))]
+    .filter((row) => hKind === "all" || row.kind === hKind)
     .sort((a, b) => String(b.ts).localeCompare(String(a.ts)));
+  let day = null, group = null;
   for (const row of rows) {
-    if (row.kind === "meet") { list.append(meetingHistoryItem(row.x)); continue; }
+    const d = dayLabel(row.ts);  // grouped by day, a card each (dictado-6oe.5)
+    if (d !== day) {
+      day = d;
+      const hd = document.createElement("li"); hd.className = "r-day"; hd.textContent = d; list.append(hd);
+      const g = document.createElement("li"); g.className = "h-group"; group = document.createElement("ol"); group.className = "h-group-list";
+      g.append(group); list.append(g);
+    }
+    if (row.kind === "meet") { group.append(meetingHistoryItem(row.x)); continue; }
     const r = row.x;
     const li = document.createElement("li");
     li.className = "h-item";
+    const t = document.createElement("span"); t.className = "h-time"; t.textContent = timeOf(r.ts);
     const p = document.createElement("p");
     p.className = "h-text"; p.textContent = r.text.trim();
     const meta = document.createElement("div");
     meta.className = "h-meta";
-    meta.textContent = [when(r.ts), appName(r.target)].filter(Boolean).join(" · ");
-    if (r.pasted === false) {
-      const b = document.createElement("span");
-      b.className = "badge"; b.textContent = "didn't paste";
-      meta.append(b);
-    }
-    if (r.retried) {
-      const b = document.createElement("span");
-      b.className = "badge"; b.textContent = "retried";
-      meta.append(b);
-    }
+    const tag = (txt, cls = "") => { const b = document.createElement("span"); b.className = "h-tag " + cls; b.textContent = txt; meta.append(b); };
+    if (r.lang && !String(r.lang).includes("+")) tag(String(r.lang).toUpperCase(), "h-tag-line");
+    if (appName(r.target)) tag(appName(r.target));
+    if (r.pasted === false) tag("Not pasted: copy it here", "h-tag-dark");
+    if (r.retried) tag("Retried", "h-tag-blue");
     const btns = document.createElement("div");
     btns.className = "h-btns";
     if (r.audio && r.id) btns.append(retryButton(r, p));
@@ -965,13 +970,15 @@ async function renderHistory() {
     btn.className = "btn btn-ghost btn-sm h-copy"; btn.textContent = "Copy";
     btn.onclick = () => copy(r.text, btn);
     btns.append(btn);
-    li.append(p, btns, meta);
-    list.append(li);
+    li.append(t, p, btns, meta);
+    group.append(li);
   }
   const empty = rows.length === 0;
   $("#history-empty").hidden = !empty;
   $("#history-empty-text").textContent = q ? `Nothing matches "${q}".` : "Everything you dictate will show up here.";
-  $("#history-count").textContent = h.stats.total ? `${fmtNum(h.stats.total)} dictations · ${fmtNum(h.stats.total_words)} words` : "";
+  const count = h.stats.total ? `${fmtNum(h.stats.total)} dictations · ${fmtNum(h.stats.total_words)} words` : "";
+  $("#history-count").textContent = count;
+  $("#history-sub").textContent = count ? count + " · kept on this computer" : "";
   $("#history-clear").hidden = !h.stats.total;
 }
 
@@ -1026,8 +1033,9 @@ function meetingHistoryItem(m) {  // a meeting transcript in History: opens in M
   const st = document.createElement("span"); st.className = "r-chip"; chip(st, m);
   const meta = document.createElement("div");
   meta.className = "h-meta";
-  meta.textContent = [when(m.created), m.source === "import" ? "Imported file" : "Meeting", m.lang_name, fmtDur(m.duration_s)].filter(Boolean).join(" · ");
-  meta.prepend(st);
+  meta.textContent = [m.source === "import" ? "Imported file" : "Meeting", m.lang_name, fmtDur(m.duration_s)].filter(Boolean).join(" · ");
+  if (m.status !== "done") meta.prepend(st);  // a finished one needs no chip (dictado-6oe.5)
+  const t = document.createElement("span"); t.className = "h-time"; t.textContent = timeOf(m.created);
   const btns = document.createElement("div");
   btns.className = "h-btns";
   const open = document.createElement("button");
@@ -1040,7 +1048,7 @@ function meetingHistoryItem(m) {  // a meeting transcript in History: opens in M
     dl.onclick = async () => { const out = await api.save_export(m.name, "md"); toast(out.ok ? `In Downloads: ${out.name}` : out.error || "Couldn't export."); };
     btns.append(dl);
   }
-  li.append(p, btns, meta);
+  li.append(t, p, btns, meta);
   return li;
 }
 
@@ -1641,6 +1649,9 @@ async function boot() {
   notesWire();
   hkWire();
   $("#search").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(renderHistory, 120); });
+  for (const b of $$("#h-filter .seg")) b.onclick = () => {
+    hKind = b.dataset.kind; $$("#h-filter .seg").forEach((x) => x.classList.toggle("active", x === b)); renderHistory();
+  };
   $("#history-clear").onclick = async () => {
     if (!confirm("Clear the whole history? A backup copy is kept in the Ecoscribe folder.")) return;
     await api.clear_history(); renderHistory(); toast("History cleared.");

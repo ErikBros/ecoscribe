@@ -269,11 +269,16 @@
     </section>
 
     <section class="page" id="page-historial" hidden>
-      <header class="page-head">
-        <h1>History</h1>
+      <header class="page-head h-head">  <!-- dictado-6oe.5 -->
+        <div class="h-title"><h1>History</h1><span class="muted small" id="history-sub"></span></div>
+        <div class="segs" id="h-filter" role="group" aria-label="Show">
+          <button type="button" class="seg active" data-kind="all">All</button>
+          <button type="button" class="seg" data-kind="dict">Dictations</button>
+          <button type="button" class="seg" data-kind="meet">Meetings</button>
+        </div>
         <div class="search">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg>
-          <input id="search" type="search" placeholder="Search dictations and meetings" autocomplete="off">
+          <input id="search" type="search" placeholder="Search" autocomplete="off">
         </div>
       </header>
       <ol class="history" id="history"></ol>

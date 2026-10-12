@@ -151,7 +151,11 @@ async function load(query) {
   done.querySelector("button").click(); await sleep(200);
   check(!doc.querySelector("#page-reuniones").hidden && !doc.querySelector("#r-detail-view").hidden, "Open jumps to the transcript");
   doc.querySelector('.nav-item[data-page="historial"]').click(); await sleep(150);
-  check(doc.querySelector(".badge")?.textContent === "didn't paste", "not-pasted badge");
+  check(doc.querySelector("#page-historial .h-tag-dark")?.textContent.startsWith("Not pasted"), "not-pasted chip");
+  check(doc.querySelectorAll("#history .h-group").length >= 1, "History: a card per day (dictado-6oe.5)");
+  doc.querySelector('#h-filter [data-kind="meet"]').click(); await sleep(150);
+  check([...doc.querySelectorAll("#history .h-item")].every((li) => li.classList.contains("h-meeting")), "the Meetings filter shows only meetings");
+  doc.querySelector('#h-filter [data-kind="all"]').click(); await sleep(150);
   const s = doc.querySelector("#search");
   s.value = "climbing"; s.dispatchEvent(new window.Event("input"));
   await sleep(250);
