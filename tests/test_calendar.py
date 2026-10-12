@@ -237,3 +237,34 @@ def test_background_app_sets_the_feed_only_with_a_link(tmp_path):
     c.meetings.calendar_url = URL
     feed = _calendar_feed(c, tmp_path, ctl, logging.getLogger())
     assert feed is not None and ctl.calendar is feed
+
+
+def test_no_calendar_event_takes_the_meet_tab_name(tmp_path):
+    """dictado-4ar: a browser call with no calendar event is named from the Meet tab; the calendar wins."""
+    from ecoscribe import sessions
+    c = _ctl(tmp_path, FakeFeed(None))
+    c.name_now = lambda: "Sprint retro, week 41"
+    assert sessions.read_meta(c.start_meeting("sv", app="chrome"))["title"] == "Sprint retro, week 41"
+    [e] = events(ics(RETRO))
+    c2 = _ctl(tmp_path / "b", FakeFeed(e))
+    c2.name_now = lambda: "Something else"
+    assert sessions.read_meta(c2.start_meeting("sv", app="chrome"))["title"] == "Sprint retro, week 41"
+
+
+def test_meet_tab_name_only_for_a_browser_call(tmp_path):
+    from ecoscribe import sessions
+    c = _ctl(tmp_path, None)
+    c.name_now = lambda: "Sprint retro"
+    assert sessions.read_meta(c.start_meeting("sv", app="msteams"))["title"] == "Meeting"
+    c2 = _ctl(tmp_path / "b", None)
+    c2.name_now = lambda: "Sprint retro"
+    assert sessions.read_meta(c2.start_meeting("sv", title="Mine", app="chrome"))["title"] == "Mine"
+
+    def boom():
+        raise RuntimeError("no windows")
+    c3 = _ctl(tmp_path / "c", None)
+    c3.name_now = boom
+    assert sessions.read_meta(c3.start_meeting("sv"))["title"] == "Meeting"
+    c4 = _ctl(tmp_path / "d", None)
+    c4.name_now = lambda: "Weekly sync"
+    assert sessions.read_meta(c4.start_meeting("sv"))["title"] == "Weekly sync"  # started by hand, no call app
