@@ -117,6 +117,31 @@ def test_end_after_grace_stops_detector_meeting(tmp_path):
     assert ctl.stopped == 1
 
 
+def test_end_stops_a_manual_meeting_of_that_call(tmp_path):
+    """Not now, then Transcribe meeting now during the call: the meeting has the call's app, so the
+    call's end stops it too, not the 4-minute silence backup (dictado-2s7)."""
+    w, ctl, world, clock, prompts = make(tmp_path)
+    world.mic = {"chrome"}
+    world.titles = [("Meet - Weekly sync - Google Chrome", "chrome")]
+    run(w, clock, 6)
+    w.answer("ahora_no")
+    ctl.start_meeting("sv", app="chrome")  # by hand, the call app recorded (t0u.33)
+    run(w, clock, 60)
+    world.mic, world.titles = set(), []
+    run(w, clock, 30)
+    assert ctl.stopped == 1
+
+
+def test_end_of_another_call_does_not_stop_a_manual_meeting(tmp_path):
+    w, ctl, world, clock, prompts = make(tmp_path, mode="auto")
+    ctl.start_meeting("sv", app="slack")
+    world.mic = {"msteams"}
+    run(w, clock, 6)
+    world.mic = set()
+    run(w, clock, 30)
+    assert ctl.stopped == 0
+
+
 def test_end_does_not_stop_a_manual_meeting(tmp_path):
     w, ctl, world, clock, prompts = make(tmp_path, mode="auto")
     ctl.start_meeting("sv")  # the user pressed Transcribe meeting now
