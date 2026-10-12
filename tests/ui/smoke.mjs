@@ -353,5 +353,17 @@ async function load(query) {
   check(items[0].querySelector(".h-text").textContent.startsWith("Could you"), "the new text replaces the old one");
   check(!doc.querySelector("#toast").hidden && doc.querySelector("#toast").textContent.includes("copied"), "says it's copied");
 }
+{ // Settings > Speech models (dictado-z4q)
+  const { window, doc } = await load("page=ajustes");
+  await sleep(250);
+  const rows = doc.querySelectorAll("#m-rows .m-row");
+  check(rows.length === 2 && rows[0].textContent.includes("In use") && rows[0].textContent.includes("on this computer"), "models listed, the one in use on disk");
+  check(rows[1].textContent.includes("Not downloaded") && rows[1].querySelector("[data-get]"), "the other can be downloaded");
+  rows[1].querySelector("[data-get]").click();
+  for (let i = 0; i < 40 && !doc.querySelector("#m-rows [data-del='Systran/faster-whisper-large-v3']"); i++) await sleep(100);
+  check(doc.querySelector("#m-rows [data-del='Systran/faster-whisper-large-v3']"), "download runs to Ready, then it can be deleted");
+  doc.querySelector("#m-rows [data-del='large-v3-turbo']").click(); await sleep(200);
+  check(window.__deleted === "large-v3-turbo" && doc.querySelector("#toast").textContent.includes("free"), "delete frees the space");
+}
 console.log(failed ? `\n${failed} FAILED` : "\nall ok");
 process.exit(failed ? 1 : 0);

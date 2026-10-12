@@ -770,6 +770,27 @@ class Api:
         threading.Thread(target=run, name="ecoscribe-setup-models", daemon=True).start()
         return self.setup_models_progress()
 
+    def models_info(self) -> dict:
+        """Settings > Speech models (dictado-z4q): both models, what each is for, on disk or not."""
+        from . import models
+        c = self._load()
+        rows = models.setup_models(c.whisper, c.whisper.languages)
+        for m in rows:
+            m["ready"] = models.is_ready(m["name"])
+            m["disk"] = models.disk_size(m["name"]) if m["ready"] else 0
+        return {"models": rows}
+
+    def delete_model(self, name: str) -> dict:
+        from . import models
+        c = self._load()
+        if name not in (c.whisper.model, c.whisper.sv_model):
+            return {"ok": False, "error": "unknown model"}
+        try:
+            return {"ok": models.delete(name)}
+        except OSError:
+            log.exception("model delete failed")
+            return {"ok": False, "error": "It's in use right now. Try again in a few minutes, when Ecoscribe has been idle."}
+
     def setup_models_progress(self) -> dict:
         dl = getattr(self, "_dl", None) or {"running": False, "error": None, "models": {}}
         return {"running": dl["running"], "error": dl["error"], "models": {k: dict(v) for k, v in dl["models"].items()}}

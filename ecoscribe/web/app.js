@@ -195,6 +195,11 @@ function demoApi() {
       r.lang = lang || "en"; r.retried = true;
       return { ok: true, text: r.text, lang: r.lang };
     },
+    models_info: async () => ({ models: [
+      { name: "large-v3-turbo", label: "Fast", use: "English, Spanish and similar; finds the language in meetings and files", size: 1.62e9, required: true, ready: !window.__deleted, disk: 1.62e9 },
+      { name: "Systran/faster-whisper-large-v3", label: "Most accurate", use: "Swedish, Greek and other languages; meetings and files in them", size: 3.09e9, required: false,
+        ready: !!(dl.models["Systran/faster-whisper-large-v3"] || {}).ready, disk: 3.09e9 }] }),
+    delete_model: async (name) => { window.__deleted = name; return { ok: true }; },
   };
 }
 
@@ -1048,7 +1053,48 @@ function fillSelect(sel, options, value) {
   }
   sel.value = value;
 }
+/* Settings > Speech models (dictado-z4q): what each model is for, on disk or not, download / delete. */
+async function renderModelsPage() {
+  let info, p;
+  try { [info, p] = [await api.models_info(), await api.setup_models_progress()]; } catch { return; }
+  const box = $("#m-rows");
+  box.innerHTML = info.models.map((m) => {
+    const g = (p.models || {})[m.name] || {};
+    const going = p.running && p.models[m.name] && !g.ready;
+    const total = g.total || m.size;
+    const pct = going && g.done ? Math.min(99, Math.round((100 * g.done) / total)) : 0;
+    const tag = m.required ? '<span class="s-tag req">In use</span>' : '<span class="s-tag">Recommended</span>';
+    const state = m.ready ? `${gb(m.disk || m.size)} on this computer` : going ? (g.done ? `Downloading: ${gb(g.done)} of ${gb(total)}` : "Waiting…")
+      : `Not downloaded · ${gb(m.size)}`;
+    const act = m.ready ? `<button type="button" class="btn btn-ghost btn-sm" data-del="${m.name}">Delete</button>`
+      : going ? "" : `<button type="button" class="btn btn-ghost btn-sm" data-get="${m.name}">Download</button>`;
+    return `<div class="row m-row"><span class="row-text"><span class="row-label">${m.label} ${tag}</span>
+      <span class="muted small">${m.use}</span>
+      ${going ? `<div class="s-progress"><div style="width:${pct}%"></div></div>` : ""}
+      <span class="muted small">${state}</span></span>${act}</div>`;
+  }).join("") + (p.error ? `<p class="muted small m-err">Download stopped: ${p.error}</p>` : "");
+  $$("#m-rows [data-get]").forEach((b) => (b.onclick = async () => { await api.setup_models_start([b.dataset.get]); renderModelsPage(); watchModelsPage(); }));
+  $$("#m-rows [data-del]").forEach((b) => (b.onclick = async () => {
+    if (!confirm("Delete this model? It downloads again the next time it's needed.")) return;
+    const r = await api.delete_model(b.dataset.del);
+    toast(r.ok ? "Deleted. The space is free." : r.error || "Couldn't delete it.");
+    renderModelsPage();
+  }));
+  if (p.running) watchModelsPage();
+}
+let mPoll = null;
+function watchModelsPage() {
+  if (mPoll) return;
+  mPoll = setInterval(async () => {
+    const p = await api.setup_models_progress();
+    if ($("#page-ajustes").hidden) { clearInterval(mPoll); mPoll = null; return; }
+    if (!p.running) { clearInterval(mPoll); mPoll = null; }
+    renderModelsPage();
+  }, 700);
+}
+
 async function renderSettings() {
+  renderModelsPage();
   const s = await api.get_settings();
   $("#f-hotkey").value = s.values.hotkey;
   $("#hk-label").textContent = s.values.hotkey_label || hotkeyLabel(s.values.hotkey);
@@ -1354,8 +1400,10 @@ function renderModels(p) {
     const total = g.total || m.size;
     const pct = ready ? 100 : g.done ? Math.min(99, Math.round((100 * g.done) / total)) : 0;
     const going = p.running && g && !ready && sx.want.has(m.name);
+    const first = sx.models.find((x) => p.running && (p.models || {})[x.name] && !(p.models[x.name] || {}).ready && sx.want.has(x.name));
+    const queued = going && first && first.name !== m.name && !g.done;  // the one after: waits its turn
     const tag = m.required ? "Needed for your languages" : "Recommended";
-    const state = ready ? "Ready" : going ? (g.done ? `${gb(g.done)} of ${gb(total)}` : "Starting…") : gb(m.size);
+    const state = ready ? "Ready" : queued ? "Waiting…" : going ? (g.done ? `${gb(g.done)} of ${gb(total)}` : "Starting…") : gb(m.size);
     return `<div class="s-row s-model${ready ? " ready" : ""}">
       <input type="checkbox" data-model="${m.name}" ${sx.want.has(m.name) || ready ? "checked" : ""} ${m.required || ready || p.running ? "disabled" : ""} aria-label="${m.label}">
       <div class="s-row-text"><strong>${m.label} <span class="s-tag${m.required ? " req" : ""}">${tag}</span></strong>
@@ -1542,6 +1590,7 @@ async function boot() {
   if (page === "bienvenida" || !w.done) openSetup();
   setInterval(refreshStatus, 1500);
   if (params.get("demo") === "1" && params.get("retrymenu") === "1") setTimeout(() => $(".h-retry button")?.click(), 300);  // screenshot
+  if (params.get("demo") === "1" && params.get("models") === "scroll") setTimeout(() => $("#m-rows").scrollIntoView(), 300);  // screenshot
   if (params.get("demo") === "1" && params.get("dirty") === "1") {  // screenshot of the save bar
     $("#f-sounds").checked = !$("#f-sounds").checked; dirty();
   }
