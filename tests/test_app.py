@@ -332,7 +332,9 @@ def test_no_text_box_says_where_the_text_is(tmp_path):
     app.on_action("toggle")
     app.on_action("toggle")
     assert wait(lambda: ("flash", f"No text box here: copied, paste with {app_mod.PASTE_KEYS}", 4.0) in ui.events)
-    rec = json.loads((tmp_path / "h.jsonl").read_text(encoding="utf-8").splitlines()[-1])
+    hist = tmp_path / "h.jsonl"  # written just after the flash: wait for it, don't race it
+    assert wait(lambda: hist.exists() and hist.read_text(encoding="utf-8").strip())
+    rec = json.loads(hist.read_text(encoding="utf-8").splitlines()[-1])
     assert rec["pasted"] is False  # Home's Last dictation says "not pasted: copy it from here"
 
 
