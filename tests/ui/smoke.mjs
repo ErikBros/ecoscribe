@@ -299,7 +299,17 @@ async function load(query) {
   check(!doc.querySelector("#setup").hidden, "setup opens on first run");
   check(on() === "languages", "Windows skips the permissions step");
   check(doc.querySelectorAll("#s-bar span").length === 6, "progress bar has a segment per step");
-  doc.querySelector('#s-langs input[value="sv"]').click(); await sleep(20);
+  check(doc.querySelectorAll("#s-langs .s-lchip").length === 1 && doc.querySelector("#s-langs").textContent.includes("English")
+    && !doc.querySelector("#s-langs [data-x]"), "starts with English only, which can't be removed");
+  check(doc.querySelector("#s-skip").hidden, "the first run can't be skipped");
+  const add = doc.querySelector("#s-lang-more");
+  add.value = "sv"; add.dispatchEvent(new window.Event("change")); await sleep(20);
+  add.value = "el"; add.dispatchEvent(new window.Event("change")); await sleep(20);
+  check(doc.querySelectorAll("#s-langs .s-lchip").length === 3, "Add a language adds chips");
+  doc.querySelector('#s-langs [data-x="el"]').click(); await sleep(20);
+  check(doc.querySelectorAll("#s-langs .s-lchip").length === 2 && !doc.querySelector("#s-langs").textContent.includes("Greek"), "✕ removes one");
+  doc.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape" })); await sleep(50);
+  check(!doc.querySelector("#setup").hidden, "Esc doesn't skip the first run");
   next.click(); await sleep(150);
   check(on() === "models", "languages -> models");
   const rows = doc.querySelectorAll("#s-models .s-row");
@@ -330,6 +340,9 @@ async function load(query) {
   check(doc.querySelector("#setup").hidden && !doc.querySelector("#page-inicio").hidden, "setup closes to Home");
   doc.querySelector("#setup-again").click(); await sleep(200);
   check(!doc.querySelector("#setup").hidden && on() === "languages", "Run setup again reopens it");
+  check(!doc.querySelector("#s-skip").hidden && doc.querySelector("#s-skip").textContent === "Cancel", "a rerun can be cancelled");
+  doc.querySelector("#s-skip").click(); await sleep(100);
+  check(doc.querySelector("#setup").hidden, "Cancel closes the rerun");
 }
 { // setup on the Mac starts with the permissions
   const { window, doc } = await load("page=bienvenida&welcome=1&mac=1");
@@ -338,8 +351,7 @@ async function load(query) {
   doc.querySelector("#s-perms [data-perm]").click(); await sleep(20);
   check(window.__perm === "accessibility", "Open settings opens that pane");
   check(doc.querySelector("#s-done-sub").textContent.includes("menu bar"), "Mac wording on the last step");
-  doc.querySelector("#s-skip").click(); await sleep(100);
-  check(doc.querySelector("#setup").hidden, "Skip setup closes it");
+  check(doc.querySelector("#s-skip").hidden, "no skipping on the Mac's first run either");
 }
 { // History > Retry (dictado-a2r)
   const { window, doc } = await load("page=historial");

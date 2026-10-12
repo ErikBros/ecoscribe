@@ -1315,11 +1315,12 @@ function hkWire() {
 // dictation, a summary. Each step saves what it changed when you leave it.
 const S_COMMON = ["en", "sv", "es", "de", "fr", "el", "fi", "it", "pt", "nl", "da", "no"];
 const sx = { steps: [], i: 0, cfg: null, langs: [], extra: [], hotkey: "", hold: false, mic: "",
-  models: [], want: new Set(), poll: null, permPoll: null, keyRec: false };
+  models: [], want: new Set(), poll: null, permPoll: null, keyRec: false, rerun: false };
 const gb = (n) => (n < 1e9 ? `${Math.round(n / 1e6)} MB` : `${(n / 1e9).toFixed(1)} GB`);
 const sKey = () => hotkeyLabel(sx.hotkey);
 
-async function openSetup() {
+async function openSetup(rerun = false) {  // the first run can't be skipped; Run setup again can be cancelled
+  sx.rerun = rerun === true;
   const st = await api.get_settings();
   sx.cfg = st;
   sx.langs = st.values.languages.split(",").filter(Boolean);
@@ -1339,7 +1340,7 @@ async function paintSetup() {
   $$(".sstep").forEach((el) => el.classList.toggle("on", el.dataset.step === step));
   $$("#s-bar span").forEach((el, i) => el.classList.toggle("on", i <= sx.i));
   $("#s-back").style.visibility = sx.i ? "visible" : "hidden";
-  $("#s-skip").hidden = step === "done";
+  $("#s-skip").hidden = !sx.rerun || step === "done";
   $("#s-next").textContent = step === "done" ? "Start using Ecoscribe" : "Continue →";
   $("#s-next").disabled = false;
   clearInterval(sx.permPoll); sx.permPoll = null;
@@ -1369,17 +1370,19 @@ async function paintPerms() {
   $$("#s-perms [data-perm]").forEach((b) => (b.onclick = async () => { await api.open_permission(b.dataset.perm); paintPerms(); }));
 }
 
-function paintLangs() {
+function paintLangs() {  // the chosen languages as chips (✕ removes one), and Add a language
   const all = Object.fromEntries([...sx.cfg.options.languages, ...sx.cfg.options.all_languages].map((o) => [o.value, o.label]));
-  const shown = [...new Set([...S_COMMON.filter((c) => all[c]), ...sx.langs])];
-  $("#s-langs").innerHTML = shown.map((c) => `<label class="s-chip"><input type="checkbox" value="${c}" ${sx.langs.includes(c) ? "checked" : ""}><span>${all[c]}</span></label>`).join("");
-  $$("#s-langs input").forEach((el) => (el.onchange = () => {
-    sx.langs = $$("#s-langs input:checked").map((x) => x.value);
-    $("#s-next").disabled = !sx.langs.length;
-  }));
-  const more = Object.entries(all).filter(([c]) => !shown.includes(c)).sort((x, y) => x[1].localeCompare(y[1]));
-  $("#s-lang-more").innerHTML = '<option value="">More languages…</option>' + more.map(([c, l]) => `<option value="${c}">${l}</option>`).join("");
+  $("#s-langs").innerHTML = sx.langs.map((c) => `<span class="s-lchip"><span>${all[c] || c}</span>${sx.langs.length > 1
+    ? `<button type="button" class="s-chip-x" data-x="${c}" aria-label="Remove ${all[c] || c}">✕</button>` : ""}</span>`).join("");
+  $$("#s-langs [data-x]").forEach((b) => (b.onclick = () => { sx.langs = sx.langs.filter((c) => c !== b.dataset.x); paintLangs(); }));
+  const rest = Object.entries(all).filter(([c]) => !sx.langs.includes(c));
+  const common = S_COMMON.filter((c) => all[c] && !sx.langs.includes(c)).map((c) => [c, all[c]]);
+  const opt = ([c, l]) => `<option value="${c}">${l}</option>`;
+  $("#s-lang-more").innerHTML = '<option value="">Add a language…</option>'
+    + (common.length ? `<optgroup label="Common">${common.map(opt).join("")}</optgroup>` : "")
+    + `<optgroup label="All languages">${rest.sort((x, y) => x[1].localeCompare(y[1])).map(opt).join("")}</optgroup>`;
   $("#s-lang-more").onchange = (e) => { if (e.target.value) { sx.langs.push(e.target.value); paintLangs(); } };
+  $("#s-next").disabled = !sx.langs.length;
 }
 
 async function saveLangs() {
@@ -1532,7 +1535,7 @@ function setupWire() {
   $("#s-next").onclick = setupNext;
   $("#s-back").onclick = setupBack;
   $("#s-skip").onclick = closeSetup;
-  $("#setup-again").onclick = openSetup;
+  $("#setup-again").onclick = () => openSetup(true);
   $("#s-download").onclick = async () => {
     const names = sx.models.filter((m) => sx.want.has(m.name)).map((m) => m.name);
     renderModels(await api.setup_models_start(names));
@@ -1554,7 +1557,10 @@ function setupWire() {
     e.preventDefault();
     if (HK_MODS.has(e.code) && !hk.other) sKeyTry(hkName(e));
   }, true);
-  document.addEventListener("keydown", (e) => { if (sx.keyRec) return; if (e.key === "Escape" && !$("#setup").hidden && sx.steps[sx.i] !== "try") closeSetup(); });
+  document.addEventListener("keydown", (e) => {  // Esc leaves only a setup opened from Settings
+    if (sx.keyRec || !sx.rerun) return;
+    if (e.key === "Escape" && !$("#setup").hidden && sx.steps[sx.i] !== "try") closeSetup();
+  });
 }
 
 /* ---------------------------------------------------------------- boot */
@@ -1598,6 +1604,7 @@ async function boot() {
   setInterval(refreshStatus, 1500);
   if (params.get("demo") === "1" && params.get("retrymenu") === "1") setTimeout(() => $(".h-retry button")?.click(), 300);  // screenshot
   if (params.get("demo") === "1" && params.get("models") === "scroll") setTimeout(() => $("#m-rows").scrollIntoView(), 300);  // screenshot
+  if (params.get("demo") === "1" && params.get("addlangs")) setTimeout(() => { sx.langs.push(...params.get("addlangs").split(",")); paintLangs(); }, 300);  // screenshot
   if (params.get("demo") === "1" && params.get("dirty") === "1") {  // screenshot of the save bar
     $("#f-sounds").checked = !$("#f-sounds").checked; dirty();
   }
