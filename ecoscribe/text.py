@@ -9,11 +9,34 @@ _SPACE_PUNCT = re.compile(r"\s+([,.!?;:])")
 _DOUBLE_COMMA = re.compile(r",\s*([,.!?])")
 
 # Whisper invents these on silence. Only dropped with barely any speech or a high no-speech prob.
-_HALLUCINATIONS = {
-    "thank you", "thanks for watching", "thank you for watching",
-    "subtitles by the amaraorg community", "you", "gracias", "gracias por ver el video",
-    "subtítulos realizados por la comunidad de amaraorg",
-}
+# Whisper's stock inventions on silence or noise (subtitle credits, video sign-offs), in the
+# languages people dictate in. Only ever dropped with almost no speech (is_hallucination's gate),
+# so a real spoken "Thank you." stays. Written as said; matched after _norm.
+_HALLUCINATION_PHRASES = (
+    # English
+    "Thank you.", "Thank you very much.", "Thank you so much.", "Thanks.", "Thanks for watching!",
+    "Thank you for watching!", "Thank you so much for watching!", "Thanks for watching, see you next time.",
+    "Please subscribe.", "Like and subscribe.", "Don't forget to like and subscribe!",
+    "See you in the next video.", "See you next time.", "Bye.", "Bye-bye.", "You", "The end.",
+    "Subtitles by the Amara.org community", "[Music]", "[Applause]", "[Laughter]", "[Silence]",
+    # Swedish
+    "Tack.", "Tack så mycket.", "Tack för att du tittade!", "Tack för att ni tittade!",
+    "Tack för att ni har tittat.", "Undertexter från Amara.org-gemenskapen", "Svensktextning", "Textning",
+    "[Musik]",
+    # Spanish
+    "Gracias.", "Muchas gracias.", "Gracias por ver.", "Gracias por ver el video.", "Gracias por ver el vídeo.",
+    "¡Suscríbete!", "Suscríbete al canal.", "Hasta la próxima.", "Nos vemos en el próximo video.",
+    "Subtítulos realizados por la comunidad de Amara.org", "Subtítulos por la comunidad de Amara.org", "[Música]",
+    # Greek
+    "Ευχαριστώ.", "Ευχαριστώ πολύ.", "Ευχαριστούμε για την παρακολούθηση.", "Ευχαριστώ που παρακολουθήσατε.",
+    # German
+    "Vielen Dank.", "Danke.", "Danke fürs Zuschauen!", "Bis zum nächsten Mal.",
+    "Untertitel der Amara.org-Community", "Untertitel im Auftrag des ZDF für funk, 2017",
+    # French
+    "Merci.", "Merci d'avoir regardé !", "Sous-titres réalisés par la communauté d'Amara.org",
+    # Finnish
+    "Kiitos.", "Kiitos katsomisesta!",
+)
 
 
 def clean(s: str, strip_fillers: bool = True, append_space: bool = True) -> str:
@@ -108,6 +131,9 @@ def snippets(s: str, table) -> str:
 
 def _norm(s: str) -> str:
     return re.sub(r"[^\w ]", "", s.lower()).strip()
+
+
+_HALLUCINATIONS = {_norm(x) for x in _HALLUCINATION_PHRASES}
 
 
 def is_hallucination(s: str, speech_s: float, no_speech_prob: float = 0.0) -> bool:
