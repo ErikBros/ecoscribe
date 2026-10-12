@@ -18,7 +18,7 @@ def test_credit_lines():
               "Undertexter från Amara.org-gemenskapen"):
         assert segclean.is_credit(s), s
     for s in ("Text är viktigt i det här projektet.", "Vi pratar om undertexter på YouTube.",
-              "Ja, hallå där och välkommen till Simple Swedish Podcast", "Översätt det till engelska."):
+              "Ja, hej och välkommen till vårt lilla möte om cyklar", "Översätt det till engelska."):
         assert not segclean.is_credit(s), s
 
 
