@@ -503,9 +503,21 @@ async function refreshStatus() {
   side.dataset.state = state;
   $(".side-status-text", side).textContent = state === "ready" ? `Ready · ${hotkeyLabel(s.hotkey)}` : short;
   $("#ver").textContent = `v${s.version || ""}`;
+  paintFacts(s, state);  // the sidebar card, on every page (dictado-6oe.3)
   if (current === "inicio") paintHero(s, state, short, long);
 }
+function paintFacts(s, state) {
+  const none = state === "stopped" ? "—" : "…";
+  $("#fact-mic").textContent = s.mic ? (s.fell_back ? DEFAULT_MIC : prettyMic(s.mic)) : none;
+  $("#fact-mic").title = s.mic || "";
+  const langs = s.languages || [];
+  $("#fact-lang").textContent = !langs.length ? none
+    : langs.length === 1 ? (DICT_LANGS[langs[0]] || langs[0]) : langs.map((l) => l.toUpperCase()).join(" · ") + ", detected";
+  $("#fact-lang").title = langs.map((l) => DICT_LANGS[l] || l).join(", ");
+  $("#fact-engine").textContent = s.device ? (s.device === "cuda" || s.device === "mlx" ? "GPU · fast" : "CPU · slow") : none;
+}
 function paintHero(s, state, short, long) {
+  $(".hero").dataset.state = state;
   $("#hero-badge").dataset.state = state;
   $("#hero-badge-text").textContent = short;
   $("#hero-title").textContent = long;
@@ -525,15 +537,11 @@ function paintHero(s, state, short, long) {
   if (s.hotkey && s.hotkey.includes("+")) {  // a combo: no tap, and no Esc cancel (tray > Cancel recording)
     $("#hero-how").textContent = `Press ${hotkeyLabel(s.hotkey)}, talk, and press it again. The text appears wherever the cursor is.`;
     $("#tip-cancel").hidden = true;
+  } else if (s.hotkey) {  // the user's own key, as a keycap
+    $("#hero-how").innerHTML = `Tap <kbd class="key key-wide"></kbd>, talk, and tap it again. The text appears wherever the cursor is.`;
+    $("#hero-how kbd").textContent = hotkeyLabel(s.hotkey);
+    $$(".tip-key").forEach((el) => (el.textContent = hotkeyLabel(s.hotkey)));
   }
-  const none = state === "stopped" ? "—" : "…";
-  $("#fact-mic").textContent = s.mic ? (s.fell_back ? DEFAULT_MIC : prettyMic(s.mic)) : none;
-  $("#fact-mic").title = s.mic || "";
-  const langs = s.languages || [];
-  $("#fact-lang").textContent = !langs.length ? none
-    : langs.length === 1 ? (DICT_LANGS[langs[0]] || langs[0]) : langs.map((l) => l.toUpperCase()).join(" · ") + " (auto)";
-  $("#fact-lang").title = langs.map((l) => DICT_LANGS[l] || l).join(", ");
-  $("#fact-engine").textContent = s.device ? (s.device === "cuda" ? "GPU · fast" : "CPU · slow") : none;
 }
 
 // dictation languages (dictado-bvf): any mix, auto-detected among them; set in Settings
@@ -554,25 +562,37 @@ async function crashCard() {  // t0u.37: a crash is never silent
   $("#crash-dismiss").onclick = async () => { for (const i of c.items) await api.dismiss_crash(i.name); crashCard(); };
 }
 
-async function renderInicio() {
+async function renderInicio() {  // the dictate banner, today's numbers, recent dictations (dictado-6oe.3)
   crashCard();
+  const hour = new Date().getHours();
+  $("#home-hello").textContent = hour < 5 ? "Good night" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  $("#home-date").textContent = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
   await refreshStatus();
-  const h = await api.get_history(1, "");
+  const h = await api.get_history(200, "");
+  const today = new Date().toISOString().slice(0, 10);
+  const todays = h.items.filter((x) => String(x.ts || "").startsWith(today));
   $("#stat-today").textContent = fmtNum(h.stats.today_words);
-  $("#stat-total").textContent = `${fmtNum(h.stats.total_words)} words in total`;
-  const last = h.items[0];
-  const copyBtn = $("#last-copy");
-  if (last) {
-    $("#last-text").textContent = last.text.trim();
-    $("#last-meta").textContent = [when(last.ts), last.pasted === false ? "not pasted: copy it from here" : appName(last.target)]
-      .filter(Boolean).join(" · ");  // dictado-bhe: no text box under the cursor at the stop
-    copyBtn.hidden = false;
-    copyBtn.onclick = () => copy(last.text, copyBtn);
-  } else {
-    $("#last-text").innerHTML = '<span class="muted">You haven\'t dictated anything yet.</span>';
-    $("#last-meta").textContent = "";
-    copyBtn.hidden = true;
+  $("#stat-saved").textContent = `${Math.max(0, Math.round(h.stats.today_words / 40))} min`;  // typing runs about 40 words a minute
+  $("#stat-count").textContent = fmtNum(todays.length);
+  $("#stat-total").textContent = h.stats.total_words ? `${fmtNum(h.stats.total_words)} words in total` : "";
+  const list = $("#recent-list");
+  list.innerHTML = "";
+  for (const [i, x] of h.items.slice(0, 3).entries()) {
+    const li = document.createElement("li"); li.className = "recent-item";
+    const p = document.createElement("p"); p.className = "last-text"; p.textContent = x.text.trim();
+    if (i === 0) p.id = "last-text";
+    const meta = document.createElement("span"); meta.className = "recent-meta";
+    meta.textContent = [when(x.ts), x.pasted === false ? "" : appName(x.target)].filter(Boolean).join(" · ");
+    li.append(p, meta);
+    if (x.pasted === false) {  // dictado-bhe: no text box under the cursor at the stop
+      const b = document.createElement("span"); b.className = "badge"; b.textContent = "Not pasted"; li.append(b);
+    }
+    const c = document.createElement("button"); c.type = "button"; c.className = "btn btn-ghost btn-sm"; c.textContent = "Copy";
+    c.onclick = () => copy(x.text, c);
+    li.append(c);
+    list.append(li);
   }
+  if (!h.items.length) list.innerHTML = '<li class="recent-item"><p class="last-text" id="last-text"><span class="muted">You haven\'t dictated anything yet. Tap the key and talk.</span></p></li>';
 }
 
 /* ---------------------------------------------------------------- reuniones */
@@ -819,6 +839,9 @@ function rWire() {
   if (!sel.value) sel.value = R_LANGS[0][0];  // a stored language that was removed
   sel.onchange = () => store("ecoscribe.r-lang", sel.value);
   $("#r-start").onclick = rStart;
+  $("#home-record").onclick = async () => { await show("reuniones"); rStart(); };  // Home's quick actions (dictado-6oe.3)
+  $("#home-file").onclick = async () => { const out = await api.pick_files(); if (out.paths && out.paths.length) { await show("reuniones"); rImport(out.paths); } };
+  $("#recent-all").onclick = (e) => { e.preventDefault(); show("historial"); };
   $("#r-now-stop").onclick = rStop;
   $("#r-d-stop").onclick = rStop;
   $("#r-segs").addEventListener("scroll", () => { if (atBottom($("#r-segs"))) $("#r-jump").hidden = true; });
@@ -1615,7 +1638,7 @@ async function boot() {
 function macify() {
   const set = (sel, html) => { const el = $(sel); if (el) el.innerHTML = html; };
   set("#hero-how", 'Tap <kbd class="key key-wide">⌘</kbd> <span class="key-side">(right Command)</span>, talk, and tap it again. The text appears wherever the cursor is.');
-  set("#tip-cancel", '<span class="keys"><kbd class="key">⌘</kbd><span class="plus">+</span><kbd class="key">Esc</kbd></span><span>Hold Right Command and press Esc to cancel.</span>');
+  set("#tip-cancel", '<strong>Tip</strong> · Hold <span class="tip-key">Right Command</span> and press Esc to cancel a dictation.');
   set("#hk-label", "Right Command");
   set("#hk-hint", HK_HINT);
   for (const el of $$(".tip .keys kbd.key")) if (el.textContent === "Ctrl") el.textContent = "⌘";

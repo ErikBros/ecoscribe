@@ -32,8 +32,13 @@
       <button class="nav-item" data-page="ajustes">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h8M17 7h2M5 17h2M11 17h8"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>Settings</button>
     </nav>
-    <div class="side-status" id="side-status">
-      <span class="dot"></span><span class="side-status-text">Checking…</span>
+    <div class="side-card">  <!-- what Home's facts were (dictado-6oe.3) -->
+      <div class="side-status" id="side-status"><span class="dot"></span><span class="side-status-text">Checking…</span></div>
+      <div class="side-facts">
+        <span title="Microphone"><span class="sr">Mic: </span><span id="fact-mic">…</span></span>
+        <span><span class="sr">Languages: </span><span id="fact-lang"></span></span>
+        <span><span class="sr">Engine: </span><span id="fact-engine">…</span></span>
+      </div>
     </div>
   </aside>
 
@@ -41,7 +46,7 @@
     <!-- INICIO -->
     <section class="page" id="page-inicio" hidden>
       <header class="page-head">
-        <h1>Home</h1>
+        <h1 id="home-hello">Home</h1><span class="muted" id="home-date"></span>
       </header>
       <div class="crash-card card" id="crash-card" hidden>
         <div class="crash-text"><strong id="crash-title">Ecoscribe crashed</strong>
@@ -50,40 +55,32 @@
           <button type="button" class="btn btn-sm" id="crash-copy">Copy crash report for Claude</button>
           <button type="button" class="btn btn-ghost btn-sm" id="crash-dismiss">Dismiss</button></div>
       </div>
-      <div class="hero card">
+      <div class="hero" data-state="ready">  <!-- the dictate banner (dictado-6oe.3) -->
         <div class="hero-state">
           <span class="state-badge" id="hero-badge"><span class="dot"></span><span id="hero-badge-text">…</span></span>
           <h2 id="hero-title">Checking Ecoscribe…</h2>
-          <p class="hero-how" id="hero-how">Tap <kbd class="key key-wide">Ctrl</kbd> <span class="key-side">(right)</span>, talk, and tap it again. The text appears wherever the cursor is.</p>
+          <p class="hero-how" id="hero-how">Tap <kbd class="key key-wide">Right Ctrl</kbd>, talk, and tap it again. The text appears wherever the cursor is.</p>
           <div class="hero-actions" id="hero-actions"></div>
         </div>
-        <div class="hero-facts">
-          <div class="fact"><span class="fact-label">Mic</span><span class="fact-value" id="fact-mic">…</span></div>
-          <div class="fact"><label class="fact-label" for="fact-lang">Language</label><span class="fact-value" id="fact-lang"></span></div>
-          <div class="fact"><span class="fact-label">Engine</span><span class="fact-value" id="fact-engine">…</span></div>
-        </div>
+        <svg class="hero-wave" viewBox="0 0 220 90" aria-hidden="true"><path d="M10 45v0M24 38v14M38 30v30M52 20v50M66 34v22M80 26v38M94 12v66M108 28v34M122 36v18M136 22v46M150 32v26M164 40v10M178 30v30M192 38v14M206 45v0"/><circle cx="94" cy="45" r="6"/></svg>
       </div>
 
-      <div class="grid2">
-        <div class="card stat-card">
-          <div class="card-title">Today</div>
-          <div class="stat"><span class="stat-num" id="stat-today">0</span><span class="stat-unit">words</span></div>
-          <div class="muted" id="stat-total">0 words in total</div>
-        </div>
-        <div class="card last-card">
-          <div class="card-title">Last dictation</div>
-          <p class="last-text" id="last-text"><span class="muted">You haven't dictated anything yet.</span></p>
-          <div class="last-meta">
-            <span class="muted small" id="last-meta"></span>
-            <button class="btn btn-ghost btn-sm" id="last-copy" hidden>Copy</button>
-          </div>
-        </div>
+      <div class="today">
+        <div class="card today-stat"><span class="card-title">Words today</span><span class="today-num" id="stat-today">0</span></div>
+        <div class="card today-stat"><span class="card-title">Typing saved</span><span class="today-num" id="stat-saved">0 min</span></div>
+        <div class="card today-stat"><span class="card-title">Dictations</span><span class="today-num" id="stat-count">0</span></div>
       </div>
 
-      <div class="card tips">
-        <div class="tip"><svg viewBox="0 0 24 24" class="tip-ico" aria-hidden="true"><rect x="3.5" y="5" width="12" height="9" rx="1.5"/><path d="M8.5 17.5V19a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 20.5 19v-6A1.5 1.5 0 0 0 19 11.5h-1"/></svg><span>While you talk you can switch apps, click or use shortcuts: nothing cuts the recording.</span></div>
-        <div class="tip" id="tip-cancel"><span class="keys"><kbd class="key">Ctrl</kbd><span class="plus">+</span><kbd class="key">Esc</kbd></span><span>Hold Right Ctrl and press Esc to cancel.</span></div>
-        <div class="tip"><svg viewBox="0 0 24 24" class="tip-ico" aria-hidden="true"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="8"/></svg><span>Text didn't show up? It's in History, ready to copy.</span></div>
+      <div class="home-row">
+        <div class="card recent">
+          <div class="recent-head"><strong>Recent</strong><span class="muted small" id="stat-total"></span><a href="#" id="recent-all">All in History</a></div>
+          <ul class="recent-list" id="recent-list"><li class="recent-item"><p class="last-text" id="last-text"><span class="muted">You haven't dictated anything yet.</span></p></li></ul>
+        </div>
+        <div class="home-actions">
+          <button type="button" class="action action-primary" id="home-record"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg><span><strong>Record a meeting</strong><span>Mic and the call's sound</span></span></button>
+          <button type="button" class="action" id="home-file"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span><strong>Transcribe a file</strong><span>Audio or video</span></span></button>
+          <p class="home-tip" id="tip-cancel"><strong>Tip</strong> · Hold <span class="tip-key">Right Ctrl</span> and press Esc to cancel a dictation.</p>
+        </div>
       </div>
     </section>
 
