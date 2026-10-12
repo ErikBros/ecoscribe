@@ -162,6 +162,12 @@ function demoApi() {
       return { items, stats: { total: 312, total_words: 4210, today_words: 152 } };
     },
     copy_text: async () => ({ ok: true }),
+    delete_dictation: async (id, ts) => {
+      const i = history.findIndex((x) => (id ? x.id === id : x.ts === ts));
+      if (i >= 0) history.splice(i, 1);
+      window.__deletedDictation = id || ts;
+      return { ok: true, gone: i >= 0 };
+    },
     get_insights: async (days) => demoInsights(days),
     add_word: async (w) => { settings.values.vocabulary += "\n" + w; window.__added = w; return { ok: true }; },
     insights_for_claude: async () => ({ ok: true, chars: 5120 }),
@@ -217,6 +223,20 @@ function toast(msg, ms = 2600) {
   el.hidden = false;
   clearTimeout(toast._t);
   toast._t = setTimeout(() => (el.hidden = true), ms);
+}
+const UNDO_MS = Number(params.get("undo_ms")) || 5000;  // smoke tests wait less
+function toastUndo(msg, onUndo, ms = UNDO_MS) {  // a toast with Undo (dictado-vfo); false when it times out
+  const el = $("#toast");
+  el.textContent = msg + " ";
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "toast-btn"; b.textContent = "Undo";
+  el.append(b);
+  el.hidden = false;
+  clearTimeout(toast._t);
+  return new Promise((done) => {
+    b.onclick = () => { clearTimeout(toast._t); el.hidden = true; onUndo(); done(true); };
+    toast._t = setTimeout(() => { el.hidden = true; done(false); }, ms);
+  });
 }
 function prettyMic(n) {
   const m = /^[^(]*\((.+?)\)?$/.exec(n || "");
@@ -984,6 +1004,10 @@ async function renderHistory() {
     btn.className = "btn btn-ghost btn-sm h-copy"; btn.textContent = "Copy";
     btn.onclick = () => copy(r.text, btn);
     btns.append(btn);
+    const del = document.createElement("button");  // dictado-vfo
+    del.className = "btn btn-ghost btn-sm h-copy h-del"; del.textContent = "Delete"; del.title = "Delete this dictation";
+    del.onclick = () => deleteDictation(r, li);
+    btns.append(del);
     li.append(t, p, btns, meta);
     group.append(li);
   }
@@ -994,6 +1018,16 @@ async function renderHistory() {
   $("#history-count").textContent = count;
   $("#history-sub").textContent = count ? count + " · kept on this computer" : "";
   $("#history-clear").hidden = !h.stats.total;
+}
+
+/* History > Delete (dictado-vfo): the row goes at once; the line and its audio after a few seconds to Undo. */
+async function deleteDictation(r, li) {
+  li.hidden = true;
+  const undone = await toastUndo("Dictation deleted.", () => { li.hidden = false; });
+  if (undone) return;
+  const res = await api.delete_dictation(r.id || "", r.id ? "" : r.ts);
+  if (!res.ok) { li.hidden = false; toast(res.error || "Couldn't delete it."); return; }
+  renderHistory();
 }
 
 /* History > Retry (dictado-a2r): transcribe a recent dictation again, by itself or in a language.

@@ -513,6 +513,16 @@ class App:
         log.info("retry id=%s lang=%s chars=%d", rid, res.lang, len(res.text))
         return {"ok": True, "text": res.text, "lang": res.lang}
 
+    def delete_dictation(self, rid: str | None, ts: str | None = None) -> dict:
+        """History > Delete (dictado-vfo): the line and its kept audio, under the history lock."""
+        from . import histfile
+        if not self.history_path:
+            return {"ok": False, "error": "No history"}
+        with self._lock:
+            gone = histfile.delete(self.history_path, rid or None, ts or None)
+        log.info("history: deleted id=%s gone=%s", rid, gone)
+        return {"ok": True, "gone": gone}
+
     def _replace_history(self, rid: str, res) -> None:
         with self._lock:
             try:

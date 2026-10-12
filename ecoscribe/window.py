@@ -403,6 +403,15 @@ class Api:
         self._copy(text)
         return {"ok": True}
 
+    def delete_dictation(self, rid: str = "", ts: str = "") -> dict:
+        """History > Delete (dictado-vfo): the background app owns history.jsonl, so it deletes; when
+        it isn't running nothing else writes the file and the window does it."""
+        from . import commands, histfile
+        out = self._send("delete_dictation", {"id": rid, "ts": ts})
+        if not out.get("ok") and out.get("error") in (commands.NOT_RUNNING, "Dictation isn't running"):
+            return {"ok": True, "gone": histfile.delete(self._data_dir / "history.jsonl", rid or None, ts or None)}
+        return out
+
     def clear_history(self) -> dict:
         p = self._data_dir / "history.jsonl"
         if p.exists():
