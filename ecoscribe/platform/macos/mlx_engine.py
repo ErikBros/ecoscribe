@@ -17,6 +17,7 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -61,15 +62,102 @@ def mlx_repo(name: str) -> str | None:
     return None
 
 
-def ensure_mlx(repo: str, local_files_only: bool = False) -> str:
-    """Local folder with the mlx weights: the HF cache, downloading once if allowed (and needed)."""
+MLX_WEIGHTS = ("weights.safetensors", "weights.npz")
+
+
+def _cached(repo: str, cache_dir=None) -> str | None:
+    """The cached snapshot folder when it holds config + weights, else None. snapshot_download writes
+    refs/main before the files, so an interrupted download still "finds" a snapshot: check the files."""
     from huggingface_hub import snapshot_download
     try:
-        return snapshot_download(repo, local_files_only=True)
+        path = snapshot_download(repo, local_files_only=True, cache_dir=cache_dir)
     except Exception:
-        if local_files_only:
-            log.info("mlx model %s not cached yet, downloading", repo)
-        return snapshot_download(repo)
+        return None
+    p = Path(path)
+    if (p / "config.json").is_file() and any((p / w).is_file() for w in MLX_WEIGHTS):
+        return path
+    return None
+
+
+def is_cached_mlx(repo: str, cache_dir=None) -> bool:
+    """True when the mlx weights for `repo` are on disk (no download needed)."""
+    return _cached(repo, cache_dir) is not None
+
+
+def _repo_total(repo: str) -> int | None:
+    try:
+        from huggingface_hub import HfApi
+        info = HfApi().model_info(repo, files_metadata=True)
+        return sum(s.size or 0 for s in info.siblings) or None
+    except Exception:
+        log.warning("could not read the size of %s", repo, exc_info=True)
+        return None
+
+
+def _hf_snapshot(repo: str, cache_dir=None) -> str:
+    from huggingface_hub import snapshot_download
+    return snapshot_download(repo, cache_dir=cache_dir)
+
+
+def ensure_mlx(repo: str, local_files_only: bool = False, progress=None, download=_hf_snapshot,
+               total=_repo_total, cache_dir=None) -> str:
+    """Local folder with the mlx weights: the HF cache, downloading once if needed (even when
+    local_files_only: the model has to come from somewhere, and that call is only logged).
+
+    progress(done_bytes, total_bytes | None) has models.ensure_local's contract: never decreasing,
+    and always called once at the end with done == total (at once when already cached)."""
+    from ... import models
+    if progress:
+        progress = models._monotonic(progress)
+    path = _cached(repo, cache_dir)
+    if path is not None:
+        if progress:
+            progress.finish(_bytes(Path(path)))
+        return path
+    if local_files_only:
+        log.info("mlx model %s not cached yet, downloading", repo)
+    if progress is None:
+        return download(repo, cache_dir=cache_dir)
+    size = total(repo)
+    blobs = _blobs(repo, cache_dir)
+    stop = threading.Event()
+
+    def poll():  # finished blobs + the .incomplete ones being written
+        while not stop.wait(1.0):
+            progress(_bytes(blobs), size)
+    progress(_bytes(blobs), size)
+    t = threading.Thread(target=poll, name="mlx-model-progress", daemon=True)
+    t.start()
+    try:
+        path = download(repo, cache_dir=cache_dir)
+    finally:
+        stop.set()
+        t.join()
+    progress.finish(_bytes(Path(path)))
+    return path
+
+
+def _bytes(d: Path) -> int:
+    """Bytes under `d`, following symlinks once per real file. huggingface_hub 1.x writes a big file as
+    <repo>/blobs/<etag>.incomplete, then moves it to the cache-wide blobs/<xx>/<hash> and leaves a
+    symlink: models._dir_bytes (real files only) would lose it the moment it finishes."""
+    total, seen = 0, set()
+    if not d.exists():
+        return 0
+    for f in d.rglob("*"):
+        try:
+            st = f.stat()
+        except OSError:
+            continue
+        if f.is_file() and (st.st_dev, st.st_ino) not in seen:
+            seen.add((st.st_dev, st.st_ino))
+            total += st.st_size
+    return total
+
+
+def _blobs(repo: str, cache_dir=None) -> Path:
+    from huggingface_hub import constants
+    return Path(cache_dir or constants.HF_HUB_CACHE) / f"models--{repo.replace('/', '--')}" / "blobs"
 
 
 @dataclass
