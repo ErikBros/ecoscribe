@@ -341,5 +341,17 @@ async function load(query) {
   doc.querySelector("#s-skip").click(); await sleep(100);
   check(doc.querySelector("#setup").hidden, "Skip setup closes it");
 }
+{ // History > Retry (dictado-a2r)
+  const { window, doc } = await load("page=historial");
+  await sleep(200);
+  const items = [...doc.querySelectorAll("#history .h-item")].filter((li) => !li.classList.contains("h-meeting"));
+  check(items[0].querySelector(".h-retry") && !items[2].querySelector(".h-retry"), "Retry only where the audio is kept");
+  items[0].querySelector(".h-retry button").click(); await sleep(150);
+  const opts = [...items[0].querySelectorAll(".h-menu-item")].map((b) => b.textContent);
+  check(opts[0] === "Again, detect the language" && opts.includes("Again, in English"), "the menu offers detect + each language");
+  items[0].querySelectorAll(".h-menu-item")[0].click(); await sleep(150);
+  check(items[0].querySelector(".h-text").textContent.startsWith("Could you"), "the new text replaces the old one");
+  check(!doc.querySelector("#toast").hidden && doc.querySelector("#toast").textContent.includes("copied"), "says it's copied");
+}
 console.log(failed ? `\n${failed} FAILED` : "\nall ok");
 process.exit(failed ? 1 : 0);

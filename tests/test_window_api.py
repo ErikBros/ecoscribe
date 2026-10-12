@@ -321,3 +321,19 @@ def test_setup_models_error_is_reported(api, monkeypatch):
 def test_initial_page_comes_from_python_not_the_url(tmp_path):
     assert Api(data_dir=tmp_path, page="bienvenida").initial_page() == "bienvenida"
     assert Api(data_dir=tmp_path).initial_page() is None
+
+
+def test_history_says_which_dictations_can_be_retried(api):
+    write_history(api, [{"ts": "2026-10-12T09:00:00", "text": "old one", "id": "a", "audio": True},
+                        {"ts": "2026-10-12T09:01:00", "text": "new one", "id": "b", "audio": True}])
+    (api._data_dir / "recent").mkdir()
+    (api._data_dir / "recent" / "b.wav").write_bytes(b"")
+    items = api.get_history()["items"]
+    assert [(i["text"], i["audio"]) for i in items] == [("new one", True), ("old one", False)]
+
+
+def test_retry_goes_to_the_background_app(tmp_path):
+    sent = []
+    a = Api(data_dir=tmp_path, send_command=lambda d, cmd, args, **kw: sent.append((cmd, args, kw)) or {"ok": True})
+    assert a.retry_dictation("b", "sv") == {"ok": True}
+    assert sent == [("retry", {"id": "b", "lang": "sv"}, {"wait_s": 120.0})]

@@ -333,6 +333,8 @@ class Api:
                  "today_words": sum(words(r) for r in rows if str(r.get("ts", "")).startswith(today))}
         q = query.strip().lower()
         items = [r for r in reversed(rows) if not q or q in r["text"].lower()][:limit]
+        kept = {f.stem for f in (self._data_dir / "recent").glob("*.wav")}  # Retry only where the audio still is
+        items = [{**r, "audio": r.get("id") in kept} for r in items]
         return {"items": items, "stats": stats}
 
     # ---------------- insights (dictado-3je) ----------------
@@ -619,8 +621,12 @@ class Api:
         shutil.copyfile(src, dest)
         return {"ok": True, "path": str(dest), "name": dest.name}
 
-    def _send(self, cmd: str, args: dict | None = None) -> dict:
-        return self._commands(self._data_dir, cmd, args)
+    def _send(self, cmd: str, args: dict | None = None, **kw) -> dict:
+        return self._commands(self._data_dir, cmd, args, **kw)
+
+    def retry_dictation(self, rid: str, lang: str = "") -> dict:
+        """History > Retry (dictado-a2r): the background app transcribes the kept audio again."""
+        return self._send("retry", {"id": rid, "lang": lang or None}, wait_s=120.0)
 
     # ---------------- misc ----------------
     # ---------- troubleshooting (t0u.37) ----------
