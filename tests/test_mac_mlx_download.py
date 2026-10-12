@@ -13,7 +13,7 @@ def fake_download(cache, sizes, delay=0.0):
     """Writes the files the way huggingface_hub does: blobs (via .incomplete), then the snapshot links."""
     calls = []
 
-    def download(repo, cache_dir=None):
+    def download(repo, cache_dir=None, on_bytes=None):
         calls.append(repo)
         base = cache / f"models--{repo.replace('/', '--')}"
         blobs, snap = base / "blobs", base / "snapshots" / "abc"
@@ -104,3 +104,33 @@ def test_half_cached_repo_downloads_again(tmp_path):
     dl, calls = fake_download(tmp_path, SIZES)
     mlx_engine.ensure_mlx(REPO, download=dl, cache_dir=str(tmp_path))
     assert calls == [REPO]
+
+
+def test_network_bytes_move_the_bar_before_anything_is_on_disk(tmp_path):
+    """Xet keeps a file off disk until it's rebuilt: the network counter is what moves the bar."""
+    from ecoscribe.platform.macos import mlx_engine
+    inner, _ = fake_download(tmp_path, SIZES)
+
+    def dl(repo, cache_dir=None, on_bytes=None):
+        for n in (1000, 2500, 4000):
+            on_bytes("huggingface_hub.snapshot_download.transfer", n)
+            time.sleep(1.1)
+        return inner(repo)
+    seen = []
+    mlx_engine.ensure_mlx(REPO, progress=lambda d, t: seen.append((d, t)), download=dl,
+                          total=lambda r: 5100, cache_dir=str(tmp_path))
+    mid = [d for d, _ in seen[:-1]]
+    assert any(1000 <= d <= 4000 for d in mid) and max(mid) < 5100
+    assert seen[-1] == (5100, 5100)
+
+
+def test_byte_counter_reports_only_the_byte_bars():
+    from ecoscribe.platform.macos import mlx_engine
+    got = []
+    cls = mlx_engine._byte_counter(lambda bar, n: got.append((bar, n)))
+    files = cls(total=3, unit="it", name="huggingface_hub.snapshot_download.files")
+    files.update(1)
+    net = cls(total=0, unit="B", name="huggingface_hub.snapshot_download.transfer")
+    net.update(300)
+    net.update(200)
+    assert got == [("huggingface_hub.snapshot_download.transfer", 300), ("huggingface_hub.snapshot_download.transfer", 500)]
