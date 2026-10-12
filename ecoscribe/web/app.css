@@ -492,7 +492,7 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border: 1px solid var(--
 .i-card { padding: 18px 20px; margin-bottom: 16px; }
 .i-grid .i-card { margin-bottom: 0; min-width: 0; }
 .i-chart svg { width: 100%; height: auto; overflow: visible; }
-.i-chart .bar { fill: var(--aegean); }
+.i-chart .bar { fill: var(--aegean); pointer-events: none; }  /* the hover area under it takes the mouse (dictado-7qo) */
 .i-chart .bar.dim { fill: var(--aegean-soft); }
 .i-chart .hit { fill: transparent; cursor: default; }
 .i-chart .hit:hover + .bar, .i-chart .hit:focus + .bar { fill: var(--aegean-hover); }

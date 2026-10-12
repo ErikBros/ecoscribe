@@ -108,6 +108,9 @@ async function load(query) {
   check(!doc.querySelector("#i-week").hidden && doc.querySelector("#i-week-text").textContent.includes("2.2 → 1.8"), "this week: hedges went down (dictado-6oe.6)");
   check(doc.querySelectorAll("#i-hours path.bar").length > 5 && doc.querySelectorAll("#i-days .tick").length === 3, "hour and day charts drawn");
   check(doc.querySelectorAll("#i-langs .i-hbar").length === 4 && doc.querySelector("#i-langs .i-hbar-name").textContent === "English", "languages by name");
+  check(/ words · \d+%$/.test(doc.querySelector("#i-langs .i-hbar-val").textContent)
+    && / dictations?$/.test(doc.querySelector("#i-apps .i-hbar-val").textContent), "languages count words, apps dictations (dictado-7qo)");
+  check(/^The dark bar is your busiest hour, \d\d:00-\d\d:00\.$/.test(doc.querySelector("#i-hours-note").textContent), "the dark hour is explained (dictado-7qo)");
   check(doc.querySelector("#i-habits").textContent.includes("3.1"), "filler words per 100");
   check(doc.querySelector("#i-clarity").textContent === "91%" && doc.querySelector("#i-clarity-empty").hidden
     && doc.querySelectorAll("#i-clarity-weeks path.bar").length === 4, "clarity: score and the weeks that have one (9jc.1)");
