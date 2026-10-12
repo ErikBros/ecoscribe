@@ -325,7 +325,7 @@ async function load(query) {
   check(next.disabled, "can't go on before the required model is there");
   check(doc.querySelector("#s-download").textContent.includes("4.7 GB"), "download offers both models (4.7 GB)");
   doc.querySelector("#s-download").click();
-  for (let i = 0; i < 40 && next.disabled; i++) await sleep(100);
+  for (let i = 0; i < 150 && next.disabled; i++) await sleep(100);  // the demo download takes ~4 s: don't race it
   check(!next.disabled && doc.querySelectorAll("#s-models .s-model.ready").length === 2, "both models download, then Continue");
   next.click(); await sleep(250);
   check(on() === "mic" && doc.querySelector("#s-mic").options.length > 1, "mic step lists the mics");
