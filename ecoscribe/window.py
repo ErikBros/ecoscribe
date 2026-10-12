@@ -180,6 +180,7 @@ class Api:
                 "calendar_url": c.meetings.calendar_url, "debug_log": c.ui.debug_log,
                 "extra_languages": list(c.whisper.extra_languages),
                 "snippets": [{"trigger": k, "text": v} for k, v in c.text.snippets.items()],
+                "replacements": [{"heard": k, "write": v} for k, v in c.text.replacements.items()],
             },
             "speakers_addon": diarize.addon_exe().is_file(),
             "voice_command_list": _voice_command_list(),
@@ -229,6 +230,14 @@ class Api:
                     if k and k not in table and str(row.get("text", "")).strip():
                         table[k] = str(row["text"])[:2000]
                 c.text.snippets = dict(list(table.items())[:50])
+            if "replacements" in values:  # [{heard, write}] (dictado-b7u); heard lower-cased, blanks and repeats dropped
+                table = {}
+                for row in values["replacements"] or []:
+                    k = " ".join(str(row.get("heard", "")).lower().split())[:60]
+                    v = " ".join(str(row.get("write", "")).split())[:200]
+                    if k and v and k not in table:
+                        table[k] = v
+                c.text.replacements = dict(list(table.items())[:200])
             if "extra_languages" in values:  # dictado-ehs: Add a language / remove one
                 c.whisper.extra_languages = valid_extra(values["extra_languages"])
                 avail = available(c.whisper.extra_languages)

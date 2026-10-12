@@ -53,6 +53,23 @@ async function load(query) {
   doc.querySelector("#save").click(); await sleep(100);
   check(sent && sent.vocabulary === "Göteborg\npyannote\nKristineberg" && Object.keys(sent).length === 1, "saves only the word list, trimmed: " + JSON.stringify(sent));
 }
+{ // ajustes: Replace, heard -> write (dictado-b7u)
+  const { window, doc } = await load("page=ajustes");
+  const rows = () => [...doc.querySelectorAll("#reps .rep")];
+  check(rows().length === 1 && rows()[0].querySelector(".rep-heard").value === "poll request"
+    && rows()[0].querySelector(".rep-write").value === "pull request", "Replace shows the saved pair");
+  doc.querySelector("#rep-add").click();
+  const r = rows()[1];
+  r.querySelector(".rep-heard").value = "eco scribe"; r.querySelector(".rep-write").value = "Ecoscribe";
+  r.querySelector(".rep-write").dispatchEvent(new window.Event("input", { bubbles: true }));
+  check(!doc.querySelector("#savebar").hidden, "typing a replacement shows the savebar");
+  let sent = null;
+  const api = window.__ecoscribe.api, orig = api.save_settings;
+  api.save_settings = async (x) => { sent = x; return orig(x); };
+  doc.querySelector("#save").click(); await sleep(100);
+  check(sent && JSON.stringify(sent.replacements) === JSON.stringify([{ heard: "poll request", write: "pull request" }, { heard: "eco scribe", write: "Ecoscribe" }])
+    && Object.keys(sent).length === 1, "saves the replacements: " + JSON.stringify(sent));
+}
 { // ajustes: voice memory (t0u.32)
   const { window, doc } = await load("page=ajustes");
   await sleep(50);

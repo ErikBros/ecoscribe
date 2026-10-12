@@ -107,3 +107,14 @@ def test_more_known_inventions_on_silence():
 def test_a_real_sentence_with_the_same_words_is_kept():
     assert not is_hallucination("Tack för att ni tittade på förslaget igår.", 0.1)
     assert not is_hallucination("Thanks for watching the kids yesterday.", 0.2)
+
+
+def test_replacements_anywhere_whole_words_any_case():
+    """The Replace list (dictado-b7u): heard -> written, anywhere in the text."""
+    from ecoscribe.text import replacements
+    t = {"poll request": "pull request", "eco scribe": "Ecoscribe", "pr": "PR"}
+    assert replacements("Open a Poll  request for it.", t) == "Open a pull request for it."
+    assert replacements("eco scribe is open, eco scribe again", t) == "Ecoscribe is open, Ecoscribe again"
+    assert replacements("a pr, not a prize or april", t) == "a PR, not a prize or april"  # whole words only
+    assert replacements("nothing here", t) == "nothing here" and replacements("x", {}) == "x" and replacements("", t) == ""
+    assert replacements("poll requests", {"poll request": "pull request", "poll requests": "pull requests"}) == "pull requests"

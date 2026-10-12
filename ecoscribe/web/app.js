@@ -62,7 +62,7 @@ function demoApi() {
   let settings = {
     values: { hotkey: "rctrl", mic: "Anker PowerConf", languages: "en", sounds: true, overlay: true, live_text: true, insights: params.get("insights") === "1", speech_feedback: false, unmute: true, startup: true,
       meet_mode: "prompt", meet_lang: "sv", on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: false, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true,
-      snippets: [{ trigger: "my email", text: "alex@example.com" }] },
+      snippets: [{ trigger: "my email", text: "alex@example.com" }], replacements: [{ heard: "poll request", write: "pull request" }] },
     options: {
       hotkeys: [{ value: "rctrl", label: "Right Ctrl (recommended)" }, { value: "scrolllock", label: "Scroll Lock" }, { value: "pause", label: "Pause" }, { value: "f13", label: "F13" }],
       mics: [{ value: "", label: DEFAULT_MIC }, { value: "Headset (Zone Vibe 100)", label: "Zone Vibe 100" }, { value: "Anker PowerConf", label: "Anker PowerConf C20" }],
@@ -1082,6 +1082,8 @@ function formValues() {
     snippets: $$(".snip").map((r) => ({ trigger: $(".snip-trigger", r).value.trim().toLowerCase().replace(/\s+/g, " "),
                                        text: $(".snip-text", r).value }))
       .filter((x) => x.trigger && x.text.trim()),
+    replacements: $$(".rep").map((r) => ({ heard: $(".rep-heard", r).value.trim(), write: $(".rep-write", r).value.trim() }))
+      .filter((x) => x.heard && x.write),
   };
 }
 // Languages you dictate in (dictado-ehs): English + Swedish built in; "Add a language" for the rest.
@@ -1129,6 +1131,18 @@ function snipRow(trigger = "", text = "") {
   $(".snip-trigger", row).value = trigger; $(".snip-text", row).value = text;
   $(".snip-del", row).onclick = () => { row.remove(); dirty(); };
   $("#snips").append(row);
+  return row;
+}
+function repRow(heard = "", write = "") {  // Replace: heard -> write (dictado-b7u)
+  const row = document.createElement("div");
+  row.className = "rep";
+  row.innerHTML = `<input class="rep-heard rep-input" placeholder="poll request" maxlength="60" spellcheck="false" aria-label="When it writes">
+    <span class="rep-arrow" aria-hidden="true">→</span>
+    <input class="rep-write rep-input" placeholder="pull request" maxlength="200" spellcheck="false" aria-label="Write instead">
+    <button type="button" class="btn btn-ghost btn-sm snip-del" title="Remove this replacement">Remove</button>`;
+  $(".rep-heard", row).value = heard; $(".rep-write", row).value = write;
+  $(".snip-del", row).onclick = () => { row.remove(); dirty(); };
+  $("#reps").append(row);
   return row;
 }
 function fillSelect(sel, options, value) {
@@ -1213,6 +1227,9 @@ async function renderSettings() {
   $("#snips").innerHTML = "";
   for (const x of s.values.snippets || []) snipRow(x.trigger, x.text);
   $("#snip-add").onclick = () => { $(".snip-trigger", snipRow()).focus(); };
+  $("#reps").innerHTML = "";
+  for (const x of s.values.replacements || []) repRow(x.heard, x.write);
+  $("#rep-add").onclick = () => { $(".rep-heard", repRow()).focus(); };
   $("#f-speakers").checked = s.values.speakers && s.speakers_addon;
   $("#f-speakers").disabled = !s.speakers_addon;
   $("#f-speakers-help").textContent = s.speakers_addon
@@ -1684,7 +1701,7 @@ async function boot() {
   secShow(store("ecoscribe.set-sec") || "dictation");
   window.__secShow = secShow;
   $("#settings").addEventListener("change", dirty);
-  $("#settings").addEventListener("input", (e) => { if (e.target.id === "f-vocabulary" || e.target.id === "f-calendar" || e.target.closest(".snip")) dirty(); });  // savebar while typing words
+  $("#settings").addEventListener("input", (e) => { if (e.target.id === "f-vocabulary" || e.target.id === "f-calendar" || e.target.closest(".snip") || e.target.closest(".rep")) dirty(); });  // savebar while typing words
   $("#settings").addEventListener("submit", (e) => e.preventDefault());
   $("#save").onclick = save;
   $("#discard").onclick = renderSettings;
