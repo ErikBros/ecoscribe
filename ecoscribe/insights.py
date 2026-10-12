@@ -67,13 +67,14 @@ def _lang(r) -> str:
     return "mixed" if "+" in lang else lang
 
 
-def totals(rows: list[dict]) -> dict:
+def totals(rows: list[dict], typing_wpm: int | None = None) -> dict:
+    typing_wpm = int(typing_wpm or TYPING_WPM)  # the user's own speed when they set one (dictado-d8e)
     n_words = sum(len(words(r.get("text", ""))) for r in rows)
     talk_s = sum(float(r.get("audio_s") or 0) for r in rows)
-    typing_s = n_words / TYPING_WPM * 60
+    typing_s = n_words / typing_wpm * 60
     return {"dictations": len(rows), "words": n_words, "talk_s": round(talk_s),
             "wpm": round(n_words / (talk_s / 60)) if talk_s >= 30 else None,
-            "saved_s": max(0, round(typing_s - talk_s)), "typing_wpm": TYPING_WPM}
+            "saved_s": max(0, round(typing_s - talk_s)), "typing_wpm": typing_wpm}
 
 
 def rhythm(rows: list[dict], now: datetime | None = None, days: int = 14) -> dict:
@@ -182,13 +183,14 @@ def week_for_claude(rows: list[dict], now: datetime | None = None) -> str:
     return "\n".join(lines).strip() + "\n"
 
 
-def compute(rows: list[dict], vocabulary: list[str], days: int | None = None, now: datetime | None = None) -> dict:
+def compute(rows: list[dict], vocabulary: list[str], days: int | None = None, now: datetime | None = None,
+            typing_wpm: int | None = None) -> dict:
     now = now or datetime.now()
     sel = in_range(rows, days, now)
     rh = rhythm(sel, now)
     rh_all = rhythm(rows, now)  # the last 14 days and the streak whatever the range
     rh["days"], rh["streak"] = rh_all["days"], rh_all["streak"]
-    return {"days": days, "totals": totals(sel), "rhythm": rh, "languages": by_language(sel),
+    return {"days": days, "totals": totals(sel, typing_wpm), "rhythm": rh, "languages": by_language(sel),
             "apps": by_app(sel), "habits": habits(sel), "phrases": phrases(sel),
             "suggestions": name_suggestions(sel, vocabulary), "clarity": coach.clarity_summary(sel, now),
             "markers": coach.markers_summary(sel, now), "pace": coach.pace_summary(sel),

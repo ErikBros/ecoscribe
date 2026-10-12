@@ -363,7 +363,8 @@ class Api:
     def get_insights(self, days: int | None = None) -> dict:
         from . import coach, insights
         days = int(days) if days else None
-        out = insights.compute(self._history_rows(), list(self._load().text.vocabulary), days)
+        c = self._load()
+        out = insights.compute(self._history_rows(), list(c.text.vocabulary), days, typing_wpm=c.ui.typing_wpm)
         out["meetings"] = coach.meetings_summary(self._recorded_meetings(), days=days)
         return out
 
@@ -391,6 +392,17 @@ class Api:
             tomlw.save(c, self._config_path)
             self._signal()
         return {"ok": True, "vocabulary": list(c.text.vocabulary)}
+
+    def set_typing_wpm(self, wpm) -> dict:
+        """Insights > your typing speed (dictado-d8e): only the window reads it, so no restart."""
+        try:
+            n = max(10, min(200, int(wpm)))
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "A number of words a minute, like 60."}
+        c = self._load()
+        c.ui.typing_wpm = n
+        tomlw.save(c, self._config_path)
+        return {"ok": True, "typing_wpm": n}
 
     def insights_for_claude(self) -> dict:
         from . import insights
