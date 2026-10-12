@@ -58,6 +58,7 @@ function demoInsights(days) {  // invented numbers and text for the demo and scr
 function demoApi() {
   const now = new Date();
   const iso = (mins) => new Date(now - mins * 60000).toISOString().slice(0, 19);
+  const dl = { running: false, error: null, models: {} };  // the demo model download
   let settings = {
     values: { hotkey: "rctrl", mic: "Anker PowerConf", languages: "en", sounds: true, overlay: true, live_text: true, insights: params.get("insights") === "1", speech_feedback: false, unmute: true, startup: true,
       meet_mode: "prompt", meet_lang: "sv", on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: false, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true,
@@ -168,6 +169,25 @@ function demoApi() {
     open_log: async () => ({ ok: true }),
     get_welcome: async () => ({ done: params.get("welcome") !== "1" }),
     finish_welcome: async () => ({ ok: true }),
+    setup_info: async (langs) => {
+      const big = (langs || "").split(",").some((c) => c && !["en", "es", "de", "fr"].includes(c));
+      return { models: [
+        { name: "large-v3-turbo", label: "Fast", use: "English, Spanish and similar; finds the language in meetings and files", size: 1.62e9, required: !big, ready: params.get("models") === "ready" },
+        { name: "Systran/faster-whisper-large-v3", label: "Most accurate", use: "Swedish, Greek and other languages; meetings and files in them", size: 3.09e9, required: big, ready: false }],
+      permissions: MAC ? [{ key: "microphone", label: "Microphone", granted: true }, { key: "accessibility", label: "Accessibility", granted: false },
+        { key: "input", label: "Input Monitoring", granted: false }] : [] };
+    },
+    setup_models_start: async (names) => {
+      dl.models = Object.fromEntries(names.map((n) => [n, { done: 0, total: n.includes("turbo") ? 1.62e9 : 3.09e9, ready: false }]));
+      dl.running = true; dl.error = null;
+      return JSON.parse(JSON.stringify(dl));
+    },
+    setup_models_progress: async () => {  // each poll moves the demo download along
+      for (const m of Object.values(dl.models)) if (!m.ready && dl.running) { m.done = Math.min(m.total, m.done + m.total / 4); m.ready = m.done >= m.total; break; }
+      dl.running = Object.values(dl.models).some((m) => !m.ready);
+      return JSON.parse(JSON.stringify(dl));
+    },
+    open_permission: async (k) => { window.__perm = k; return { ok: true }; },
   };
 }
 
@@ -1178,36 +1198,247 @@ function hkWire() {
   }, true);
 }
 
-/* ---------------------------------------------------------------- bienvenida */
-let wStep = 0, wKeyTimer = null;
-async function openWelcome() {
-  $("#welcome").hidden = false;
-  wStep = 0;
-  paintWelcome();
-  wKeyTimer = setInterval(() => {
-    const k = $("#w-key");
-    k.classList.add("press");
-    setTimeout(() => k.classList.remove("press"), 160);
-  }, 1300);
+/* ---------------------------------------------------------------- setup (dictado-zpz) */
+// The first run, full window: (Mac) permissions, languages, speech models, mic, key, a first
+// dictation, a summary. Each step saves what it changed when you leave it.
+const S_COMMON = ["en", "sv", "es", "de", "fr", "el", "fi", "it", "pt", "nl", "da", "no"];
+const sx = { steps: [], i: 0, cfg: null, langs: [], extra: [], hotkey: "", hold: false, mic: "",
+  models: [], want: new Set(), poll: null, permPoll: null, keyRec: false };
+const gb = (n) => (n < 1e9 ? `${Math.round(n / 1e6)} MB` : `${(n / 1e9).toFixed(1)} GB`);
+const sKey = () => hotkeyLabel(sx.hotkey);
+
+async function openSetup() {
+  const st = await api.get_settings();
+  sx.cfg = st;
+  sx.langs = st.values.languages.split(",").filter(Boolean);
+  sx.extra = [...(st.values.extra_languages || [])];
+  sx.hotkey = st.values.hotkey; sx.hold = !!st.values.hold_to_talk; sx.mic = st.values.mic || "";
+  const info = await api.setup_info(sx.langs.join(","));
+  sx.steps = $$(".sstep").map((el) => el.dataset.step).filter((k) => k !== "permissions" || info.permissions.length);
+  $("#s-bar").innerHTML = sx.steps.map(() => "<span></span>").join("");
+  $("#s-bars").innerHTML = Array.from({ length: 12 }, (_, i) => `<i style="height:${18 + i * 4}px"></i>`).join("");
+  sx.i = Math.max(0, sx.steps.indexOf(params.get("sstep")));  // ?sstep=models: screenshots of one step
+  $("#setup").hidden = false;
+  await paintSetup();
 }
-async function paintWelcome() {
-  $$(".wstep").forEach((s) => s.classList.toggle("on", Number(s.dataset.step) === wStep));
-  $$(".step-dot").forEach((d, i) => d.classList.toggle("on", i === wStep));
-  $("#w-next").textContent = wStep === 2 ? "Start" : "Next";
-  $("#w-skip").style.visibility = wStep === 2 ? "hidden" : "visible";
-  if (wStep === 1) {
-    const r = await micStart(null, (lvl) => { $("#w-meter-fill").style.width = meterWidth(lvl); });
-    if (r && !r.error) $("#w-mic-name").textContent = r.device ? `${prettyMic(r.device)}${r.fell_back ? " (default)" : ""}` : "Default mic";
-  } else {
-    await micStop();
+
+async function paintSetup() {
+  const step = sx.steps[sx.i];
+  $$(".sstep").forEach((el) => el.classList.toggle("on", el.dataset.step === step));
+  $$("#s-bar span").forEach((el, i) => el.classList.toggle("on", i <= sx.i));
+  $("#s-back").style.visibility = sx.i ? "visible" : "hidden";
+  $("#s-skip").hidden = step === "done";
+  $("#s-next").textContent = step === "done" ? "Start using Ecoscribe" : "Continue →";
+  $("#s-next").disabled = false;
+  clearInterval(sx.permPoll); sx.permPoll = null;
+  if (step !== "mic") await micStop();
+  if (step === "permissions") { await paintPerms(); sx.permPoll = setInterval(paintPerms, 2000); }
+  if (step === "languages") paintLangs();
+  if (step === "models") await paintModels();
+  if (step === "mic") await paintMic();
+  if (step === "shortcut") paintKey();
+  if (step === "try") {
+    $$(".s-keyname").forEach((el) => (el.textContent = sKey()));
+    $("#s-try-sub").innerHTML = (sx.hold ? "Hold " : "Tap ") + `<strong class="s-keyname">${sKey()}</strong>` +
+      (sx.hold ? ", say something, and let go." : ", say something, and tap it again.");
+    setTimeout(() => $("#s-try-box").focus(), 50);
   }
+  if (step === "done") await paintSummary();
 }
-async function closeWelcome() {
+
+async function paintPerms() {
+  const info = await api.setup_info(sx.langs.join(","));
+  const why = { microphone: "So Ecoscribe can hear you", accessibility: "So it can type into any app",
+    input: "So the dictation key works everywhere" };
+  $("#s-perms").innerHTML = info.permissions.map((p) => `<div class="s-row">
+      <div class="s-row-text"><strong>${p.label}</strong><span class="muted small">${why[p.key] || ""}</span></div>
+      ${p.granted ? '<span class="s-ok">✓ On</span>' : `<button type="button" class="btn btn-ghost btn-sm" data-perm="${p.key}">Open settings</button>`}
+    </div>`).join("");
+  $$("#s-perms [data-perm]").forEach((b) => (b.onclick = () => api.open_permission(b.dataset.perm)));
+}
+
+function paintLangs() {
+  const all = Object.fromEntries([...sx.cfg.options.languages, ...sx.cfg.options.all_languages].map((o) => [o.value, o.label]));
+  const shown = [...new Set([...S_COMMON.filter((c) => all[c]), ...sx.langs])];
+  $("#s-langs").innerHTML = shown.map((c) => `<label class="s-chip"><input type="checkbox" value="${c}" ${sx.langs.includes(c) ? "checked" : ""}><span>${all[c]}</span></label>`).join("");
+  $$("#s-langs input").forEach((el) => (el.onchange = () => {
+    sx.langs = $$("#s-langs input:checked").map((x) => x.value);
+    $("#s-next").disabled = !sx.langs.length;
+  }));
+  const more = Object.entries(all).filter(([c]) => !shown.includes(c)).sort((x, y) => x[1].localeCompare(y[1]));
+  $("#s-lang-more").innerHTML = '<option value="">More languages…</option>' + more.map(([c, l]) => `<option value="${c}">${l}</option>`).join("");
+  $("#s-lang-more").onchange = (e) => { if (e.target.value) { sx.langs.push(e.target.value); paintLangs(); } };
+}
+
+async function saveLangs() {
+  const base = sx.cfg.options.base_languages;
+  const extra = [...new Set([...sx.extra, ...sx.langs.filter((c) => !base.includes(c))])];
+  const r = await api.save_settings({ extra_languages: extra, languages: sx.langs.join(",") });
+  if (r && r.ok) sx.extra = extra;
+  return r;
+}
+
+async function paintModels() {
+  const info = await api.setup_info(sx.langs.join(","));
+  sx.models = info.models;
+  if (!sx.want.size || ![...sx.want].every((n) => sx.models.some((m) => m.name === n))) sx.want = new Set(sx.models.map((m) => m.name));
+  sx.models.filter((m) => m.required).forEach((m) => sx.want.add(m.name));
+  const p = await api.setup_models_progress();
+  renderModels(p);
+  if (p.running) watchModels();
+}
+
+function renderModels(p) {
+  const rows = sx.models.map((m) => {
+    const g = (p.models || {})[m.name] || {};
+    const ready = m.ready || g.ready;
+    const total = g.total || m.size;
+    const pct = ready ? 100 : g.done ? Math.min(99, Math.round((100 * g.done) / total)) : 0;
+    const going = p.running && g && !ready && sx.want.has(m.name);
+    const tag = m.required ? "Needed for your languages" : "Recommended";
+    const state = ready ? "Ready" : going ? (g.done ? `${gb(g.done)} of ${gb(total)}` : "Starting…") : gb(m.size);
+    return `<div class="s-row s-model${ready ? " ready" : ""}">
+      <input type="checkbox" data-model="${m.name}" ${sx.want.has(m.name) || ready ? "checked" : ""} ${m.required || ready || p.running ? "disabled" : ""} aria-label="${m.label}">
+      <div class="s-row-text"><strong>${m.label} <span class="s-tag${m.required ? " req" : ""}">${tag}</span></strong>
+        <span class="muted small">${m.use}</span>
+        <div class="s-progress"><div style="width:${pct}%"></div></div>
+        <span class="muted small">${state}</span></div>
+      ${ready ? '<span class="s-ok">✓</span>' : ""}
+    </div>`;
+  });
+  $("#s-models").innerHTML = rows.join("");
+  $$("#s-models [data-model]").forEach((el) => (el.onchange = () => {
+    el.checked ? sx.want.add(el.dataset.model) : sx.want.delete(el.dataset.model); renderModels(p);
+  }));
+  const todo = sx.models.filter((m) => sx.want.has(m.name) && !(m.ready || (p.models[m.name] || {}).ready));
+  const reqReady = sx.models.filter((m) => m.required).every((m) => m.ready || (p.models[m.name] || {}).ready);
+  $("#s-download").hidden = !todo.length || p.running;
+  $("#s-download").textContent = `Download ${gb(todo.reduce((n, m) => n + m.size, 0))}`;
+  $("#s-models-note").textContent = p.error ? `Download stopped: ${p.error}. Check the connection and try again.`
+    : p.running ? (reqReady ? "You can go on; the rest keeps downloading." : "Keep this window open while it downloads.")
+    : !todo.length ? "All set, nothing to download." : "";
+  if (p.error) $("#s-download").textContent = "Try again";
+  if (sx.steps[sx.i] === "models") $("#s-next").disabled = !reqReady;
+}
+
+function watchModels() {
+  clearInterval(sx.poll);
+  sx.poll = setInterval(async () => {
+    const p = await api.setup_models_progress();
+    if (sx.steps[sx.i] === "models") renderModels(p);
+    if (!p.running) { clearInterval(sx.poll); sx.poll = null; if (sx.steps[sx.i] === "models") paintModels(); }
+  }, 500);
+}
+
+async function paintMic() {
+  const mics = sx.cfg.options.mics;
+  $("#s-mic").innerHTML = mics.map((m) => `<option value="${m.value}">${m.label}</option>`).join("");
+  $("#s-mic").value = sx.mic;
+  $("#s-mic").onchange = async () => { sx.mic = $("#s-mic").value; await micStop(); paintMic(); };
+  const bars = $$("#s-bars i");
+  await micStart(sx.mic, (lvl) => {
+    const n = Math.round(Math.min(1, Math.sqrt(lvl) * 2.6) * bars.length);
+    bars.forEach((b, i) => b.classList.toggle("on", i < n));
+  });
+}
+
+function paintKey() {
+  $("#s-key").textContent = sKey();
+  $$('input[name="s-mode"]').forEach((r) => { r.checked = (r.value === "hold") === sx.hold; r.onchange = () => (sx.hold = r.value === "hold"); });
+}
+
+function sKeyRecord() {
+  sx.keyRec = !sx.keyRec;
+  hk.other = false;
+  $("#s-key-change").textContent = sx.keyRec ? "Cancel" : "Change key";
+  $("#s-key").textContent = sx.keyRec ? "Press it now…" : sKey();
+  $("#s-key").classList.toggle("listening", sx.keyRec);
+  $("#s-key-hint").hidden = !sx.keyRec;
+  $("#s-key-hint").textContent = "A lone key (Right Ctrl, F13-F24, Pause) or a combo like Ctrl+L. Esc cancels.";
+}
+async function sKeyTry(v) {
+  const r = await api.check_hotkey(v);
+  if (!r.ok) { $("#s-key-hint").textContent = r.error; return; }
+  sx.hotkey = r.value; sKeyRecord();
+}
+
+async function paintSummary() {
+  const lab = Object.fromEntries([...sx.cfg.options.languages, ...sx.cfg.options.all_languages].map((o) => [o.value, o.label]));
+  const [info, p] = [await api.setup_info(sx.langs.join(",")), await api.setup_models_progress()];
+  const ready = info.models.map((m) => (m.ready || (p.models[m.name] || {}).ready ? m.label
+    : p.running && p.models[m.name] ? `${m.label} (still downloading)` : "")).filter(Boolean);
+  const micLabel = (sx.cfg.options.mics.find((m) => m.value === sx.mic) || {}).label || DEFAULT_MIC;
+  const rows = [
+    ["Languages", sx.langs.map((c) => lab[c] || c).join(", ")],
+    ["Speech models", ready.join(" + ") || "Download when first needed"],
+    ["Dictation key", `${sx.hold ? "Hold" : "Tap"} <kbd class="key">${sKey()}</kbd>`],
+    ["Microphone", micLabel],
+  ];
+  $("#s-summary").innerHTML = rows.map(([k, v]) => `<div class="s-row"><div class="s-row-text"><strong>${k}</strong><span class="muted small">${v}</span></div><span class="s-ok">✓</span></div>`).join("");
+}
+
+async function leaveStep(step) {  // save what this step changed; false keeps you on it
+  if (step === "languages") {
+    const r = await saveLangs();
+    if (!r || !r.ok) { toast((r && r.error) || "Couldn't save the languages."); return false; }
+    sx.want = new Set();
+  }
+  if (step === "mic") { await micStop(); await api.save_settings({ mic: sx.mic }); }
+  if (step === "shortcut") {
+    if (sx.keyRec) sKeyRecord();
+    const r = await api.save_settings({ hotkey: sx.hotkey, hold_to_talk: sx.hold });
+    if (!r || !r.ok) { toast((r && r.error) || "Couldn't save the key."); return false; }
+  }
+  return true;
+}
+
+async function setupNext() {
+  const step = sx.steps[sx.i];
+  if (step === "done") return closeSetup();
+  $("#s-next").disabled = true;
+  const ok = await leaveStep(step);
+  $("#s-next").disabled = false;
+  if (!ok) return;
+  sx.i += 1; await paintSetup();
+}
+async function setupBack() { if (sx.i) { await micStop(); sx.i -= 1; await paintSetup(); } }
+
+async function closeSetup() {
   await micStop();
-  clearInterval(wKeyTimer);
+  clearInterval(sx.permPoll); sx.permPoll = null;
+  if (sx.keyRec) sKeyRecord();
   await api.finish_welcome();
-  $("#welcome").hidden = true;
+  $("#setup").hidden = true;
   show("inicio");
+}
+
+function setupWire() {
+  $("#s-next").onclick = setupNext;
+  $("#s-back").onclick = setupBack;
+  $("#s-skip").onclick = closeSetup;
+  $("#setup-again").onclick = openSetup;
+  $("#s-download").onclick = async () => {
+    const names = sx.models.filter((m) => sx.want.has(m.name)).map((m) => m.name);
+    renderModels(await api.setup_models_start(names));
+    watchModels();
+  };
+  $("#s-try-box").addEventListener("input", () => { $("#s-try-ok").hidden = !$("#s-try-box").value.trim(); });
+  $("#s-key-change").onclick = sKeyRecord;
+  document.addEventListener("keydown", (e) => {
+    if (!sx.keyRec) return;
+    e.preventDefault(); e.stopPropagation();
+    if (e.code === "Escape" && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) { sKeyRecord(); return; }
+    if (HK_MODS.has(e.code)) return;
+    hk.other = true;
+    const mods = [e.ctrlKey && "ctrl", e.altKey && "alt", e.shiftKey && "shift", e.metaKey && (MAC ? "cmd" : "win")].filter(Boolean);
+    sKeyTry([...mods, hkName(e)].join("+"));
+  }, true);
+  document.addEventListener("keyup", (e) => {
+    if (!sx.keyRec) return;
+    e.preventDefault();
+    if (HK_MODS.has(e.code) && !hk.other) sKeyTry(hkName(e));
+  }, true);
+  document.addEventListener("keydown", (e) => { if (sx.keyRec) return; if (e.key === "Escape" && !$("#setup").hidden && sx.steps[sx.i] !== "try") closeSetup(); });
 }
 
 /* ---------------------------------------------------------------- boot */
@@ -1241,14 +1472,13 @@ async function boot() {
   $("#discard").onclick = renderSettings;
   $("#mic-test").onclick = () => (mic.on ? stopMicTest() : startMicTest());
   $("#f-mic").addEventListener("change", async () => { if (mic.on) { await micStop(); startMicTest(); } });
-  $("#w-next").onclick = async () => { if (wStep < 2) { wStep += 1; paintWelcome(); } else closeWelcome(); };
-  $("#w-skip").onclick = closeWelcome;
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#welcome").hidden) closeWelcome(); });
+  setupWire();
 
-  const page = params.get("page");
+  let page = params.get("page");  // demo and screenshots; the real window asks Python (no query: see Api.initial_page)
+  if (!page && api.initial_page) { try { page = await api.initial_page(); } catch {} }
   await show(page === "bienvenida" ? "inicio" : page || "inicio");
   const w = await api.get_welcome();
-  if (page === "bienvenida" || !w.done) openWelcome();
+  if (page === "bienvenida" || !w.done) openSetup();
   setInterval(refreshStatus, 1500);
   if (params.get("demo") === "1" && params.get("dirty") === "1") {  // screenshot of the save bar
     $("#f-sounds").checked = !$("#f-sounds").checked; dirty();
@@ -1263,7 +1493,6 @@ function macify() {
   set("#tip-cancel", '<span class="keys"><kbd class="key">⌘</kbd><span class="plus">+</span><kbd class="key">Esc</kbd></span><span>Hold Right Command and press Esc to cancel.</span>');
   set("#hk-label", "Right Command");
   set("#hk-hint", HK_HINT);
-  set("#w-key", "⌘");
   for (const el of $$(".tip .keys kbd.key")) if (el.textContent === "Ctrl") el.textContent = "⌘";
   const startup = $("#row-startup .row-label"); if (startup) startup.textContent = "Open at login";
   const unmute = $("#f-unmute"); if (unmute) unmute.closest("label").hidden = true;  // a PC fix (mics muted at 0)
@@ -1271,14 +1500,10 @@ function macify() {
     el.innerHTML = el.innerHTML.replaceAll("this PC", "this Mac")
       .replace("(or the tray icon: Next dictation in)", "(or the menu bar icon: Dictation language)");
   }
-  for (const p of $$("#welcome p")) {
-    p.innerHTML = p.innerHTML.replace("<strong>Right Ctrl</strong>", "<strong>Right Command</strong>")
-      .replace("Ecoscribe stays in the system tray, next to the clock, and starts with Windows. Open it any time from the Start menu.",
-               "Ecoscribe lives in the menu bar (the mic at the top right) and opens at login. Open this window any time from that menu or from Applications.");
-  }
+  set("#s-done-sub", "Ecoscribe lives in the menu bar (the mic at the top right) and opens at login. Open this window any time from that menu or from Applications.");
 }
 
 if (params.get("demo") === "1") boot();               // screenshots, smoke tests
 else if (window.pywebview && window.pywebview.api) boot();
 else window.addEventListener("pywebviewready", boot, { once: true });
-window.__ecoscribe = { show, openWelcome, closeWelcome, formValues, dropped: rDropped, openSession, get api() { return api; } };
+window.__ecoscribe = { show, openSetup, closeSetup, formValues, dropped: rDropped, openSession, get api() { return api; } };

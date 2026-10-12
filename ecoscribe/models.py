@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import sys
 import threading
 from fnmatch import fnmatch
 from pathlib import Path
@@ -45,6 +46,21 @@ def _dir_bytes(d: Path) -> int:
     return total
 
 
+def _tree_bytes(d: Path) -> int:
+    """Bytes under `d` while a download runs, following links once per real file: huggingface_hub 1.x
+    moves a finished file to a shared store and leaves a link, which _dir_bytes would stop counting."""
+    total, seen = 0, set()
+    for f in Path(d).rglob("*"):
+        try:
+            st = f.stat()
+        except OSError:
+            continue
+        if f.is_file() and (st.st_dev, st.st_ino) not in seen:
+            seen.add((st.st_dev, st.st_ino))
+            total += st.st_size
+    return total
+
+
 def _repo_total(repo: str) -> int | None:
     try:
         from huggingface_hub import HfApi
@@ -69,7 +85,7 @@ def _snapshot(repo: str, progress=None, cache_dir=None) -> str:
 
     def poll():  # finished blobs + the .incomplete ones being written
         while not stop.wait(1.0):
-            progress(_dir_bytes(blobs) if blobs.exists() else 0, total)
+            progress(_tree_bytes(blobs) if blobs.exists() else 0, total)
     t = threading.Thread(target=poll, name="model-progress", daemon=True)
     t.start()
     try:
@@ -82,7 +98,9 @@ def _snapshot(repo: str, progress=None, cache_dir=None) -> str:
 def _hf_download(name: str, progress=None, cache_dir=None) -> str:
     if "/" in name:
         return _snapshot(name, progress, cache_dir)
-    from faster_whisper.utils import download_model
+    from faster_whisper.utils import _MODELS, download_model
+    if progress is not None and name in _MODELS:  # the same files download_model fetches, with progress
+        return _snapshot(_MODELS[name], progress, cache_dir)
     try:
         return download_model(name, local_files_only=True, cache_dir=cache_dir)
     except Exception:
@@ -173,3 +191,42 @@ def for_transcribe(name: str, cfg, download=_hf_download, progress=None) -> Path
         return ensure_local(name, download=download, progress=progress)
     root = Path(cfg.models_root)
     return ensure_local(name, root=root, download=download, progress=progress, cache_dir=root / "hf")
+
+
+# ---------------- first-run setup (dictado-zpz) ----------------
+# Approximate download sizes, shown before the real total is known.
+SIZES = {"large-v3-turbo": 1_620_000_000, "Systran/faster-whisper-large-v3": 3_090_000_000}
+
+
+def setup_models(wcfg, languages) -> list[dict]:
+    """The two speech models Ecoscribe uses, fast first. `required`: the one dictation in
+    `languages` runs on; the other is recommended (meetings and files use both)."""
+    from .languages import needs_big_model
+    big = needs_big_model(languages)
+    return [
+        {"name": wcfg.model, "label": "Fast", "use": "English, Spanish and similar; finds the language in meetings and files",
+         "size": SIZES.get(wcfg.model, 1_620_000_000), "required": not big},
+        {"name": wcfg.sv_model, "label": "Most accurate", "use": "Swedish, Greek and other languages; meetings and files in them",
+         "size": SIZES.get(wcfg.sv_model, 3_090_000_000), "required": big},
+    ]
+
+
+def _mlx():
+    from .platform.macos import mlx_engine
+    return mlx_engine
+
+
+def is_ready(name: str, root: Path | None = None) -> bool:
+    """True when `name` needs no download on this platform."""
+    repo = _mlx().mlx_repo(name) if sys.platform == "darwin" else None
+    if repo:  # Mac: the mlx conversion; a model without one runs faster-whisper there too (mlx_engine.factory)
+        return bool(_mlx().is_cached_mlx(repo))
+    return is_local(name, root)
+
+
+def prepare(name: str, progress=None, root: Path | None = None, download=_hf_download) -> Path:
+    """Download `name` for this platform (once), calling progress(done_bytes, total_bytes | None)."""
+    repo = _mlx().mlx_repo(name) if sys.platform == "darwin" else None
+    if repo:
+        return Path(_mlx().ensure_mlx(repo, progress=progress))
+    return ensure_local(name, root=root, download=download, progress=progress)

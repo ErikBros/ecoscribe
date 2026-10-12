@@ -14,7 +14,10 @@ OUT.mkdir(parents=True, exist_ok=True)
 index = (APP / "ecoscribe" / "web" / "index.html").as_uri()
 SHOTS = {
     "inicio": "page=inicio", "historial": "page=historial", "ajustes": "page=ajustes",
-    "bienvenida": "page=bienvenida&welcome=1", "detenido": "page=inicio&state=stopped",
+    "bienvenida": "page=bienvenida&welcome=1",
+    **{f"setup-{k}": f"page=bienvenida&welcome=1&sstep={k}{q}" for k, q in
+       (("permissions", "&mac=1"), ("models", ""), ("mic", ""), ("shortcut", ""), ("try", ""), ("done", ""))},
+    "detenido": "page=inicio&state=stopped",
     "cargando": "page=inicio&state=loading",
     "ajustes-cambios": "page=ajustes&dirty=1",
     "reuniones": "page=reuniones", "reuniones-vacia": "page=reuniones&rec=0",

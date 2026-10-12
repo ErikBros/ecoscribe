@@ -91,8 +91,10 @@ def _copy(text: str) -> None:
 
 class Api:
     def __init__(self, data_dir: Path | None = None, config_path: Path | None = None, startup_mod=None,
-                 signal_reload=None, list_mic_names=None, copy=None, send_command=None, downloads=None):
+                 signal_reload=None, list_mic_names=None, copy=None, send_command=None, downloads=None,
+                 page: str | None = None):
         from . import startup as _startup
+        self._page = page
         self._data_dir = Path(data_dir) if data_dir else paths.data_dir()
         self._config_path = Path(config_path) if config_path else paths.config_path()
         self._startup = startup_mod or _startup
@@ -104,6 +106,11 @@ class Api:
         self._mic = None  # (recorder, gate) during the mic check
         import threading
         self._mic_lock = threading.Lock()
+
+    def initial_page(self) -> str | None:
+        """The page to open on. Not a ?page= query: WebView2 on Windows takes index.html?page=x for a
+        missing file ("File not found"), which is how the first-run window used to open."""
+        return self._page
 
     # ---------------- status ----------------
     def get_status(self) -> dict:
@@ -703,6 +710,64 @@ class Api:
         (self._data_dir / "welcome_done").write_text(time.strftime("%Y-%m-%d"), encoding="utf-8")
         return {"ok": True}
 
+    # ---------------- first-run setup (dictado-zpz) ----------------
+    def setup_info(self, languages: str = "") -> dict:
+        """The speech models for these languages (required / recommended, downloaded or not) and,
+        on the Mac, the permissions dictation needs."""
+        from . import models
+        c = self._load()
+        langs = [x.strip() for x in str(languages).split(",") if x.strip()] or c.whisper.languages
+        rows = models.setup_models(c.whisper, langs)
+        for m in rows:
+            m["ready"] = models.is_ready(m["name"])
+        perms = []
+        if sys.platform == "darwin":
+            from .platform.macos import permissions
+            st = permissions.status()
+            perms = [{"key": k, "label": permissions.PANES[k][0], "granted": bool(st.get(k))} for k in permissions.DICTATION]
+        return {"models": rows, "permissions": perms}
+
+    def open_permission(self, key: str) -> dict:
+        if sys.platform == "darwin":
+            from .platform.macos import permissions
+            if key in permissions.PANES:
+                permissions.open_pane(key)
+                return {"ok": True}
+        return {"ok": False}
+
+    def setup_models_start(self, names: list) -> dict:
+        """Download `names` one after another in the background; poll setup_models_progress()."""
+        import threading
+        from . import models
+        dl = getattr(self, "_dl", None)
+        if dl and dl["running"]:
+            return self.setup_models_progress()
+        dl = self._dl = {"running": True, "error": None,
+                         "models": {n: {"done": 0, "total": None, "ready": models.is_ready(n)} for n in names}}
+
+        def run():
+            try:
+                for n in names:
+                    row = dl["models"][n]
+                    if row["ready"]:
+                        continue
+
+                    def progress(done, total, row=row):
+                        row["done"], row["total"] = done, total
+                    models.prepare(n, progress=progress)
+                    row["ready"] = True
+            except Exception as e:
+                log.exception("setup model download failed")
+                dl["error"] = str(e) or type(e).__name__
+            finally:
+                dl["running"] = False
+        threading.Thread(target=run, name="ecoscribe-setup-models", daemon=True).start()
+        return self.setup_models_progress()
+
+    def setup_models_progress(self) -> dict:
+        dl = getattr(self, "_dl", None) or {"running": False, "error": None, "models": {}}
+        return {"running": dl["running"], "error": dl["error"], "models": {k: dict(v) for k, v in dl["models"].items()}}
+
 
 def _listen_for_focus(win) -> None:
     import threading
@@ -740,8 +805,8 @@ def main(page: str | None = None) -> int:
         ipc.focus_ui()
         return 0
     import webview
-    api = Api()
-    url = (web_dir() / "index.html").as_uri() + (f"?page={page}" if page else "")
+    api = Api(page=page)
+    url = (web_dir() / "index.html").as_uri()
     win = webview.create_window(ipc.UI_TITLE, url, js_api=api, width=980, height=720, min_size=(820, 560),
                                 background_color=P.PAPER, text_select=True)
     win.events.closed += lambda: api.mic_test_stop()
