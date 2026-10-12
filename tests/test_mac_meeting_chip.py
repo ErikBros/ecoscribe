@@ -77,3 +77,28 @@ def test_prompt_card_language_chip_and_countdown(monkeypatch):
         assert got == [("transcribir", "es")] and pw.panel is None
     finally:
         pw._close()
+
+
+def test_prompt_card_has_its_tile_and_a_draining_countdown_line(monkeypatch):
+    from AppKit import NSApplication
+    NSApplication.sharedApplication()
+    from ecoscribe import meetui
+    from ecoscribe.platform.macos import shell
+    monkeypatch.setattr(shell, "_bottom_center", lambda w, h, lift=0: (-5000, -5000))  # off every screen
+    pw = shell.PromptWindow(None, lambda *a: None)
+    p = meetui.Prompt("end?", None, None, time.monotonic())
+    pw.show(p)
+    try:
+        box = pw.panel.contentView()
+        assert box.kind == "end?" and box.left == 1.0
+        assert pw.panel.frame().size.width >= shell.PromptWindow.PW
+        p.opened_at -= p.timeout_s / 2
+        pw.tick()
+        assert abs(box.left - 0.5) < 0.05
+        title = [v for v in box.subviews() if hasattr(v, "stringValue") and v.stringValue() == p.title][0]
+        assert title.frame().origin.x >= shell.PromptWindow.PAD + shell.PromptWindow.TILE  # beside the tile
+        primary = pw._btns["parar"]
+        assert primary._fill == shell.P.PAPER and primary._ink == shell.P.INK
+        shell.snapshot(box, __import__("pathlib").Path("/dev/null"))  # draws every glyph path without error
+    finally:
+        pw._close()
