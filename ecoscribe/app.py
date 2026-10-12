@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import queue
 import sys
 import threading
@@ -21,6 +22,8 @@ from .quality import dropout_seconds, too_short
 
 log = logging.getLogger(__name__)
 from .routing import LANG_NAMES  # any language or mix (dictado-ehs)
+
+KEEP_AUDIO = 20  # dictations whose audio stays for Retry in History (dictado-a2r)
 SR = 16000
 PASTE_KEYS = "⌘V" if sys.platform == "darwin" else "Ctrl+V"  # dictado-cd2: the Mac's own words
 NOT_PASTED = {"clipboard_busy": "Couldn't paste",
@@ -459,13 +462,89 @@ class App:
             self.ui.flash("Recovered what you were saying: it's in History", 6.0)
         return n
 
+    def _recent_dir(self) -> Path:
+        return self.history_path.parent / "recent"
+
+    def _new_id(self) -> str:
+        with self._lock:
+            self._seq = getattr(self, "_seq", 0) + 1
+            return f"{time.strftime('%Y%m%d-%H%M%S')}-{self._seq:03d}"
+
+    def _keep_audio(self, rid: str, audio) -> bool:
+        """The last KEEP_AUDIO dictations keep their audio on this computer, for Retry in History
+        (dictado-a2r). 16 kHz 16-bit wav; older ones are deleted."""
+        import wave
+        try:
+            d = self._recent_dir()
+            d.mkdir(parents=True, exist_ok=True)
+            pcm = (np.clip(np.asarray(audio, np.float32), -1, 1) * 32767).astype("<i2")
+            with wave.open(str(d / f"{rid}.wav"), "wb") as w:
+                w.setnchannels(1)
+                w.setsampwidth(2)
+                w.setframerate(SR)
+                w.writeframes(pcm.tobytes())
+            for old in sorted(d.glob("*.wav"))[:-KEEP_AUDIO]:
+                old.unlink()
+            return True
+        except Exception:
+            log.exception("could not keep the dictation's audio")
+            return False
+
+    def retry(self, rid: str, lang: str | None = None) -> dict:
+        """History > Retry: transcribe a kept dictation again (in `lang`, or detected), replace its
+        text in History and copy it. Never pastes: the cursor may be anywhere by now."""
+        import wave
+        f = self._recent_dir() / f"{Path(str(rid)).name}.wav" if self.history_path else None
+        if f is None or not f.is_file():
+            return {"ok": False, "error": "That dictation's audio isn't kept any more (only the last few are)."}
+        with wave.open(str(f), "rb") as w:
+            audio = np.frombuffer(w.readframes(w.getnframes()), "<i2").astype(np.float32) / 32767
+        res = self.engine.transcribe(audio, lang=lang) if lang else self.engine.transcribe(audio)
+        if res.text and getattr(self.cfg.text, "snippets", None):
+            from .text import snippets
+            res = replace(res, text=snippets(res.text, self.cfg.text.snippets))
+        if not res.text:
+            return {"ok": False, "error": "Still didn't hear anything in it."}
+        self._replace_history(rid, res)
+        try:
+            set_clipboard_text(res.text)
+        except Exception:
+            log.exception("retry: clipboard write failed")
+        log.info("retry id=%s lang=%s chars=%d", rid, res.lang, len(res.text))
+        return {"ok": True, "text": res.text, "lang": res.lang}
+
+    def _replace_history(self, rid: str, res) -> None:
+        with self._lock:
+            try:
+                lines = self.history_path.read_text(encoding="utf-8").splitlines()
+            except OSError:
+                return
+            out = []
+            for line in lines:
+                try:
+                    rec = json.loads(line)
+                except ValueError:
+                    out.append(line)
+                    continue
+                if isinstance(rec, dict) and rec.get("id") == rid:
+                    rec.update(text=res.text, lang=res.lang, retried=True)
+                    for k in ("clarity", "heard", "unsure"):  # those were about the old text
+                        rec.pop(k, None)
+                    line = json.dumps(rec, ensure_ascii=False)
+                out.append(line)
+            tmp = self.history_path.with_suffix(".tmp")
+            tmp.write_text("\n".join(out) + "\n", encoding="utf-8")
+            os.replace(tmp, self.history_path)
+
     def _history(self, res, audio, dr, recovered: bool = False, scored: dict | None = None,
                  to: str | None = None) -> None:
         if not self.history_path:
             return
+        rid = self._new_id()
         rec = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "text": res.text,
                "lang": res.lang, "audio_s": round(len(audio) / SR, 2), "speech_s": round(res.speech_s, 2),
                "ms": res.ms, "target": dr.target_exe if dr else None, "pasted": dr.pasted if dr else False}
+        rec["id"], rec["audio"] = rid, True  # the wav follows right after the line (Retry)
         if recovered:
             rec["recovered"] = True
         if to:
@@ -473,10 +552,11 @@ class App:
         if scored:
             rec.update(scored)  # clarity, heard, unsure (dictado-9jc.1)
         try:
-            with open(self.history_path, "a", encoding="utf-8") as f:
+            with self._lock, open(self.history_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
         except OSError:
             log.exception("history write failed")
+        self._keep_audio(rid, audio)
 
 
 def _mic_label(name: str) -> str:
