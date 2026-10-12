@@ -115,6 +115,19 @@ def voice_commands(s: str) -> tuple[str, bool]:
     return (s.rstrip() if enter else s), enter
 
 
+def replacements(s: str, table) -> str:
+    """The Replace list (dictado-b7u): each heard phrase, anywhere, as whole words and in any case,
+    becomes what the user wrote; the longest phrase wins where two overlap."""
+    if not table or not s:
+        return s
+    rep = {" ".join(k.lower().split()): v for k, v in table.items() if k and k.strip() and v is not None}
+    if not rep:
+        return s
+    alts = "|".join(r"\s+".join(map(re.escape, k.split())) for k in sorted(rep, key=len, reverse=True))
+    rx = re.compile(rf"(?<!\w)({alts})(?!\w)", re.IGNORECASE)
+    return rx.sub(lambda m: rep[" ".join(m.group(1).lower().split())], s)
+
+
 def snippets(s: str, table) -> str:
     """Snippets (t0u.29): a clause that is exactly a trigger ("my email") becomes its saved text.
     Same clause rule as voice commands; case is ignored; the longest trigger wins. The
