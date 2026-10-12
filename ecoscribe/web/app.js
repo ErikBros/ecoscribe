@@ -79,8 +79,8 @@ function demoApi() {
       { what: "Press Enter after the text (at the very end only)", en: '"send it", "press enter"', es: '"envíalo", "enviar"', sv: '"skicka"' }],
   };
   const history = [
-    { ts: iso(2), text: "Can you check why the deploy failed last night and send me the logs before the standup? ", target: "WindowsTerminal.exe", pasted: true },
-    { ts: iso(14), text: "Sounds good, let's do Thursday at six. I'll bring the new shoes. ", target: "slack.exe", pasted: true },
+    { ts: iso(2), text: "Can you check why the deploy failed last night and send me the logs before the standup? ", target: "WindowsTerminal.exe", pasted: true, id: "d1", audio: true },
+    { ts: iso(14), text: "Sounds good, let's do Thursday at six. I'll bring the new shoes. ", target: "slack.exe", pasted: true, id: "d2", audio: true },
     { ts: iso(41), text: "Remind me to book the climbing gym for the weekend. ", target: "chrome.exe", pasted: false },
     { ts: iso(60 * 26), text: "The quick brown fox jumps over the lazy dog, then runs back to the barn. ", target: "notepad.exe", pasted: true },
   ];
@@ -188,6 +188,13 @@ function demoApi() {
       return JSON.parse(JSON.stringify(dl));
     },
     open_permission: async (k) => { window.__perm = k; return { ok: true }; },
+    retry_dictation: async (id, lang) => {  // the demo "hears" it again in the asked language
+      const r = history.find((x) => x.id === id);
+      if (!r) return { ok: false, error: "That dictation's audio isn't kept any more." };
+      r.text = lang === "sv" ? "Kan du kolla varför deployen misslyckades i går? " : r.text.replace("Can you", "Could you");
+      r.lang = lang || "en"; r.retried = true;
+      return { ok: true, text: r.text, lang: r.lang };
+    },
   };
 }
 
@@ -876,10 +883,19 @@ async function renderHistory() {
       b.className = "badge"; b.textContent = "didn't paste";
       meta.append(b);
     }
+    if (r.retried) {
+      const b = document.createElement("span");
+      b.className = "badge"; b.textContent = "retried";
+      meta.append(b);
+    }
+    const btns = document.createElement("div");
+    btns.className = "h-btns";
+    if (r.audio && r.id) btns.append(retryButton(r, p));
     const btn = document.createElement("button");
     btn.className = "btn btn-ghost btn-sm h-copy"; btn.textContent = "Copy";
     btn.onclick = () => copy(r.text, btn);
-    li.append(p, btn, meta);
+    btns.append(btn);
+    li.append(p, btns, meta);
     list.append(li);
   }
   const empty = rows.length === 0;
@@ -888,6 +904,49 @@ async function renderHistory() {
   $("#history-count").textContent = h.stats.total ? `${fmtNum(h.stats.total)} dictations · ${fmtNum(h.stats.total_words)} words` : "";
   $("#history-clear").hidden = !h.stats.total;
 }
+
+/* History > Retry (dictado-a2r): transcribe a recent dictation again, by itself or in a language.
+   Only the last few keep their audio, so only those have the button. */
+let retryLangs = null;
+function retryButton(r, textEl) {
+  const wrap = document.createElement("div");
+  wrap.className = "h-retry";
+  const b = document.createElement("button");
+  b.className = "btn btn-ghost btn-sm h-copy"; b.textContent = "Retry ▾";
+  const menu = document.createElement("div");
+  menu.className = "h-menu"; menu.hidden = true;
+  b.onclick = async (e) => {
+    e.stopPropagation();
+    $$(".h-menu").forEach((m) => { if (m !== menu) m.hidden = true; });
+    if (!retryLangs) {
+      try {
+        const st = await api.get_settings();
+        const lab = Object.fromEntries([...st.options.languages, ...st.options.all_languages].map((o) => [o.value, o.label]));
+        retryLangs = st.values.languages.split(",").filter(Boolean).map((c) => [c, lab[c] || c]);
+      } catch { retryLangs = []; }
+    }
+    menu.innerHTML = "";
+    for (const [code, label] of [["", "Again, detect the language"], ...retryLangs.map(([c, l]) => [c, `Again, in ${l}`])]) {
+      const it = document.createElement("button");
+      it.type = "button"; it.className = "h-menu-item"; it.textContent = label;
+      it.onclick = async (ev) => {
+        ev.stopPropagation();
+        menu.hidden = true;
+        b.disabled = true; b.textContent = "Retrying…";
+        const res = await api.retry_dictation(r.id, code);
+        b.disabled = false; b.textContent = "Retry ▾";
+        if (!res.ok) { toast(res.error || "Couldn't retry it."); return; }
+        r.text = res.text; textEl.textContent = res.text.trim();
+        toast("Done: the new text is copied, paste it where you need it.");
+      };
+      menu.append(it);
+    }
+    menu.hidden = !menu.hidden;
+  };
+  wrap.append(b, menu);
+  return wrap;
+}
+document.addEventListener("click", () => $$(".h-menu").forEach((m) => (m.hidden = true)));
 
 function meetingHistoryItem(m) {  // a meeting transcript in History: opens in Meetings, .md to Downloads
   const li = document.createElement("li");
@@ -1482,6 +1541,7 @@ async function boot() {
   const w = await api.get_welcome();
   if (page === "bienvenida" || !w.done) openSetup();
   setInterval(refreshStatus, 1500);
+  if (params.get("demo") === "1" && params.get("retrymenu") === "1") setTimeout(() => $(".h-retry button")?.click(), 300);  // screenshot
   if (params.get("demo") === "1" && params.get("dirty") === "1") {  // screenshot of the save bar
     $("#f-sounds").checked = !$("#f-sounds").checked; dirty();
   }
