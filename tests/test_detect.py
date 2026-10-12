@@ -152,6 +152,15 @@ def test_meet_name_from_the_tab_title():
     assert meet_name(["(1) Meet - Budget check"]) == "Budget check"  # bare titles, macOS without the suffix
 
 
+def test_meet_name_without_chromes_tab_state():
+    """In a live call Chrome adds the tab's state to the title, before the browser's name (or alone on the Mac)."""
+    from ecoscribe.detect import meet_name
+    for state in ("Camera and microphone recording", "Camera recording", "Microphone recording", "Audio playing",
+                  "Audio muted", "Sharing this tab", "Sharing this window", "Sharing this screen", "Network error"):
+        assert meet_name([(f"Meet - Sprint retro - {state} - Google Chrome", "chrome")]) == "Sprint retro", state
+        assert meet_name([f"Meet - Sprint retro - {state}"]) == "Sprint retro", state
+
+
 def test_meet_name_none_without_a_named_meet_tab():
     from ecoscribe.detect import meet_name
     assert meet_name([("Meet - abc-defg-hij - Google Chrome", "chrome")]) is None  # an instant meeting
