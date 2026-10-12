@@ -109,3 +109,19 @@ def test_set_meeting_lang_command():
     assert h("set_meeting_lang", {"lang": "en"}) == {"ok": True} and c.langs == ["en"]
     assert not h("set_meeting_lang", {"lang": "xx"})["ok"]  # unknown code (any Whisper language is fine)
     assert h("set_meeting_lang", {"lang": "el"})["error"] == "No meeting is recording"
+
+
+def test_retry_reaches_the_dictation_app():
+    """History > Retry through the command table (dictado-a2r). The start_meeting branch once bound a
+    local `app`, which made `app` unbound in the retry branch: every retry failed with UnboundLocalError."""
+    from ecoscribe import commands
+    calls = []
+
+    class App:
+        def retry(self, rid, lang):
+            calls.append((rid, lang))
+            return {"ok": True, "text": "hola", "lang": lang}
+    h = commands.handler_for(object(), None, app=App())
+    assert h("retry", {"id": "20260101-120000-001", "lang": "es"}) == {"ok": True, "text": "hola", "lang": "es"}
+    assert h("retry", {"id": "x"})["ok"] and calls[-1] == ("x", None)
+    assert commands.handler_for(object(), None)("retry", {"id": "x"}) == {"ok": False, "error": "Dictation isn't running"}

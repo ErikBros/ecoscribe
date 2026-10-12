@@ -102,8 +102,8 @@ def handler_for(ctl, watch=None, manual_key: str = "_manual", app=None):
             lang = args.get("lang") or (watch.lang_for(manual_key) if watch else "sv")
             if watch:
                 watch.remember(manual_key, lang)
-            app = getattr(watch, "call_app_now", lambda: None)() if watch else None
-            return {"ok": True, "dir": str(ctl.start_meeting(lang, title=args.get("title") or "Meeting", app=app))}
+            call = getattr(watch, "call_app_now", lambda: None)() if watch else None  # not `app`: that one is the App
+            return {"ok": True, "dir": str(ctl.start_meeting(lang, title=args.get("title") or "Meeting", app=call))}
         if cmd == "set_meeting_lang":
             lang = args.get("lang") or ""
             from .languages import valid_meeting_lang
