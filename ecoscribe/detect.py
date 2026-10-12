@@ -19,6 +19,10 @@ CALL_APPS = {"msteams", "ms-teams", "teams", "slack", "zoom", "discord", "signal
              "ciscocollabhost", "whatsapp"}
 BROWSERS = {"chrome", "msedge", "firefox", "brave", "opera"}
 MEETING_TITLE = re.compile(r"\bMeet\b|Zoom|Microsoft Teams|Whereby|Jitsi|Google Meet|Huddle", re.I)
+# dictado-4ar: a Google Meet tab is titled "Meet - <event> - <browser>"; an instant meeting shows only its code
+MEET_TAB = re.compile(r"^(?:\(\d+\)\s*)?Meet\s+[-\u2013\u2014]\s+(.+)$")
+MEET_CODE = re.compile(r"^[a-z]{3}-[a-z]{4}-[a-z]{3}$")
+BROWSER_SUFFIX = re.compile(r"\s+[-\u2013\u2014]\s+(?:Google Chrome|Microsoft\s*Edge|Mozilla Firefox|Brave|Opera|Safari)\b.*$")
 
 
 @dataclass(frozen=True)
@@ -46,6 +50,23 @@ def app_from_nonpackaged(key: str) -> str:
 def app_from_packaged(key: str) -> str:
     """'MSTeams_8wekyb3d8bbwe' -> 'msteams'; 'com.notion.app.desktop.notion_x' -> 'notion'."""
     return key.split("_")[0].split(".")[-1].lower()
+
+
+def meet_name(titles) -> str | None:
+    """The event name in a Google Meet tab's title ("Meet - Sprint retro - Google Chrome" -> "Sprint retro"),
+    or None: no Meet tab in front of a browser window, or an instant meeting that shows only its code.
+    titles: (title, exe) pairs or bare titles, as Detector.update takes them. dictado-4ar"""
+    for t in titles:
+        title, exe = (t, None) if isinstance(t, str) else (t[0], t[1])
+        if exe is not None and exe not in BROWSERS:
+            continue
+        m = MEET_TAB.match(BROWSER_SUFFIX.sub("", title.replace("\u200b", "")).strip())
+        if not m:
+            continue
+        name = re.sub(r"\s+and \d+ more pages?\b.*$", "", m.group(1)).strip()  # Edge, with several tabs (and a profile)
+        if name and not MEET_CODE.match(name):
+            return name
+    return None
 
 
 def is_call_app(app: str) -> bool:
