@@ -108,6 +108,10 @@ async function load(query) {
   check(!doc.querySelector("#i-week").hidden && doc.querySelector("#i-week-text").textContent.includes("2.2 → 1.8"), "this week: hedges went down (dictado-6oe.6)");
   check(doc.querySelectorAll("#i-hours path.bar").length > 5 && doc.querySelectorAll("#i-days .tick").length === 3, "hour and day charts drawn");
   check(doc.querySelectorAll("#i-langs .i-hbar").length === 4 && doc.querySelector("#i-langs .i-hbar-name").textContent === "English", "languages by name");
+  const wpm = doc.querySelector("#i-wpm"), saved0 = doc.querySelector("#i-saved").textContent;
+  check(wpm && wpm.value === "40", "typing speed shows 40 until set (dictado-d8e)");
+  wpm.value = "80"; wpm.dispatchEvent(new window.Event("change", { bubbles: true })); await sleep(80);
+  check(window.__wpm === 80 && doc.querySelector("#i-wpm").value === "80" && doc.querySelector("#i-saved-how").textContent.includes("type at 80"), "a new typing speed is saved and used");
   check(doc.querySelector("#i-habits").textContent.includes("3.1"), "filler words per 100");
   check(doc.querySelector("#i-clarity").textContent === "91%" && doc.querySelector("#i-clarity-empty").hidden
     && doc.querySelectorAll("#i-clarity-weeks path.bar").length === 4, "clarity: score and the weeks that have one (9jc.1)");

@@ -162,7 +162,8 @@ function demoApi() {
       return { items, stats: { total: 312, total_words: 4210, today_words: 152 } };
     },
     copy_text: async () => ({ ok: true }),
-    get_insights: async (days) => demoInsights(days),
+    get_insights: async (days) => { const d = demoInsights(days); if (window.__wpm) d.totals.typing_wpm = window.__wpm; return d; },
+    set_typing_wpm: async (n) => { window.__wpm = Math.max(10, Math.min(200, Math.round(n) || 40)); return { ok: true, typing_wpm: window.__wpm }; },
     add_word: async (w) => { settings.values.vocabulary += "\n" + w; window.__added = w; return { ok: true }; },
     insights_for_claude: async () => ({ ok: true, chars: 5120 }),
     coach_me: async () => ({ ok: true, chars: 3900 }),
@@ -438,8 +439,16 @@ async function renderInsights() {
   if (!t.dictations) return;
   $("#i-saved").textContent = fmtDur(t.saved_s);
   $("#i-saved-how").textContent = t.wpm
-    ? `You talk at ${t.wpm} words a minute; typing runs about ${t.typing_wpm}. ${fmtNum(t.words)} words took ${fmtDur(t.talk_s)} to say.`
+    ? `You talk at ${t.wpm} words a minute and type at ${t.typing_wpm}. ${fmtNum(t.words)} words took ${fmtDur(t.talk_s)} to say.`
     : `Typing ${fmtNum(t.words)} words at ${t.typing_wpm} a minute takes longer than saying them.`;
+  const wpmIn = $("#i-wpm");  // dictado-d8e: measured against the user's own typing speed
+  if (document.activeElement !== wpmIn) wpmIn.value = String(t.typing_wpm);
+  wpmIn.onchange = async () => {
+    const res = await api.set_typing_wpm(Number(wpmIn.value));
+    if (!res.ok) { toast(res.error); return; }
+    wpmIn.value = String(res.typing_wpm);
+    renderInsights();
+  };
   $("#i-words").textContent = fmtNum(t.words);
   $("#i-dictations").textContent = fmtNum(t.dictations);
   $("#i-talk").textContent = fmtDur(t.talk_s);
