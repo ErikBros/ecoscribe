@@ -433,7 +433,8 @@ class Api:
                 "source": m.get("source"), "created": m.get("created"), "error": m.get("error"),
                 "pct": prog.get("pct"), "slow": m.get("slow", False),
                 "speakers": m.get("speakers"), "speaker_names": m.get("speaker_names") or {},
-                "recognised": [(m.get("speaker_names") or {}).get(x, x) for x in m.get("speakers_recognised") or []]}
+                "recognised": [(m.get("speaker_names") or {}).get(x, x) for x in m.get("speakers_recognised") or []],
+                "people": list((m.get("calendar") or {}).get("attendees") or []), "app": m.get("app")}  # dictado-6oe.4
 
     def list_sessions(self, query: str = "") -> dict:
         q = str(query or "").strip().lower()

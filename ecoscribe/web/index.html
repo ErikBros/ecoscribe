@@ -87,24 +87,22 @@
     <!-- REUNIONES -->
     <section class="page" id="page-reuniones" hidden>
       <div id="r-list-view">
-        <header class="page-head">
+        <header class="page-head r-head">  <!-- dictado-6oe.4: one primary action, the rest beside it -->
           <h1>Meetings</h1>
           <div class="search">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg>
-            <input id="r-search" type="search" placeholder="Search by title" autocomplete="off">
+            <input id="r-search" type="search" placeholder="Search meetings" autocomplete="off">
+          </div>
+          <div class="r-actions">
+            <button class="btn btn-ghost" id="r-import">Import file</button>
+            <label class="r-lang"><span class="sr">Language</span><select id="r-lang" aria-label="Language"></select></label>
+            <button class="btn btn-primary" id="r-start">Record meeting</button>
           </div>
         </header>
-        <div class="card r-actions">
-          <div class="r-actions-main">
-            <button class="btn btn-primary" id="r-start">Transcribe meeting now</button>
-            <label class="r-lang"><span class="muted small">Language</span>
-              <select id="r-lang" aria-label="Language"></select></label>
-          </div>
-          <button class="btn btn-ghost" id="r-import">Import file</button>
-        </div>
         <div class="card r-now" id="r-now" hidden>
           <span class="r-rec-dot"></span>
           <div class="r-now-text"><strong id="r-now-title">Recording</strong><span class="muted small" id="r-now-meta"></span></div>
+          <svg class="r-now-wave" viewBox="0 0 160 36" aria-hidden="true"><path d="M4 18v0M14 12v12M24 8v20M34 14v8M44 4v28M54 10v16M64 15v6M74 6v24M84 12v12M94 16v4M104 9v18M114 13v10M124 17v2M134 11v14M144 15v6M154 18v0"/></svg>
           <button class="btn btn-ghost btn-sm" id="r-now-open">Watch live</button>
           <button class="btn btn-sm r-stop" id="r-now-stop">Stop</button>
         </div>
@@ -118,7 +116,7 @@
 
       <div id="r-detail-view" hidden>
         <header class="page-head r-detail-head">
-          <button class="btn btn-ghost btn-sm" id="r-back">Back to Meetings</button>
+          <button class="btn-link r-back" id="r-back">← Meetings</button>
           <span class="r-chip" id="r-d-status"></span>
         </header>
         <input class="r-title" id="r-d-title" aria-label="Title" maxlength="120">
@@ -129,25 +127,38 @@
             <select id="r-d-lang" aria-label="Meeting language"></select></label>
           <button class="btn r-stop" id="r-d-stop">Stop</button>
         </div>
-        <div class="r-d-actions" id="r-d-done-actions" hidden>
-          <button class="btn btn-primary btn-sm" id="r-copy">Copy all</button>
-          <button class="btn btn-ghost btn-sm" id="r-copy-claude">Copy for Claude</button>
-            <button class="btn btn-ghost btn-sm" id="r-copy-summary" title="The transcript with a request for decisions and action items: paste it into Claude">Copy summary prompt</button>
-          <button class="btn btn-ghost btn-sm" id="r-email" title="A draft in your mail program, to the people in the calendar invite. You read it and press Send.">Email to participants</button>
-          <span class="r-export"><span class="muted small">Download</span>
-            <button class="btn btn-ghost btn-sm" data-fmt="txt">.txt</button>
-            <button class="btn btn-ghost btn-sm" data-fmt="md">.md</button>
-            <button class="btn btn-ghost btn-sm" data-fmt="srt">.srt</button></span>
-          <button class="btn btn-ghost btn-sm" id="r-folder">Open folder</button>
-          <button class="btn btn-ghost btn-sm danger r-delete" id="r-delete">Delete</button>
+        <div class="r-d-actions" id="r-d-done-actions" hidden>  <!-- eight buttons became three (dictado-6oe.4) -->
+          <details class="menu"><summary class="btn btn-primary btn-sm">Copy ▾</summary>
+            <div class="menu-pop">
+              <button type="button" class="menu-item" id="r-copy">Copy the transcript</button>
+              <button type="button" class="menu-item" id="r-copy-claude">Copy for Claude <span>with date, app and language</span></button>
+              <button type="button" class="menu-item" id="r-copy-summary">Copy a summary prompt <span>decisions and action items</span></button>
+            </div></details>
+          <button class="btn btn-ghost btn-sm" id="r-email" title="A draft in your mail program, to the people in the calendar invite. You read it and press Send.">Email participants</button>
+          <details class="menu"><summary class="btn btn-ghost btn-sm" aria-label="More: download, open folder, delete">···</summary>
+            <div class="menu-pop menu-right">
+              <span class="menu-label">Download</span>
+              <button type="button" class="menu-item" data-fmt="txt">Text (.txt)</button>
+              <button type="button" class="menu-item" data-fmt="md">Markdown (.md)</button>
+              <button type="button" class="menu-item" data-fmt="srt">Subtitles (.srt)</button>
+              <button type="button" class="menu-item" id="r-folder">Open folder</button>
+              <button type="button" class="menu-item danger" id="r-delete">Delete</button>
+            </div></details>
         </div>
         <div class="r-progress" id="r-d-progress" hidden><div class="meter"><div class="meter-fill" id="r-d-progress-fill"></div></div><span class="muted small" id="r-d-progress-text"></span></div>
-        <div class="r-notes" id="r-notes">
-          <div class="r-notes-head"><span class="row-label">Your notes</span><span class="muted small" id="r-notes-state">Saved with this meeting, and part of Copy for Claude and the summary prompt.</span></div>
-          <textarea class="vocab r-notes-text" id="r-notes-text" rows="3" placeholder="Type while you talk: what you want out of the call, things to check, decisions…"></textarea>
+        <div class="r-body">
+          <div class="r-main">
+          <div class="r-segs-wrap"><ol class="history r-segs" id="r-segs"></ol><button class="btn r-jump" id="r-jump" hidden>Jump to latest</button></div>
+          <div class="empty" id="r-segs-empty" hidden><p id="r-segs-empty-text">No text yet.</p></div>
+          </div>
+          <aside class="r-aside">
+          <div class="r-notes" id="r-notes">
+            <div class="r-notes-head"><span class="row-label">Your notes</span><span class="muted small" id="r-notes-state">Saved with this meeting, and part of Copy for Claude and the summary prompt.</span></div>
+            <textarea class="vocab r-notes-text" id="r-notes-text" rows="3" placeholder="Type while you talk: what you want out of the call, things to check, decisions…"></textarea>
+          </div>
+            <div class="card r-people" id="r-people" hidden><strong>People</strong><ul id="r-people-list"></ul></div>
+          </aside>
         </div>
-        <div class="r-segs-wrap"><ol class="history r-segs" id="r-segs"></ol><button class="btn r-jump" id="r-jump" hidden>Jump to latest</button></div>
-        <div class="empty" id="r-segs-empty" hidden><p id="r-segs-empty-text">No text yet.</p></div>
       </div>
 
       <div class="r-drop" id="r-drop" hidden><div class="r-drop-box">Drop audio or video to transcribe it</div></div>

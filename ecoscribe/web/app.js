@@ -635,17 +635,27 @@ async function renderReuniones() {
   paintNow(out.state);
   const list = $("#r-list");
   list.innerHTML = "";
+  let day = null;
   for (const row of out.items) {
+    const d = dayLabel(row.created);  // grouped by day (dictado-6oe.4)
+    if (d !== day) {
+      day = d;
+      const h = document.createElement("li"); h.className = "r-day"; h.textContent = d; list.append(h);
+    }
     const li = document.createElement("li");
     li.className = "h-item r-row"; li.tabIndex = 0; li.dataset.name = row.name;
+    li.insertAdjacentHTML("afterbegin", row.source === "import"
+      ? '<svg class="r-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7z"/><path d="M14 3v4h4"/></svg>'
+      : '<svg class="r-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg>');
     const title = document.createElement("p");
     title.className = "h-text r-row-title"; title.textContent = row.title || "Untitled";
     const st = document.createElement("span");
     st.className = "r-chip"; chip(st, row);
+    if (row.status === "done") { st.className = "r-dur"; st.textContent = fmtDur(row.duration_s); }  // finished: just how long
     const meta = document.createElement("div");
     meta.className = "h-meta";
-    meta.textContent = [when(row.created), row.lang_name, fmtDur(row.duration_s), row.source === "import" ? "file" : "meeting"]
-      .filter(Boolean).join(" · ");
+    meta.textContent = [timeOf(row.created), row.source === "import" ? "file" : appName((row.app || "") + ".exe") || "meeting", row.lang_name,
+      row.people && row.people.length ? row.people.slice(0, 3).join(", ") : ""].filter(Boolean).join(" · ");
     li.append(title, st, meta);
     li.onclick = () => openSession(row.name);
     li.onkeydown = (e) => { if (e.key === "Enter") openSession(row.name); };
@@ -655,6 +665,14 @@ async function renderReuniones() {
   $("#r-empty").hidden = out.items.length > 0;
   $("#r-empty-text").textContent = q ? `Nothing matches "${q}".` : "Your meetings and the audio you import will show up here.";
 }
+function dayLabel(iso) {
+  const d = new Date(iso || 0), t = new Date(), y = new Date(t); y.setDate(t.getDate() - 1);
+  if (isNaN(d)) return "Earlier";
+  if (d.toDateString() === t.toDateString()) return "Today";
+  if (d.toDateString() === y.toDateString()) return "Yesterday";
+  return d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+}
+function timeOf(iso) { const d = new Date(iso || 0); return isNaN(d) ? "" : d.toTimeString().slice(0, 5); }
 function paintNow(state) {
   const m = state && state.meeting;
   $("#r-now").hidden = !m;
@@ -714,7 +732,12 @@ function segLi(s, editable) {
   }
   const p = document.createElement("p");
   p.className = "r-text"; p.textContent = s.text;
-  li.append(t, who, p);
+  const av = document.createElement("span");  // a conversation, not a table (dictado-6oe.4)
+  av.className = "r-av"; av.dataset.who = who.dataset.who; av.setAttribute("aria-hidden", "true");
+  av.textContent = who.dataset.who === "Me" ? "Me" : (whoName(s.speaker) || "?").slice(0, 1).toUpperCase();
+  const head = document.createElement("span"); head.className = "r-seg-head";
+  head.append(who, t);
+  li.append(av, head, p);
   return li;
 }
 async function renderDetail(name) {
@@ -764,6 +787,15 @@ async function renderDetail(name) {
     $("#r-d-progress-fill").style.width = `${s.pct || 0}%`;
     $("#r-d-progress-text").textContent = s.status === "queued" || s.status === "new" ? "Queued: starts when the previous one finishes."
       : s.status === "downloading" ? "Downloading this language's model (first time only)." : `${s.pct || 0} %${s.slow ? " · on CPU, slow" : ""}`;
+  }
+  const people = s.people || [];
+  $("#r-people").hidden = !people.length;
+  $("#r-people-list").innerHTML = "";
+  for (const n of people) {
+    const li = document.createElement("li");
+    li.innerHTML = '<span class="r-av"></span><span></span>';
+    li.firstChild.textContent = n.slice(0, 1).toUpperCase(); li.lastChild.textContent = n;
+    $("#r-people-list").append(li);
   }
   if (segs && (changed || $("#r-segs").childElementCount !== segs.length)) {
     const list = $("#r-segs");
@@ -843,6 +875,9 @@ function rWire() {
   $("#home-file").onclick = async () => { const out = await api.pick_files(); if (out.paths && out.paths.length) { await show("reuniones"); rImport(out.paths); } };
   $("#recent-all").onclick = (e) => { e.preventDefault(); show("historial"); };
   $("#r-now-stop").onclick = rStop;
+  document.addEventListener("click", (e) => {  // the Copy and ··· menus: close after a choice or a click elsewhere
+    for (const m of $$("details.menu[open]")) if (!m.contains(e.target) || e.target.closest(".menu-item")) m.open = false;
+  });
   $("#r-d-stop").onclick = rStop;
   $("#r-segs").addEventListener("scroll", () => { if (atBottom($("#r-segs"))) $("#r-jump").hidden = true; });
   $("#r-jump").onclick = () => { const l = $("#r-segs"); l.scrollTop = l.scrollHeight; $("#r-jump").hidden = true; };

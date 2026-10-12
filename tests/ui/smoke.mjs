@@ -260,7 +260,9 @@ async function load(query) {
   [...doc.querySelectorAll(".r-row")].find((li) => li.dataset.name === "2026-10-05_0915_planering").click(); await sleep(150);
   check(!doc.querySelector("#r-d-done-actions").hidden && doc.querySelectorAll(".r-seg").length === 4, "done session: transcript + actions");
   check(doc.querySelector('.r-who[data-who="Others"]') !== null, "speaker labels shown");
-  check(doc.querySelector("#r-copy-summary")?.textContent === "Copy summary prompt", "done session offers a summary prompt");
+  check(doc.querySelector("#r-copy-summary")?.textContent.startsWith("Copy a summary prompt"), "done session offers a summary prompt (in the Copy menu)");
+  check(doc.querySelectorAll("#r-d-done-actions > .btn, #r-d-done-actions > details").length === 3, "three actions: Copy ▾, Email, ··· (dictado-6oe.4)");
+  check(doc.querySelectorAll("#r-list .r-day").length >= 1, "the list is grouped by day");
   { // t0u.22: several remote speakers, named and renamed
     doc.querySelector("#r-back").click(); await sleep(150);
     [...doc.querySelectorAll(".r-row")].find((li) => li.dataset.name === "2026-10-04_1600_kund").click(); await sleep(150);
