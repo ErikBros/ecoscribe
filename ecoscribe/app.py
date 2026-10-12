@@ -48,6 +48,7 @@ class App:
         self._quiet = False  # hold mode: the mic is on since the key went down, not announced yet
         self._by_hold = False  # this recording stops when the key is let go
         self.state = "idle"
+        self._unheard = 0  # dictations in a row that heard nothing (dictado-99x)
         self.next_lang: str | None = None  # dictation-languages: forced for the next dictation (key + L)
         self.last_lang: str | None = None  # what the last dictation was in: close calls stay with it
         self.ready = True
@@ -366,8 +367,13 @@ class App:
             res = replace(res, text=snippets(res.text, self.cfg.text.snippets))
         if not res.text:
             log.info("no speech (audio_s=%.2f speech_s=%.2f)", len(audio) / SR, res.speech_s)
-            self.ui.flash("Didn't hear you")
+            self._unheard += 1
+            mic = _mic_label(getattr(self.recorder, "device_name", ""))
+            self.ui.flash(f"Didn't hear you ({mic})" if mic else "Didn't hear you")
+            if self._unheard >= 2:  # twice in a row: likely the wrong or a muted mic (dictado-99x)
+                self.ui.prompt("nomic", mic or "the mic", None)
             return
+        self._unheard = 0
         dr = self.deliver(res.text)
         to = self._audience(dr.target_exe)
         if enter and dr.pasted:
@@ -471,6 +477,13 @@ class App:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
         except OSError:
             log.exception("history write failed")
+
+
+def _mic_label(name: str) -> str:
+    """'Microphone (Anker PowerConf C20' -> 'Anker PowerConf C20', as Settings shows it."""
+    import re
+    m = re.match(r"^[^(]*\((.+?)\)?$", name or "")
+    return m.group(1).strip() if m else (name or "")
 
 
 def _press_enter() -> None:

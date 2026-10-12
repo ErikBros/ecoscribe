@@ -197,3 +197,9 @@ def test_done_prompt_says_which_meeting(tmp_path):
     assert p.title == "Transcript ready" and p.question == "Weekly planning · 23 min"
     assert meetui.Prompt("failed", str(d), None, opened_at=0.0).question == "Weekly planning · 23 min"
     assert meetui.Prompt("done", str(tmp_path / "gone"), None, opened_at=0.0).question == ""  # no meta: no line
+
+
+def test_nomic_prompt_names_the_mic():
+    p = meetui.Prompt("nomic", "Zone Vibe 100", None, opened_at=0.0)
+    assert "Zone Vibe 100" in p.question and [c for _l, c in p.buttons] == ["mic", "hide"]
+    assert p.expired(1000.0) == "hide"
