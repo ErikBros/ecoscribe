@@ -602,6 +602,19 @@ class Api:
             return {"ok": False, "error": "No such speaker in this session"}
         names = dict(sessions.read_meta(d).get("speaker_names") or {})
         new = " ".join(str(new or "").split())[:40]
+        into = next((x for x in dict.fromkeys(s.get("speaker") for s in segs)
+                     if x and x != label and new and new.lower() in (str(x).lower(), str(names.get(x, "")).lower())), None)
+        if into:  # dictado-gk9: the same name as another speaker = one person: merge into that one
+            for s in segs:
+                if s.get("speaker") == label:
+                    s["speaker"] = into
+            tr = json.loads((d / "transcript.json").read_text(encoding="utf-8"))
+            tr["segments"] = segs
+            sessions._write_json(d / "transcript.json", tr)
+            names.pop(label, None)
+            sessions.write_meta(d, speaker_names=names)
+            export.write_all(d)
+            return {"ok": True, "names": names, "merged": into}
         if new and new != label:
             names[label] = new
         else:

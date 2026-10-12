@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -55,6 +56,43 @@ def _who(s: dict, turns: list) -> str | None:
         if g <= gap:
             gap, near = g, spk
     return near
+
+
+ONE_ON_ONE = re.compile(r"\b1\s*[:/]\s*1\b|\b1[- ]on[- ]1\b|\bone[- ]on[- ]one\b", re.I)
+
+
+def other_side_cap(meta: dict) -> int | None:
+    """How many people the other side of a call can be (dictado-gk9): 1 for a meeting named as a 1:1,
+    else the calendar invite's guests minus the user; None when nothing says."""
+    if meta.get("source") != "meeting":
+        return None
+    if ONE_ON_ONE.search(str(meta.get("title") or "")):
+        return 1
+    att = (meta.get("calendar") or {}).get("attendees") or []
+    return max(1, len(att) - 1) if len(att) >= 2 else None
+
+
+def cap_turns(turns: list, cap: int | None, voices_by_spk: dict | None = None) -> list:
+    """Fold the add-on's speakers beyond `cap` into the ones kept (the ones who talked most): each
+    into the kept voice it sounds most like when the add-on gave voices, else into the main one."""
+    talk: dict = {}
+    for t0, t1, spk in turns:
+        talk[spk] = talk.get(spk, 0.0) + (t1 - t0)
+    if not cap or len(talk) <= cap:
+        return turns
+    keep = sorted(talk, key=talk.get, reverse=True)[:cap]
+    vs = voices_by_spk or {}
+
+    def home(spk):
+        if spk in keep:
+            return spk
+        if spk in vs and all(k in vs for k in keep):
+            from .voices import cosine
+            return max(keep, key=lambda k: cosine(vs[spk], vs[k]))
+        return keep[0]
+    to = {spk: home(spk) for spk in talk}
+    log.info("speakers capped at %d: %d voices folded", cap, len(talk) - cap)
+    return [[t0, t1, to[spk]] for t0, t1, spk in turns]
 
 
 def assign(segments: list[dict], turns: list, target) -> int:
@@ -134,6 +172,14 @@ def run(session_dir: Path, run_addon=_run_addon, convert=_to_flac, memory: Path 
         if rc != 0:
             raise RuntimeError(f"the speaker add-on ended with code {rc}")
         turns = json.loads(out.read_text(encoding="utf-8"))
+        cap = other_side_cap(meta)
+        if cap:  # a 1:1 or an invite: never more voices on the other side than people (dictado-gk9)
+            side = Path(str(out.with_suffix("")) + ".voices.json")
+            try:
+                vs = json.loads(side.read_text(encoding="utf-8")) if side.exists() else None
+            except (OSError, ValueError):
+                vs = None
+            turns = cap_turns(turns, cap, vs)
         path = d / "transcript.json"
         tr = json.loads(path.read_text(encoding="utf-8"))
         shown, n = _assign(tr["segments"], turns, "Others" if meta.get("source") == "meeting" else None)
