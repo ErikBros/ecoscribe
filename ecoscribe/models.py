@@ -230,3 +230,42 @@ def prepare(name: str, progress=None, root: Path | None = None, download=_hf_dow
     if repo:
         return Path(_mlx().ensure_mlx(repo, progress=progress))
     return ensure_local(name, root=root, download=download, progress=progress)
+
+
+# ---------------- Settings > Speech models (dictado-z4q) ----------------
+def _hf_cache_dir(name: str) -> Path | None:
+    """The Hugging Face cache folder that holds `name`'s download on this platform."""
+    from huggingface_hub import constants
+    repo = None
+    if sys.platform == "darwin":
+        repo = _mlx().mlx_repo(name)
+    if repo is None:
+        if "/" in name:
+            repo = name
+        else:
+            from faster_whisper.utils import _MODELS
+            repo = _MODELS.get(name)
+    return Path(constants.HF_HUB_CACHE) / f"models--{safe_name(repo)}" if repo else None
+
+
+def disk_size(name: str, root: Path | None = None) -> int:
+    """Bytes `name` takes on disk: the download (the mirror hard-links it, so it isn't counted twice)."""
+    cache = _hf_cache_dir(name)
+    root = Path(root) if root else paths.data_dir() / "models"
+    total = _tree_bytes(cache) if cache and cache.exists() else 0
+    mirror = root / safe_name(name)
+    if mirror.exists():
+        total = max(total, _tree_bytes(mirror))
+    return total
+
+
+def delete(name: str, root: Path | None = None) -> bool:
+    """Free the space: the mirror and the download. It downloads again the next time it's needed.
+    False when there was nothing to delete; OSError when a file is in use (a dictation running)."""
+    root = Path(root) if root else paths.data_dir() / "models"
+    gone = False
+    for d in (root / safe_name(name), _hf_cache_dir(name)):
+        if d is not None and d.exists():
+            shutil.rmtree(d)
+            gone = True
+    return gone
