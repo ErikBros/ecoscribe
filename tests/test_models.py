@@ -229,3 +229,17 @@ def test_mac_model_without_mlx_conversion_uses_the_ct2_mirror(tmp_path, monkeypa
     out = models.prepare("KBLab/kb-whisper-large", root=tmp_path / "models", download=lambda name, **kw: str(src))
     assert (out / "model.bin").exists()
     assert models.is_ready("KBLab/kb-whisper-large", root=tmp_path / "models")
+
+
+def test_disk_size_and_delete_free_the_mirror_and_the_cache(tmp_path, monkeypatch):
+    monkeypatch.setattr(models.sys, "platform", "win32")
+    src = make_src(tmp_path)
+    root, cache = tmp_path / "models", tmp_path / "hf"
+    monkeypatch.setattr(models, "_hf_cache_dir", lambda name: cache)  # the fake cache make_src wrote
+    models.prepare("large-v3-turbo", root=root, download=lambda name, **kw: str(src))
+    assert models.disk_size("large-v3-turbo", root=root) >= 1000
+    assert models.delete("large-v3-turbo", root=root) is True
+    assert not models.is_ready("large-v3-turbo", root=root)
+    assert not (root / "large-v3-turbo").exists() and not cache.exists()
+    assert models.disk_size("large-v3-turbo", root=root) == 0
+    assert models.delete("large-v3-turbo", root=root) is False  # nothing left to delete
