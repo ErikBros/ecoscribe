@@ -91,7 +91,7 @@ else:  # the consent store, EnumWindows, the process list (ecoscribe/platform/wi
 class Detector:
     """Feed it a poll every couple of seconds; it returns start / end events."""
 
-    def __init__(self, grace_s: float = 20.0, own_apps=("ecoscribe", "python", "pythonw"), debounce_polls: int = 2):
+    def __init__(self, grace_s: float = 10.0, own_apps=("ecoscribe", "python", "pythonw"), debounce_polls: int = 2):
         self.grace_s = grace_s
         # python/pythonw are excluded because Ecoscribe runs as Python in development; neither is a
         # call app nor a browser, so this can never hide a real meeting.

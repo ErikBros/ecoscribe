@@ -44,7 +44,7 @@ def test_own_process_excluded():
 def test_short_release_within_grace_keeps_meeting():
     d = Detector(debounce_polls=1)
     frames = ([([use("msteams")], [])] * 5 + [([use("msteams", False)], [])] * 5
-              + [([use("msteams")], [])] * 20 + [([use("msteams", False)], [])] * 9)
+              + [([use("msteams")], [])] * 20 + [([use("msteams", False)], [])] * 4)
     evs = run(d, frames)
     assert [e.kind for e in evs] == ["start"]
 
@@ -53,10 +53,10 @@ def test_release_past_grace_ends():
     d = Detector(debounce_polls=1)
     assert d.update([use("msteams")], [], 0.0).kind == "start"
     assert d.update([use("msteams", False)], [], 100.0) is None  # released, seen at 100
-    assert d.update([use("msteams", False)], [], 118.0) is None
-    ev = d.update([use("msteams", False)], [], 120.0)
-    assert ev.kind == "end" and ev.app == "msteams" and ev.at == 120.0
-    assert d.update([use("msteams", False)], [], 122.0) is None
+    assert d.update([use("msteams", False)], [], 108.0) is None
+    ev = d.update([use("msteams", False)], [], 110.0)
+    assert ev.kind == "end" and ev.app == "msteams" and ev.at == 110.0  # 10 s (dictado-mtc)
+    assert d.update([use("msteams", False)], [], 112.0) is None
 
 
 def test_one_meeting_at_a_time():

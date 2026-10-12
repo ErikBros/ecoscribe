@@ -125,7 +125,7 @@ class MeetingsCfg:
     """Call detection (detect.py + meetwatch.py). mode: "prompt" asks near the pill,
     "auto" starts recording by itself, "off" never looks."""
     mode: str = "prompt"
-    grace_s: float = 20  # mic released this long = the call ended (mute toggles, quick rejoins)
+    grace_s: float = 10  # mic released this long = the call ended (mute toggles, quick rejoins); 20 felt too long (dictado-mtc)
     silence_stop_s: float = 180  # backup when the end is missed: both tracks silent this long
     default_lang: str = "sv"
     speakers: bool = True  # tell remote voices apart after a call (needs the speaker add-on)
@@ -161,6 +161,8 @@ def load(path: Path | None) -> Config:
                 log.warning("config: unknown key %s.%s ignored", section, key)
                 continue
             setattr(target, key, value)
+    if cfg.meetings.grace_s == 20:  # the old default, written into every saved config: now 10 (dictado-mtc)
+        cfg.meetings.grace_s = 10
     from . import hotkeys  # lone keys (KEYS) or combos like "ctrl+l"
     cfg.hotkey.key = hotkeys.normalize(cfg.hotkey.key)  # raises ValueError with the reason
     return cfg
