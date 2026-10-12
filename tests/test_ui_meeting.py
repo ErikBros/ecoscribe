@@ -188,3 +188,12 @@ def test_hover_inside_the_pill_with_a_margin():
     assert meetui.hovering((95, 515), rect)  # a few px off still counts: no flicker at the edge
     assert not meetui.hovering((150, 400), rect)
     assert not meetui.hovering(None, rect) and not meetui.hovering((150, 515), None)
+
+
+def test_done_prompt_says_which_meeting(tmp_path):
+    d = sessions.create("Weekly planning", "sv", "meeting", tmp_path)
+    sessions.write_meta(d, duration_s=23 * 60 + 10)
+    p = meetui.Prompt("done", str(d), None, opened_at=0.0)
+    assert p.title == "Transcript ready" and p.question == "Weekly planning · 23 min"
+    assert meetui.Prompt("failed", str(d), None, opened_at=0.0).question == "Weekly planning · 23 min"
+    assert meetui.Prompt("done", str(tmp_path / "gone"), None, opened_at=0.0).question == ""  # no meta: no line
