@@ -375,6 +375,18 @@ async function load(query) {
   check(items[0].querySelector(".h-text").textContent.startsWith("Could you"), "the new text replaces the old one");
   check(!doc.querySelector("#toast").hidden && doc.querySelector("#toast").textContent.includes("copied"), "says it's copied");
 }
+{ // History > Delete with Undo (dictado-vfo)
+  const { window, doc } = await load("page=historial&undo_ms=200");
+  await sleep(200);
+  const dicts = () => [...doc.querySelectorAll("#history .h-item")].filter((li) => !li.classList.contains("h-meeting"));
+  const before = dicts().length, first = dicts()[0];
+  first.querySelector(".h-del").click(); await sleep(30);
+  check(first.hidden && doc.querySelector("#toast .toast-btn").textContent === "Undo", "Delete hides the row and offers Undo");
+  doc.querySelector("#toast .toast-btn").click(); await sleep(300);
+  check(!first.hidden && !window.__deletedDictation, "Undo brings it back, nothing deleted");
+  first.querySelector(".h-del").click(); await sleep(450);
+  check(window.__deletedDictation && dicts().length === before - 1, "without Undo it's deleted for good");
+}
 { // Settings > Speech models (dictado-z4q)
   const { window, doc } = await load("page=ajustes");
   await sleep(250);

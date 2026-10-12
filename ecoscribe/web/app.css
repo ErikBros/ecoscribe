@@ -427,6 +427,7 @@ select:hover { border-color: #d6d2c6; }
   position: fixed; right: 24px; bottom: 24px; max-width: 360px; padding: 11px 16px; border-radius: 10px;
   background: var(--ink); color: var(--paper); box-shadow: 0 8px 28px rgba(35, 42, 51, .28); animation: rise2 .18s ease-out;
 }
+.toast-btn { margin-left: 10px; padding: 0; border: 0; background: none; font: inherit; font-weight: 700; color: var(--paper); text-decoration: underline; cursor: pointer; }
 @keyframes rise2 { from { opacity: 0; transform: translateY(8px); } }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
