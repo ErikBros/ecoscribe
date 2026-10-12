@@ -452,3 +452,8 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border: 1px solid var(--
 .m-row .row-text { gap: 2px; }
 .m-row .s-progress { max-width: 360px; }
 .m-err { margin: 6px 0 0; color: var(--tile); }
+.s-lchip { display: inline-flex; align-items: center; gap: 4px; height: 36px; padding: 0 6px 0 15px; border-radius: 99px;
+  background: var(--aegean); color: #fff; font-weight: 500; }
+.s-lchip:not(:has(.s-chip-x)) { padding-right: 15px; }
+.s-chip-x { width: 24px; height: 24px; border: 0; border-radius: 99px; background: rgba(255, 255, 255, .16); color: #fff; font-size: 11px; cursor: pointer; }
+.s-chip-x:hover, .s-chip-x:focus-visible { background: rgba(255, 255, 255, .3); outline: none; }
