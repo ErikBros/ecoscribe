@@ -26,7 +26,8 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Voice commands + full list in Settings | done | done (real desktop run: line break + Enter, no command words typed) |
 | Meetings: live transcript, notes, Me / Others, exports, Copy for Claude | done | check on Mac (dictado-tjn): needs the System Audio Recording permission |
 | Meeting / file languages incl. Greek + Spanish mixed | done | done (GPU test passes on mlx) |
-| Meeting pill: a small chip (dot + timer) that shows the live line when the mouse is on it | done | dictado-f6o |
+| Meeting pill: a small chip (dot + timer) that shows the live line when the mouse is on it | done | done (dictado-f6o: polls the mouse, stays click-through; checked on screen) |
+| Meeting prompt box: a rounded dark card that says which meeting, rounded buttons, language as a chip with a menu | done | done (dictado-jfz, checked on screen) |
 | Meeting names + attendees from a calendar (iCal link) | done | check on Mac (dictado-tjn) |
 | File transcription (drag and drop) | done | done (installed app: Greek file on the Apple GPU, 2.4% WER) |
 | First-run setup: languages, speech models (both recommended, with download progress), mic test, dictation key, a first dictation, summary; Settings > Run setup again | done | check on Mac (run it with a fresh data folder) |
