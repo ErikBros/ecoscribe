@@ -125,6 +125,7 @@ async function load(query) {
   check(!doc.querySelector("#i-week").hidden && doc.querySelector("#i-week-text").textContent.includes("2.2 → 1.8"), "this week: hedges went down (dictado-6oe.6)");
   check(doc.querySelectorAll("#i-hours path.bar").length > 5 && doc.querySelectorAll("#i-days .tick").length === 3, "hour and day charts drawn");
   check(doc.querySelectorAll("#i-langs .i-hbar").length === 4 && doc.querySelector("#i-langs .i-hbar-name").textContent === "English", "languages by name");
+  check([...doc.querySelectorAll("#i-apps .i-hbar-name")].some((e) => e.textContent === "Snipping Tool"), "a program name reads as words (dictado-d4h)");
   const wpm = doc.querySelector("#i-wpm"), saved0 = doc.querySelector("#i-saved").textContent;
   check(wpm && wpm.value === "40", "typing speed shows 40 until set (dictado-d8e)");
   wpm.value = "80"; wpm.dispatchEvent(new window.Event("change", { bubbles: true })); await sleep(80);

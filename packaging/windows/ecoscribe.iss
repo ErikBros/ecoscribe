@@ -31,6 +31,8 @@ WizardStyle=modern
 Compression=lzma2/normal
 SolidCompression=yes
 CloseApplications=no
+; tell Windows to refresh icons, or the taskbar keeps the old one from its cache after an update (dictado-d4h)
+ChangesAssociations=yes
 
 [Languages]
 Name: "en"; MessagesFile: "compiler:Default.isl"

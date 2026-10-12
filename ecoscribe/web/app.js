@@ -26,7 +26,7 @@ function demoInsights(days) {  // invented numbers and text for the demo and scr
     totals: { dictations: Math.round(240 * k), words: Math.round(11800 * k), talk_s: Math.round(5530 * k), wpm: 128, saved_s: Math.round(12170 * k), typing_wpm: 40 },
     rhythm: { hours, days: dayList, streak: 2 },
     languages: [{ lang: "en", words: Math.round(8200 * k) }, { lang: "sv", words: Math.round(2900 * k) }, { lang: "de", words: Math.round(500 * k) }, { lang: "mixed", words: Math.round(200 * k) }],
-    apps: [{ app: "slack.exe", dictations: 96 }, { app: "code.exe", dictations: 71 }, { app: "outlook.exe", dictations: 44 }, { app: "chrome.exe", dictations: 29 }],
+    apps: [{ app: "slack.exe", dictations: 96 }, { app: "code.exe", dictations: 71 }, { app: "outlook.exe", dictations: 44 }, { app: "chrome.exe", dictations: 29 }, { app: "SnippingTool.exe", dictations: 3 }],
     habits: [{ lang: "en", words: 8200, per_100: 3.1, top: [{ word: "like", count: 120 }, { word: "you know", count: 61 }, { word: "basically", count: 40 }, { word: "kind of", count: 33 }] },
       { lang: "sv", words: 2900, per_100: 1.4, top: [{ word: "typ", count: 25 }, { word: "liksom", count: 16 }] }],
     phrases: [{ phrase: "at the end of", count: 18 }, { phrase: "let me check", count: 14 }, { phrase: "as soon as", count: 11 }, { phrase: "on the other hand", count: 9 }],
@@ -247,9 +247,15 @@ function fmtNum(n) { return Number(n || 0).toLocaleString("en-GB"); }
 function appName(exe) {
   const m = { "windowsterminal.exe": "Terminal", "slack.exe": "Slack", "chrome.exe": "Chrome", "msedge.exe": "Edge",
     "code.exe": "VS Code", "teams.exe": "Teams", "ms-teams.exe": "Teams", "notepad.exe": "Notepad", "firefox.exe": "Firefox",
-    "obsidian.exe": "Obsidian", "outlook.exe": "Outlook", "python.exe": "Python", "pythonw.exe": "Python" };
+    "obsidian.exe": "Obsidian", "outlook.exe": "Outlook", "olk.exe": "Outlook", "python.exe": "Python", "pythonw.exe": "Python",
+    "explorer.exe": "File Explorer", "winword.exe": "Word", "excel.exe": "Excel", "powerpnt.exe": "PowerPoint",
+    "whatsapp.exe": "WhatsApp", "whatsapp.root.exe": "WhatsApp", "chatgpt.exe": "ChatGPT", "vlc.exe": "VLC" };
   if (!exe) return "";
-  return m[exe.toLowerCase()] || exe.replace(/\.exe$/i, "");
+  const known = m[exe.toLowerCase()];
+  if (known) return known;
+  // anything else as words: "SnippingTool.exe" -> "Snipping Tool", "discord" -> "Discord" (dictado-d4h)
+  const base = exe.replace(/\.exe$/i, "").replace(/[_-]+/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").trim();
+  return base.charAt(0).toUpperCase() + base.slice(1);
 }
 function when(ts) {
   if (!ts) return "";
