@@ -29,6 +29,8 @@ u32.SetWindowPos.argtypes = (w.HWND, w.HWND, ctypes.c_int, ctypes.c_int, ctypes.
 u32.MonitorFromWindow.argtypes = (w.HWND, w.DWORD)
 u32.MonitorFromWindow.restype = w.HANDLE
 u32.GetForegroundWindow.restype = w.HWND
+u32.GetCursorPos.argtypes = (ctypes.POINTER(w.POINT),)
+u32.GetWindowRect.argtypes = (w.HWND, ctypes.POINTER(w.RECT))
 
 GWL_EXSTYLE = -20
 WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST = 0x08000000, 0x80, 0x8
@@ -38,7 +40,8 @@ HWND_TOPMOST = w.HWND(-1)
 SWP_NOSIZE, SWP_NOACTIVATE = 0x1, 0x10
 W, H = 210, 44
 RW, RH = 230, 54  # the dictating pill: timer + how to cancel (t0u.36)
-MW, MH = 380, 56  # the meeting pill: label + latest live line
+MW, MH = 380, 56  # the meeting pill opened by the mouse: label + latest live line
+CW, CH = 92, 30  # the meeting pill as it sits: a small chip, recording dot + timer (dictado-z4j)
 LW, LH = 460, 84  # the dictating pill with live text under it (dictado-live)
 KEY = "#010203"  # transparent color key, gives the pill round ends
 
@@ -73,6 +76,7 @@ class Overlay:
         self.meeting: dict | None = None  # meetui.meeting_view(); shown whenever dictation isn't
         self._drawn = None  # what the meeting layer last drew (no redraw, no flicker)
         self.live_text = ""  # what the live transcript has heard so far (this recording)
+        self.open = False  # the meeting chip is opened by the mouse over it (dictado-z4j)
 
     def ex_style(self) -> int:
         return u32.GetWindowLongW(self.hwnd, GWL_EXSTYLE)
@@ -150,9 +154,33 @@ class Overlay:
             hgt = 6 + i * 3
             c.create_rectangle(x, 19 + hgt // 2, x + 5, 19 - hgt // 2, fill=P.PAPER if on else P.PILL_OFF, outline="")
 
+    def _hover(self) -> bool:
+        pt, rc = w.POINT(), w.RECT()
+        if not (u32.GetCursorPos(ctypes.byref(pt)) and u32.GetWindowRect(self.hwnd, ctypes.byref(rc))):
+            return False
+        return meetui.hovering((pt.x, pt.y), (rc.left, rc.top, rc.right, rc.bottom))
+
+    def _meeting_chip(self, view: dict) -> None:
+        """The meeting as it sits: a small dark chip, recording dot + timer. Click-through."""
+        self._size(CW, CH)
+        c = self.c
+        c.delete("all")
+        r, bg = CH // 2, P.INK
+        c.create_oval(0, 0, CH, CH, fill=bg, outline=bg)
+        c.create_oval(CW - CH, 0, CW, CH, fill=bg, outline=bg)
+        c.create_rectangle(r, 0, CW - r, CH, fill=bg, outline=bg)
+        dot = P.AEGEAN_SOFT if view["busy"] else P.TILE
+        c.create_oval(12, r - 5, 22, r + 5, fill=dot, outline=dot)
+        c.create_text(30, r, text=view.get("short") or view["label"], fill=P.PAPER, font=("Segoe UI", 10), anchor="w")
+
     def _meeting_pill(self, view: dict) -> None:
-        key = (view["label"], view["line"], view["busy"])
+        key = (view["label"], view["line"], view["busy"], self.open)
         if key == self._drawn:
+            return
+        if not self.open:
+            self._meeting_chip(view)
+            self._place_and_show()
+            self._drawn = key
             return
         self._size(MW, MH)
         c = self.c
@@ -221,6 +249,11 @@ class Overlay:
         elif self.mode == "hidden" and self._flash_until and now >= self._flash_until:
             self._flash_until = 0.0
             self._show_layer()
+        elif self.mode == "hidden" and self.meeting and not self._flash_until:
+            hover = self._hover()  # the chip opens to the live line while the mouse is on it
+            if hover != self.open:
+                self.open = hover
+                self._show_layer()
         elif self.mode == "busy" and self._flash_until and now >= self._flash_until:
             self._flash_until = 0.0
             self.busy()

@@ -17,7 +17,7 @@ EMPTY = {"meeting": None, "job": None, "queue": []}
 
 def test_view_elapsed_and_live_line():
     v = meetui.meeting_view(st(), now=T0.timestamp() + 12 * 60 + 4, line="hej och välkomna")
-    assert v == {"label": "Taking notes 12:04", "line": "hej och välkomna", "busy": False}
+    assert v == {"label": "Taking notes 12:04", "short": "12:04", "line": "hej och välkomna", "busy": False}
     v = meetui.meeting_view(st(), now=T0.timestamp() + 3600 + 65, line=None)
     assert v["label"] == "Taking notes 1:01:05" and v["line"] == ""
 
@@ -124,11 +124,15 @@ def test_tk_meeting_pill_and_prompt_box():
         ov = ui.Overlay(root)
         view = meetui.meeting_view(st(), now=T0.timestamp() + 5, line="hej")
         ov.set_meeting(view)
-        assert (ov.w, ov.h) == (ui.MW, ui.MH) and ov._drawn == ("Taking notes 0:05", "hej", False)
+        assert (ov.w, ov.h) == (ui.CW, ui.CH) and ov._drawn == ("Taking notes 0:05", "hej", False, False)  # the chip
+        ov.open = True  # the mouse on it (dictado-z4j): the live line
+        ov._show_layer()
+        assert (ov.w, ov.h) == (ui.MW, ui.MH) and ov._drawn == ("Taking notes 0:05", "hej", False, True)
+        ov.open = False
         ov.recording(0.0)
         assert (ov.w, ov.h) == (ui.RW, ui.RH)  # Dictando wins, with the cancel line (t0u.36)
         ov.idle()
-        assert (ov.w, ov.h) == (ui.MW, ui.MH)  # back to Tomando notas
+        assert (ov.w, ov.h) == (ui.CW, ui.CH)  # back to the meeting chip
         ov.set_meeting(None)
         assert ov._drawn is None
         answers = []
@@ -147,6 +151,7 @@ def test_tk_meeting_pill_and_prompt_box():
         assert pw._btns["ahora_no"].cget("text") == "Not now (7)"  # t0u.21: the countdown on screen
         pw._answer("ahora_no")
     finally:
+        meetui.set_langs([])  # the language list is module state: don't leak Greek + Spanish into later tests
         root.destroy()
 
 
@@ -171,3 +176,15 @@ def test_tray_language_submenu():
     finally:
         meetui.set_langs([])
     assert meetui.tray_recording(EMPTY) is False and meetui.tray_recording(st()) is True
+
+
+def test_short_label_for_the_compact_chip():
+    assert meetui.meeting_view(st("finalizing"), now=T0.timestamp(), line="x")["short"] == "Saving…"
+
+
+def test_hover_inside_the_pill_with_a_margin():
+    rect = (100, 500, 200, 530)  # left, top, right, bottom
+    assert meetui.hovering((150, 515), rect)
+    assert meetui.hovering((95, 515), rect)  # a few px off still counts: no flicker at the edge
+    assert not meetui.hovering((150, 400), rect)
+    assert not meetui.hovering(None, rect) and not meetui.hovering((150, 515), None)
