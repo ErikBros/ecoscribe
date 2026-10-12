@@ -113,6 +113,14 @@ CAPABILITIES: dict[str, dict] = {
         "windows": ("not_needed", "process names (slack.exe) are the same in every language"),
         "macos": "ecoscribe.platform.macos.context:foreground_app",  # bundle id -> the English name coach knows (dictado-uee)
     },
+    "Setup: permissions step (first run)": {
+        "windows": ("not_needed", "Windows asks for no permission to listen, type or watch the keyboard"),
+        "macos": "ecoscribe.platform.macos.permissions:status,open_pane,DICTATION",  # Api.setup_info / open_permission
+    },
+    "Setup: speech model download with progress": {
+        "windows": "ecoscribe.models:ensure_local,prepare,is_ready",  # progress from the HF blobs (dictado-zpz)
+        "macos": ("ticket", "dictado-kuu"),  # ensure_mlx(progress=...); until then the bar jumps at the end
+    },
     "Installer": {
         "windows": "file:packaging/windows/ecoscribe.iss",
         "macos": "file:tools/build_mac.py",  # Ecoscribe.app + .dmg, signed so permissions survive updates

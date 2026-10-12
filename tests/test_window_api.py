@@ -271,3 +271,48 @@ def test_languages_are_add_ons(tmp_path):
     c = config.load(cfg)
     assert c.whisper.languages == ["en", "sv", "es"] and c.meetings.default_lang == "sv"  # Greek dropped everywhere
     assert not api.save_settings({"extra_languages": ["xx"]})["ok"]
+
+
+def test_setup_info_lists_both_models_and_no_permissions_off_mac(api, monkeypatch):
+    monkeypatch.setattr("ecoscribe.window.sys.platform", "win32")
+    monkeypatch.setattr("ecoscribe.models.is_ready", lambda name, root=None: name == "large-v3-turbo")
+    info = api.setup_info("en")
+    assert [m["label"] for m in info["models"]] == ["Fast", "Most accurate"]
+    assert [m["ready"] for m in info["models"]] == [True, False]
+    assert info["models"][0]["required"] and not info["models"][1]["required"]
+    assert info["permissions"] == []
+    assert api.setup_info("en,sv")["models"][1]["required"]
+
+
+def test_setup_models_download_in_order_with_progress(api, monkeypatch):
+    done = []
+
+    def fake_prepare(name, progress=None, **kw):
+        progress(50, 100)
+        progress(100, 100)
+        done.append(name)
+    monkeypatch.setattr("ecoscribe.models.prepare", fake_prepare)
+    monkeypatch.setattr("ecoscribe.models.is_ready", lambda name, root=None: name in done)
+    api.setup_models_start(["large-v3-turbo", "Systran/faster-whisper-large-v3"])
+    for _ in range(100):
+        p = api.setup_models_progress()
+        if not p["running"]:
+            break
+        time.sleep(0.02)
+    assert done == ["large-v3-turbo", "Systran/faster-whisper-large-v3"]
+    assert all(m["done"] == m["total"] == 100 and m["ready"] for m in p["models"].values())
+    assert p["error"] is None
+
+
+def test_setup_models_error_is_reported(api, monkeypatch):
+    def boom(name, progress=None, **kw):
+        raise OSError("no network")
+    monkeypatch.setattr("ecoscribe.models.prepare", boom)
+    monkeypatch.setattr("ecoscribe.models.is_ready", lambda name, root=None: False)
+    api.setup_models_start(["large-v3-turbo"])
+    for _ in range(100):
+        p = api.setup_models_progress()
+        if not p["running"]:
+            break
+        time.sleep(0.02)
+    assert "no network" in p["error"]
