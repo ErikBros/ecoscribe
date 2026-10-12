@@ -172,6 +172,8 @@ def _start_meetings(cfg, data, ui, root, log):
     def on_answer(prompt, choice, lang):
         if choice == "abrir":
             ipc.open_ui("reuniones/" + Path(prompt.app).name)
+        elif choice == "mic":  # "Didn't hear you, twice": the mic picker and its test
+            ipc.open_ui("ajustes")
         else:
             watch.answer(choice, lang)
     ui.prompts = PromptWindow(root, on_answer)
