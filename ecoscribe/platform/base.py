@@ -119,7 +119,7 @@ CAPABILITIES: dict[str, dict] = {
     },
     "Setup: speech model download with progress": {
         "windows": "ecoscribe.models:ensure_local,prepare,is_ready",  # progress from the HF blobs (dictado-zpz)
-        "macos": ("ticket", "dictado-kuu"),  # ensure_mlx(progress=...); until then the bar jumps at the end
+        "macos": "ecoscribe.platform.macos.mlx_engine:ensure_mlx,is_cached_mlx",  # bytes from the HF blobs (dictado-kuu)
     },
     "Installer": {
         "windows": "file:packaging/windows/ecoscribe.iss",

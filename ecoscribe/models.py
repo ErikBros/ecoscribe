@@ -220,15 +220,7 @@ def is_ready(name: str, root: Path | None = None) -> bool:
     """True when `name` needs no download on this platform."""
     repo = _mlx().mlx_repo(name) if sys.platform == "darwin" else None
     if repo:  # Mac: the mlx conversion; a model without one runs faster-whisper there too (mlx_engine.factory)
-        m = _mlx()
-        if hasattr(m, "is_cached_mlx"):  # dictado-kuu
-            return bool(m.is_cached_mlx(repo))
-        try:
-            from huggingface_hub import snapshot_download
-            snapshot_download(repo, local_files_only=True)
-            return True
-        except Exception:
-            return False
+        return bool(_mlx().is_cached_mlx(repo))
     return is_local(name, root)
 
 
@@ -236,11 +228,5 @@ def prepare(name: str, progress=None, root: Path | None = None, download=_hf_dow
     """Download `name` for this platform (once), calling progress(done_bytes, total_bytes | None)."""
     repo = _mlx().mlx_repo(name) if sys.platform == "darwin" else None
     if repo:
-        m = _mlx()
-        if "is_cached_mlx" in vars(m):  # dictado-kuu: ensure_mlx reports progress
-            return Path(m.ensure_mlx(repo, progress=progress))
-        out = m.ensure_mlx(repo)  # before it: only the end
-        if progress:
-            progress(1, 1)
-        return Path(out)
+        return Path(_mlx().ensure_mlx(repo, progress=progress))
     return ensure_local(name, root=root, download=download, progress=progress)
