@@ -712,7 +712,9 @@ function renameSpeaker(el) {
     const v = input.value.trim();
     if (save && v !== whoName(label)) {
       const out = await api.rename_speaker(r.open, label, v);
-      if (out.ok) r.names = out.names; else toast(out.error || "Couldn't rename.");
+      if (!out.ok) toast(out.error || "Couldn't rename.");
+      else if (out.merged) { toast(`Merged into ${whoName(out.merged)}.`); openSession(r.open); return; }  // dictado-gk9
+      else r.names = out.names;
     }
     for (const w of document.querySelectorAll(".r-who-edit")) if (w.dataset.label === label) w.textContent = whoName(label);
   };
@@ -740,7 +742,7 @@ function segLi(s, editable) {
   who.dataset.who = sp.startsWith("Speaker") ? "Others" : sp;
   if (editable && s.speaker) {
     who.dataset.label = s.speaker; who.tabIndex = 0; who.classList.add("r-who-edit");
-    who.title = "Click to name this speaker";
+    who.title = "Click to name this speaker. Give two speakers the same name to make them one.";
     who.onclick = () => renameSpeaker(who);
     who.onkeydown = (e) => { if (e.key === "Enter") renameSpeaker(who); };
   }
