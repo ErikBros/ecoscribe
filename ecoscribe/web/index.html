@@ -442,7 +442,12 @@
 
 <!-- SETUP (dictado-zpz): the first run, full window. Steps are shown or skipped per platform. -->
 <div class="setup" id="setup" hidden>
-  <div class="s-bar" id="s-bar" aria-hidden="true"></div>
+  <aside class="s-side">  <!-- a dark side panel listing the steps (dictado-6oe.8) -->
+    <div class="s-brand"><svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="11" fill="#23557a"/><path d="M13 15h22M13 24h15M13 33h22" stroke="#f6f5f1" stroke-width="4.2" stroke-linecap="round"/><circle cx="34" cy="24" r="2.6" fill="#e58a5f"/></svg>Ecoscribe</div>
+    <ol class="s-steps" id="s-steps" aria-label="Setup steps"></ol>
+    <p class="s-side-note">Everything runs on this computer. Nothing you say leaves it.</p>
+  </aside>
+  <div class="s-main">
   <div class="s-body">
 
     <section class="sstep" data-step="permissions" data-mac-only>
@@ -550,6 +555,7 @@
     <button type="button" class="btn btn-link" id="s-back">← Back</button>
     <button type="button" class="btn btn-link s-skip" id="s-skip" hidden>Cancel</button>
     <button type="button" class="btn btn-primary btn-lg" id="s-next">Continue →</button>
+  </div>
   </div>
 </div>
 

@@ -341,26 +341,34 @@ select:hover { border-color: #d6d2c6; }
 
 /* ---------- setup (dictado-zpz): the first run, full window ---------- */
 .setup {
-  position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; padding: 30px 48px 26px;
-  background: radial-gradient(ellipse 70% 45% at 50% -8%, var(--aegean-soft), transparent 70%), var(--paper);
-  animation: fade .2s ease-out;
+  position: fixed; inset: 0; z-index: 20; display: grid; grid-template-columns: 250px minmax(0, 1fr);
+  background: var(--paper); animation: fade .2s ease-out;
 }
-.s-bar { display: flex; gap: 8px; }
-.s-bar span { flex: 1; height: 4px; border-radius: 99px; background: var(--line); transition: background .3s; }
-.s-bar span.on { background: var(--aegean); }
-.s-body { flex: 1; display: grid; align-items: center; min-height: 0; }
-.sstep { display: none; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 48px; align-items: center; }
+.s-side { display: flex; flex-direction: column; gap: 34px; padding: 34px 26px; background: var(--ink); color: #f6f5f1; }
+.s-brand { display: flex; align-items: center; gap: 10px; font: 800 19px/1 var(--font-display); letter-spacing: -.02em; }
+.s-brand svg { width: 30px; height: 30px; }
+.s-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.s-steps li { display: flex; align-items: center; gap: 12px; padding: 9px 0; color: #9aa4b1; font-weight: 600; }
+.s-num { width: 26px; height: 26px; flex: none; border-radius: 50%; border: 1.5px solid #4a5563; display: grid; place-items: center; font-size: 12.5px; font-weight: 700; }
+.s-steps li.done { color: #9db7cc; }
+.s-steps li.done .s-num { background: var(--aegean); border-color: var(--aegean); color: #fff; }
+.s-steps li.on { color: #fff; font-weight: 800; }
+.s-steps li.on .s-num { background: #f6f5f1; border-color: #f6f5f1; color: var(--ink); }
+.s-side-note { margin: auto 0 0; font-size: 13.5px; line-height: 1.5; color: #9aa4b1; }
+.s-main { display: flex; flex-direction: column; padding: 48px 56px 28px; min-width: 0; }
+.s-body { flex: 1; display: grid; align-items: start; min-height: 0; }
+.sstep { display: none; grid-template-columns: minmax(0, 1fr); gap: 26px; align-content: start; max-width: 600px; }
 .sstep.on { display: grid; animation: s-rise .45s ease-out; }
 @keyframes s-rise { from { opacity: 0; transform: translateY(10px); } }
 .s-eyebrow { display: flex; align-items: center; gap: 10px; font: 700 11.5px/1 var(--font); letter-spacing: .1em; text-transform: uppercase; color: var(--aegean); }
-.s-eyebrow::before { content: ""; width: 18px; height: 1.5px; background: currentColor; opacity: .6; }
-.s-text h1 { margin: 12px 0 10px; font: 700 31px/1.15 var(--font-display); letter-spacing: -.02em; }
+
+.s-text h1 { margin: 10px 0 10px; font: 800 36px/1.1 var(--font-display); letter-spacing: -.03em; }
 .s-sub { margin: 0; color: var(--ink-soft); font-size: 15px; line-height: 1.55; max-width: 44ch; }
 .s-hint { display: flex; gap: 8px; align-items: flex-start; margin: 18px 0 0; color: var(--ink-soft); font-size: 13px; max-width: 46ch; }
 .s-hint svg { width: 16px; height: 16px; flex: none; margin-top: 1px; fill: none; stroke: var(--aegean); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .s-card {
-  position: relative; padding: 22px; border: 1px solid var(--line); border-radius: 18px; min-height: 300px;
-  background: linear-gradient(160deg, var(--card), #f6f4ee); box-shadow: var(--shadow);
+  position: relative; padding: 22px; border: 1px solid var(--line); border-radius: 18px; min-height: 0;
+  background: var(--card); box-shadow: none;
   display: flex; flex-direction: column; justify-content: center; gap: 12px;
 }
 .s-card-center { align-items: center; text-align: center; gap: 16px; }
@@ -411,8 +419,8 @@ select:hover { border-color: #d6d2c6; }
 #s-next { margin-left: auto; }
 .btn-link { background: none; border: 0; color: var(--ink-soft); padding: 0 6px; }
 .btn-link:hover { color: var(--ink); }
-.btn-lg { height: 44px; padding: 0 22px; border-radius: 99px; font-size: 15px; box-shadow: 0 6px 18px rgba(46, 97, 135, .25); }
-@media (max-width: 900px) { .setup { padding: 24px 28px 20px; } .sstep { grid-template-columns: 1fr; gap: 22px; } .s-card { min-height: 0; } }
+.btn-lg { height: 48px; padding: 0 26px; border-radius: 99px; font-size: 16px; font-weight: 700; }
+@media (max-width: 760px) { .setup { grid-template-columns: 1fr; } .s-side { display: none; } .s-main { padding: 28px 24px 20px; } }
 
 /* ---------- toast ---------- */
 .toast {

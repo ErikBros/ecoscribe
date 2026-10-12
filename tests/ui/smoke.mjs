@@ -305,7 +305,7 @@ async function load(query) {
   const next = doc.querySelector("#s-next");
   check(!doc.querySelector("#setup").hidden, "setup opens on first run");
   check(on() === "languages", "Windows skips the permissions step");
-  check(doc.querySelectorAll("#s-bar span").length === 6, "progress bar has a segment per step");
+  check(doc.querySelectorAll("#s-steps li").length === 6, "the side panel lists every step (dictado-6oe.8)");
   check(doc.querySelectorAll("#s-langs .s-lchip").length === 1 && doc.querySelector("#s-langs").textContent.includes("English")
     && !doc.querySelector("#s-langs [data-x]"), "starts with English only, which can't be removed");
   check(doc.querySelector("#s-skip").hidden, "the first run can't be skipped");

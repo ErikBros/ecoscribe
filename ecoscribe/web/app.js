@@ -1408,7 +1408,8 @@ async function openSetup(rerun = false) {  // the first run can't be skipped; Ru
   sx.hotkey = st.values.hotkey; sx.hold = !!st.values.hold_to_talk; sx.mic = st.values.mic || "";
   const info = await api.setup_info(sx.langs.join(","));
   sx.steps = $$(".sstep").map((el) => el.dataset.step).filter((k) => k !== "permissions" || info.permissions.length);
-  $("#s-bar").innerHTML = sx.steps.map(() => "<span></span>").join("");
+  const label = { permissions: "Permissions", languages: "Languages", models: "Speech models", mic: "Microphone", shortcut: "Dictation key", try: "Try it", done: "Done" };
+  $("#s-steps").innerHTML = sx.steps.map((k, i) => `<li data-step="${k}"><span class="s-num">${i + 1}</span>${label[k] || k}</li>`).join("");
   $("#s-bars").innerHTML = Array.from({ length: 12 }, (_, i) => `<i style="height:${18 + i * 4}px"></i>`).join("");
   sx.i = Math.max(0, sx.steps.indexOf(params.get("sstep")));  // ?sstep=models: screenshots of one step
   $("#setup").hidden = false;
@@ -1418,7 +1419,10 @@ async function openSetup(rerun = false) {  // the first run can't be skipped; Ru
 async function paintSetup() {
   const step = sx.steps[sx.i];
   $$(".sstep").forEach((el) => el.classList.toggle("on", el.dataset.step === step));
-  $$("#s-bar span").forEach((el, i) => el.classList.toggle("on", i <= sx.i));
+  $$("#s-steps li").forEach((el, i) => { el.classList.toggle("done", i < sx.i); el.classList.toggle("on", i === sx.i);
+    el.querySelector(".s-num").textContent = i < sx.i ? "✓" : String(i + 1); if (i === sx.i) el.setAttribute("aria-current", "step"); else el.removeAttribute("aria-current"); });
+  const eb = $(`.sstep[data-step="${step}"] .s-eyebrow`);
+  if (eb && step !== "done") eb.textContent = `Step ${sx.i + 1} of ${sx.steps.length - 1}`;
   $("#s-back").style.visibility = sx.i ? "visible" : "hidden";
   $("#s-skip").hidden = !sx.rerun || step === "done";
   $("#s-next").textContent = step === "done" ? "Start using Ecoscribe" : "Continue →";
