@@ -95,3 +95,15 @@ def test_dev_missing():
 
 def test_dev_skips_outputs():
     assert pick_device(DEV, HOST, "Speakers", "MME") is None
+
+
+def test_more_known_inventions_on_silence():
+    for s in ("Tack för att ni tittade!", "Untertitel der Amara.org-Community", "[Música]",
+              "Ευχαριστώ πολύ.", "Merci d'avoir regardé !", "Don't forget to like and subscribe!"):
+        assert is_hallucination(s, 0.1), s
+        assert not is_hallucination(s, 1.5), s  # really said: kept
+
+
+def test_a_real_sentence_with_the_same_words_is_kept():
+    assert not is_hallucination("Tack för att ni tittade på förslaget igår.", 0.1)
+    assert not is_hallucination("Thanks for watching the kids yesterday.", 0.2)
