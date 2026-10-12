@@ -28,7 +28,7 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Meeting / file languages incl. Greek + Spanish mixed | done | done (GPU test passes on mlx) |
 | Meeting names + attendees from a calendar (iCal link) | done | check on Mac (dictado-tjn) |
 | File transcription (drag and drop) | done | done (installed app: Greek file on the Apple GPU, 2.4% WER) |
-| First-run setup: languages, speech models (both recommended, with download progress), mic test, dictation key, a first dictation, summary; Settings > Run setup again | done | check on Mac (dictado-kuu) |
+| First-run setup: languages, speech models (both recommended, with download progress), mic test, dictation key, a first dictation, summary; Settings > Run setup again | done | check on Mac (run it with a fresh data folder) |
 | Crash reports, freeze traces, watchdog restart | done | done |
 | Dictation recovered after a crash | done | done (real crash mid-dictation: back in History, not pasted) |
 | Home crash card, Settings > Troubleshooting | done | done (real SIGSEGV of the installed app: report, restart, card) |
@@ -67,6 +67,6 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Word confidence for Insights (clarity, words it wasn't sure of) | done (a second pass with word timestamps after the paste, ~0.3 s on the GPU, only with Insights on and nothing waiting) | done (the dictation's own tokens aligned to the audio, ~0.56 s on large-v3-turbo; the first after a load ~1 s) |
 | Window title at the paste (who a dictation was for: people / AI app) | done (GetWindowText; only the label is saved) | done (Accessibility: the focused window's title; desktop check: dictado-9jc.7) |
 | App at the paste by a locale-independent id (people / AI app) | not needed: process names (slack.exe) are the same in every language | done (bundle id, so a translated app name still counts: dictado-uee) |
-| Setup: permissions step (first run) | not needed: Windows asks for no permission to listen, type or watch the keyboard | done (Microphone, Accessibility, Input Monitoring: ticks live, Open settings; real Mac run: dictado-kuu) |
-| Setup: speech model download with progress | done (bytes from the download, both models, Continue once the needed one is there) | dictado-kuu: mlx download progress; until then the bar fills at the end |
+| Setup: permissions step (first run) | not needed: Windows asks for no permission to listen, type or watch the keyboard | done (Microphone, Accessibility, Input Monitoring: ticks live, Open settings; check on Mac) |
+| Setup: speech model download with progress | done (bytes from the download, both models, Continue once the needed one is there) | done (mlx weights, bytes from the download, never backwards: dictado-kuu) |
 | Installer | done (.exe, Inno Setup) | done (Ecoscribe.app + .dmg, com.erikbros.ecoscribe, self-signed: this Mac only; a public build needs a Developer ID) |
