@@ -165,6 +165,16 @@ def placement(current, new) -> str:
     return "displace" if new.kind in QUESTIONS else "queue"
 
 
+def _which(d: str | None) -> str:
+    """'Weekly planning · 23 min' for a done/failed note (app is the recording's folder there)."""
+    try:
+        m = sessions.read_meta(Path(d))
+    except (OSError, TypeError, ValueError):
+        return ""
+    mins = round((m.get("duration_s") or 0) / 60)
+    return " · ".join(x for x in (m.get("title") or "", f"{mins} min" if mins else "") if x)
+
+
 class Prompt:
     """kind: start (a call began) | end? (long silence) | done | failed (a transcript ended)."""
 
@@ -177,10 +187,10 @@ class Prompt:
             self.title, self.question = "Did the meeting end?", "Nothing has been heard for a while."
             self.buttons = [("Stop", "parar"), ("Keep going", "seguir")]
         elif kind == "done":
-            self.title, self.question = "Transcript ready", ""
+            self.title, self.question = "Transcript ready", _which(app)
             self.buttons = [("Open", "abrir"), ("Close", "hide")]
         else:
-            self.title, self.question = "Transcription failed", ""
+            self.title, self.question = "Transcription failed", _which(app)
             self.buttons = [("Open", "abrir"), ("Close", "hide")]
 
     @property
