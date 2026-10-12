@@ -111,9 +111,9 @@ def test_end_after_grace_stops_detector_meeting(tmp_path):
     world.mic = {"msteams"}
     run(w, clock, 6)
     world.mic = set()
-    run(w, clock, 10)
+    run(w, clock, 6)
     assert ctl.stopped == 0  # mute toggle / quick rejoin: still the same meeting
-    run(w, clock, 14)
+    run(w, clock, 8)
     assert ctl.stopped == 1
 
 
@@ -275,7 +275,7 @@ def test_back_to_back_calls_with_the_real_controller(tmp_path):
         w.tick(); clock.t += 2
     assert ctl.state()["meeting"]["app"] == "msteams"
     world.mic = set()
-    for _ in range(12):  # past the 20 s grace: Teams stops, its worker saves
+    for _ in range(12):  # past the 10 s grace: Teams stops, its worker saves
         w.tick(); clock.t += 2
     assert ctl.state()["meeting"]["status"] == "stopping"
     world.mic = {"slack"}

@@ -51,9 +51,17 @@ def test_meetings_defaults_and_round_trip(tmp_path):
     from ecoscribe import tomlw
     c = config.load(None)
     assert (c.meetings.mode, c.meetings.grace_s, c.meetings.silence_stop_s, c.meetings.default_lang) == \
-        ("prompt", 20, 180, "sv")
+        ("prompt", 10, 180, "sv")
     c.meetings.mode, c.meetings.default_lang = "auto", "en"
     p = tmp_path / "c.toml"
     tomlw.save(c, p)
     back = config.load(p)
     assert back.meetings.mode == "auto" and back.meetings.default_lang == "en"
+
+
+def test_a_saved_old_call_end_wait_moves_to_10_s(tmp_path):
+    p = tmp_path / "c.toml"
+    p.write_text("[meetings]\ngrace_s = 20\n", encoding="utf-8")
+    assert config.load(p).meetings.grace_s == 10  # the old default, written by every Settings save
+    p.write_text("[meetings]\ngrace_s = 30\n", encoding="utf-8")
+    assert config.load(p).meetings.grace_s == 30  # a value the user chose stays
