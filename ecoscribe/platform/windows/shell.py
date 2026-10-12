@@ -14,6 +14,7 @@ import os
 import threading
 import time
 import tkinter as tk
+import tkinter.font as tkfont
 from ctypes import wintypes as w
 from pathlib import Path
 
@@ -259,6 +260,29 @@ class Overlay:
             self.busy()
 
 
+PW = 340  # the prompt box's least width
+
+
+def _round_rect(c: tk.Canvas, x0, y0, x1, y1, r, **kw):
+    """A filled rounded rectangle on a canvas (a smoothed polygon)."""
+    pts = [x0 + r, y0, x1 - r, y0, x1, y0, x1, y0 + r, x1, y1 - r, x1, y1, x1 - r, y1, x0 + r, y1,
+           x0, y1, x0, y1 - r, x0, y0 + r, x0, y0]
+    return c.create_polygon(pts, smooth=True, splinesteps=12, outline="", **kw)
+
+
+class _CanvasText:
+    """A canvas text item with a Label's cget/config("text"): the countdown on a button."""
+
+    def __init__(self, c: tk.Canvas, item):
+        self.c, self.item = c, item
+
+    def cget(self, key):
+        return self.c.itemcget(self.item, key)
+
+    def config(self, **kw):
+        self.c.itemconfig(self.item, **kw)
+
+
 class PromptWindow:
     """The clickable box above the pill: a call started, long silence, transcript ready.
     No-activate (clicking it never takes focus from the call window), not click-through."""
@@ -282,31 +306,56 @@ class PromptWindow:
         top = self.top = tk.Toplevel(self.root)
         top.overrideredirect(True)
         top.attributes("-topmost", True)
-        top.configure(bg=P.INK)
-        box = tk.Frame(top, bg=P.PAPER, padx=16, pady=12)
-        box.pack(padx=1, pady=1)
-        tk.Label(box, text=prompt.title, bg=P.PAPER, fg=P.INK, font=("Segoe UI", 11, "bold")).pack(anchor="w")
+        top.attributes("-transparentcolor", KEY)  # round corners, like the pill (dictado-2df)
+        top.configure(bg=KEY)
+        f_title, f_text, f_btn = tkfont.Font(family="Segoe UI", size=11, weight="bold"), \
+            tkfont.Font(family="Segoe UI", size=10), tkfont.Font(family="Segoe UI", size=10, weight="bold")
+        pad, bh, gap = 18, 32, 8
+        now = time.monotonic()
+        labels = [(prompt.button_text(c, now), c) for _l, c in prompt.buttons]  # "Not now (10)": the widest
+        bws = [f_btn.measure(t) + 32 for t, _c in labels]
+        width = max(PW, sum(bws) + gap * (len(bws) - 1) + 2 * pad, f_title.measure(prompt.title) + 2 * pad)
+        c = tk.Canvas(top, width=width, height=10, bg=KEY, highlightthickness=0, bd=0)
+        c.pack()
+        y = pad
+        c.create_text(pad, y, text=prompt.title, fill=P.PAPER, font=f_title, anchor="nw")
+        y += f_title.metrics("linespace") + 4
         self.lang = tk.StringVar(value=dict(meetui.LANGS).get(prompt.lang or "sv", "Swedish"))
-        if prompt.kind == "start":
-            row = tk.Frame(box, bg=P.PAPER)
-            row.pack(anchor="w", pady=(6, 0))
-            tk.Label(row, text=prompt.question, bg=P.PAPER, fg=P.INK, font=("Segoe UI", 10)).pack(side="left")
-            om = tk.OptionMenu(row, self.lang, *[n for _, n in meetui.LANGS])
-            om.config(bg=P.PAPER, fg=P.INK, activebackground=P.AEGEAN_SOFT, highlightthickness=0, bd=1,
-                      relief="solid", font=("Segoe UI", 10))
-            om["menu"].config(bg=P.PAPER, fg=P.INK, activebackground=P.AEGEAN, activeforeground=P.PAPER)
-            om.pack(side="left", padx=(6, 0))
-        elif prompt.question:
-            tk.Label(box, text=prompt.question, bg=P.PAPER, fg=P.INK_SOFT, font=("Segoe UI", 10)).pack(anchor="w")
-        btns = tk.Frame(box, bg=P.PAPER)
-        btns.pack(anchor="e", pady=(10, 0))
+        if prompt.question:
+            t = c.create_text(pad, y, text=prompt.question, fill=P.LINE, font=f_text, anchor="nw", width=width - 2 * pad)
+            y = c.bbox(t)[3] + 4
+        if prompt.kind == "start":  # the language: a rounded chip that opens a menu
+            menu = tk.Menu(c, tearoff=0, bg=P.PAPER, fg=P.INK, activebackground=P.AEGEAN, activeforeground=P.PAPER, font=f_text)
+            for _code, name in meetui.LANGS:
+                menu.add_radiobutton(label=name, variable=self.lang, value=name)
+            cw = max(f_text.measure(n) for _, n in meetui.LANGS) + 44
+            ch = 28
+            _round_rect(c, pad, y + 4, pad + cw, y + 4 + ch, ch // 2, fill=P.INK_2, tags=("lang", "lang-bg"))
+            lt = c.create_text(pad + 12, y + 4 + ch / 2, text=self.lang.get(), fill=P.PAPER, font=f_text, anchor="w", tags=("lang",))
+            c.create_text(pad + cw - 14, y + 4 + ch / 2, text="▾", fill=P.LINE, font=f_text, tags=("lang",))
+            self.lang.trace_add("write", lambda *_a: c.itemconfig(lt, text=self.lang.get()))
+            c.tag_bind("lang", "<Button-1>", lambda e: menu.tk_popup(e.x_root, e.y_root))
+            c.tag_bind("lang", "<Enter>", lambda _e: (c.itemconfig("lang-bg", fill=P.PILL_OFF), c.config(cursor="hand2")))
+            c.tag_bind("lang", "<Leave>", lambda _e: (c.itemconfig("lang-bg", fill=P.INK_2), c.config(cursor="")))
+            y += ch + 12
+        y += 10
         self._btns = {}
-        for i, (label, choice) in enumerate(prompt.buttons):
+        x = width - pad
+        for i, ((text, choice), bw) in reversed(list(enumerate(zip(labels, bws)))):
             primary = i == 0
-            b = self._btns[choice] = tk.Label(btns, text=prompt.button_text(choice, time.monotonic()), bg=P.AEGEAN if primary else P.LINE, fg=P.PAPER if primary else P.INK,
-                         font=("Segoe UI", 10, "bold" if primary else "normal"), padx=14, pady=5, cursor="hand2")
-            b.bind("<Button-1>", lambda _e, c=choice: self._answer(c))
-            b.pack(side="left", padx=(8 if i else 0, 0))
+            fill, hover = (P.AEGEAN_BRIGHT, P.AEGEAN) if primary else (P.PILL_OFF, P.INK_2)
+            tag = f"btn-{choice}"
+            _round_rect(c, x - bw, y, x, y + bh, bh // 2, fill=fill, tags=(tag, tag + "-bg"))
+            item = c.create_text(x - bw / 2, y + bh / 2, text=text, fill=P.PAPER, font=f_btn, tags=(tag,))
+            c.tag_bind(tag, "<Button-1>", lambda _e, ch=choice: self._answer(ch))
+            c.tag_bind(tag, "<Enter>", lambda _e, t=tag, h=hover: (c.itemconfig(t + "-bg", fill=h), c.config(cursor="hand2")))
+            c.tag_bind(tag, "<Leave>", lambda _e, t=tag, f=fill: (c.itemconfig(t + "-bg", fill=f), c.config(cursor="")))
+            self._btns[choice] = _CanvasText(c, item)
+            x -= bw + gap
+        height = y + bh + pad
+        c.config(height=height)
+        _round_rect(c, 0, 0, width, height, 16, fill=P.INK, tags=("card",))
+        c.tag_lower("card")
         top.update_idletasks()
         hwnd = int(top.wm_frame(), 16)
         ex = u32.GetWindowLongW(hwnd, GWL_EXSTYLE)
