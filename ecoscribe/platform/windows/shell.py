@@ -19,6 +19,7 @@ from ctypes import wintypes as w
 from pathlib import Path
 
 from ... import meetui
+from ...notice import notice
 from ... import palette as P
 
 log = logging.getLogger(__name__)
@@ -40,7 +41,7 @@ SW_HIDE, SW_SHOWNOACTIVATE = 0, 4
 HWND_TOPMOST = w.HWND(-1)
 SWP_NOSIZE, SWP_NOACTIVATE = 0x1, 0x10
 W, H = 210, 44
-RW, RH = 236, 38  # the dictating pill: dot, waveform, timer (dictado-3tl)
+RW, RH = 236, 40  # the dictating pill: dot, waveform, timer (dictado-3tl); pill A: every capsule is 40 tall (dictado-v5g)
 WAVE_N = 24  # waveform bars: about the last second of the voice (one per 50 ms tick)
 WAVE_W = 130  # the waveform's width, the same with or without live text
 MW, MH = 380, 56  # the meeting pill opened by the mouse: label + latest live line
@@ -105,20 +106,52 @@ class Overlay:
             self.top.geometry(f"{w_}x{h_}")
             self.c.config(width=w_, height=h_)
 
-    def _pill(self, dot: str, label: str) -> None:
-        self._size(W, H)
+    def _capsule(self, w_: int, h_: int = RH, r: int = RH // 2) -> None:
+        """Pill A (dictado-v5g): every state is the same dark capsule; only what's in it changes."""
+        self._size(w_, h_)
         self._drawn = None
         c = self.c
         c.delete("all")
-        r = H // 2
         bg = P.INK
-        c.create_oval(0, 0, H, H, fill=bg, outline=bg)
-        c.create_oval(W - H, 0, W, H, fill=bg, outline=bg)
-        c.create_rectangle(r, 0, W - r, H, fill=bg, outline=bg)
-        if dot:
-            c.create_oval(16, r - 6, 28, r + 6, fill=dot, outline=dot)
-        c.create_text(40 if dot else W // 2, r, text=label, fill=P.PAPER,
-                      font=("Segoe UI", 11), anchor="w" if dot else "center")
+        c.create_oval(0, 0, 2 * r, 2 * r, fill=bg, outline=bg)
+        c.create_oval(w_ - 2 * r, 0, w_, 2 * r, fill=bg, outline=bg)
+        c.create_oval(0, h_ - 2 * r, 2 * r, h_, fill=bg, outline=bg)
+        c.create_oval(w_ - 2 * r, h_ - 2 * r, w_, h_, fill=bg, outline=bg)
+        c.create_rectangle(r, 0, w_ - r, h_, fill=bg, outline=bg)
+        c.create_rectangle(0, r, w_, h_ - r, fill=bg, outline=bg)
+
+    def _notice(self, msg: str) -> None:
+        """A flash as pill A draws it: an icon (a struck mic, a language badge, a warning),
+        the words, the mic's name softly after them."""
+        n = notice(msg)
+        f, fd, fb = self._fonts()
+        mid = RH // 2
+        badge_w = fb.measure(n.badge) + 16 if n.icon == "lang" else 0
+        icon_w = {"nomic": 16, "warn": 16, "lang": badge_w}.get(n.icon, 0)
+        x = 8 if n.icon == "lang" else 16
+        w_ = x + icon_w + (10 if icon_w else 0) + f.measure(n.text) + (10 + fd.measure(n.detail) if n.detail else 0) + 18
+        self._capsule(max(w_, 120))
+        c = self.c
+        if n.icon == "lang":
+            _round_rect(c, x, mid - 12, x + badge_w, mid + 12, 12, fill=P.AEGEAN)
+            c.create_text(x + badge_w / 2, mid, text=n.badge, fill=P.PAPER, font=fb)
+        elif n.icon == "nomic":
+            _mic_struck(c, x + 8, mid, P.CLAY_BRIGHT)
+        elif n.icon == "warn":
+            c.create_oval(x, mid - 8, x + 16, mid + 8, outline=P.CLAY_BRIGHT, width=2)
+            c.create_text(x + 8, mid, text="!", fill=P.CLAY_BRIGHT, font=fb)
+        x += icon_w + (10 if icon_w else 0)
+        if not n.icon:
+            x = (self.w - f.measure(n.text)) // 2
+        c.create_text(x, mid, text=n.text, fill=P.PAPER, font=f, anchor="w")
+        if n.detail:
+            c.create_text(x + f.measure(n.text) + 10, mid, text=n.detail, fill=P.AEGEAN_MUTED, font=fd, anchor="w")
+
+    def _fonts(self):
+        if not hasattr(self, "_f"):
+            self._f = (tkfont.Font(family="Segoe UI", size=10, weight="bold"), tkfont.Font(family="Segoe UI", size=9),
+                       tkfont.Font(family="Segoe UI", size=8, weight="bold"))
+        return self._f
 
     def _dictating_pill(self, secs: int, level: float) -> None:
         """A slim ink pill (dictado-3tl, the user picked it): the recording dot, a waveform of the
@@ -129,24 +162,15 @@ class Overlay:
         live = self.live_text
         w_, h_ = (LW, LH) if live else (RW, RH)
         grew = (w_, h_) != (self.w, self.h)
-        self._size(w_, h_)
+        self._capsule(w_, h_, RH // 2)
         if grew:
             self._place_and_show()  # stay centered above the taskbar at the new size
-        self._drawn = None
         c = self.c
-        c.delete("all")
-        bg, r = P.INK, min(h_, 2 * RH) // 2 if not live else 18
-        c.create_oval(0, 0, 2 * r, 2 * r, fill=bg, outline=bg)
-        c.create_oval(w_ - 2 * r, 0, w_, 2 * r, fill=bg, outline=bg)
-        c.create_oval(0, h_ - 2 * r, 2 * r, h_, fill=bg, outline=bg)
-        c.create_oval(w_ - 2 * r, h_ - 2 * r, w_, h_, fill=bg, outline=bg)
-        c.create_rectangle(r, 0, w_ - r, h_, fill=bg, outline=bg)
-        c.create_rectangle(0, r, w_, h_ - r, fill=bg, outline=bg)
         mid = RH // 2
         on = int(time.monotonic() * 2) % 2 == 0 or level > 0.05  # the dot breathes while it's quiet
         if on:  # a soft halo while it's lit (dictado-6oe.9)
             c.create_oval(12, mid - 9, 30, mid + 9, fill=P.TILE_HALO, outline="")
-        c.create_oval(16, mid - 5, 26, mid + 5, fill=P.TILE if on else P.TILE_DIM, outline="")
+        c.create_oval(16, mid - 5, 26, mid + 5, fill=P.CLAY_BRIGHT if on else P.TILE_DIM, outline="")
         c.create_text(w_ - 16, mid, text=f"{secs // 60}:{secs % 60:02d}", fill=P.PAPER,
                       font=("Segoe UI", 10, "bold"), anchor="e")
         x0 = 38
@@ -154,14 +178,14 @@ class Overlay:
         if secs < 2:  # how to cancel, drawn as the keys themselves (dictado-6oe.9)
             keys = self.hint.split(" to ")[0].split(" + ")
             x = _keycaps(c, x0, mid, keys)
-            c.create_text(x + 6, mid, text="cancels", fill=P.LINE, font=("Segoe UI", 9), anchor="w")
+            c.create_text(x + 6, mid, text="cancels", fill=P.AEGEAN_PALE, font=("Segoe UI", 9), anchor="w")
         else:  # the waveform: newest on the right, each bar from the middle line
             step = (x1 - x0) / WAVE_N
             pad = [0.0] * (WAVE_N - len(self._levels)) + self._levels
             for i, lv in enumerate(pad):
                 hh = 2 + (lv ** 1.5) * (RH - 18)
                 x = x0 + i * step + step / 2
-                c.create_line(x, mid - hh / 2, x, mid + hh / 2, fill=P.PAPER if lv > 0.04 else P.PILL_OFF,
+                c.create_line(x, mid - hh / 2, x, mid + hh / 2, fill=(P.AEGEAN_PALE if lv > 0.25 else P.AEGEAN_MID) if lv > 0.04 else P.PILL_OFF,
                               width=2, capstyle="round")
         if live:
             f = self._live_font
@@ -170,7 +194,7 @@ class Overlay:
                 while text and f.measure("…" + text) > room:
                     text = text.split(" ", 1)[1] if " " in text else text[1:]
                 text = "…" + text
-            c.create_text(16, RH + 6, text=text, fill=P.PAPER, font=f, anchor="w")
+            c.create_text(16, RH + 4, text=text, fill=P.PAPER, font=f, anchor="w")
 
     def _hover(self) -> bool:
         pt, rc = w.POINT(), w.RECT()
@@ -242,15 +266,20 @@ class Overlay:
         self.tick()
 
     def busy(self) -> None:
-        """Transcribing: three soft dots and what it's doing (dictado-6oe.9)."""
+        """Transcribing: a turning arc and what it's doing (pill A, dictado-v5g)."""
         self.mode = "busy"
         self.live_text = ""
-        self._pill("", "")
-        c, r = self.c, H // 2
-        for i, col in enumerate((P.AEGEAN_BRIGHT, "#7fa6c4", "#c9dcea")):
-            c.create_oval(22 + i * 11, r - 3, 28 + i * 11, r + 3, fill=col, outline="")
-        c.create_text(62, r, text="Writing it down", fill=P.PAPER, font=("Segoe UI", 10, "bold"), anchor="w")
+        self._busy_frame()
         self._place_and_show()
+
+    def _busy_frame(self) -> None:
+        f = self._fonts()[0]
+        self._capsule(16 + 16 + 10 + f.measure("Writing it down") + 18)
+        c, mid = self.c, RH // 2
+        x0, start = 16, (time.monotonic() * 360) % 360  # one turn a second
+        c.create_oval(x0, mid - 7, x0 + 14, mid + 7, outline=P.PILL_OFF, width=2)
+        c.create_arc(x0, mid - 7, x0 + 14, mid + 7, start=-start, extent=90, style="arc", outline=P.AEGEAN_PALE, width=2)
+        c.create_text(x0 + 16 + 10, mid, text="Writing it down", fill=P.PAPER, font=f, anchor="w")
 
     def idle(self) -> None:
         self.mode = "hidden"
@@ -262,7 +291,7 @@ class Overlay:
         self._flash_msg, self._flash_until = msg, time.monotonic() + seconds
         if self.mode == "recording":
             return
-        self._pill("", msg)
+        self._notice(msg)
         self._place_and_show()
 
     def tick(self) -> None:
@@ -281,6 +310,8 @@ class Overlay:
         elif self.mode == "busy" and self._flash_until and now >= self._flash_until:
             self._flash_until = 0.0
             self.busy()
+        elif self.mode == "busy" and not self._flash_until:
+            self._busy_frame()  # the arc turns
 
 
 PW = 360  # the prompt box's least width
@@ -289,10 +320,10 @@ PW = 360  # the prompt box's least width
 def _prompt_icon(c: tk.Canvas, x: float, y: float, kind: str) -> None:
     """A 38 px tile with a glyph for the box's kind: a call (the clay dot), silence (a clock),
     a transcript (a page), no sound (a mic, struck through)."""
-    _round_rect(c, x, y, x + 38, y + 38, 11, fill="#3a2a22" if kind == "start" else "#2a3542")
-    cx, cy, g = x + 19, y + 19, "#9db7cc"
+    _round_rect(c, x, y, x + 38, y + 38, 11, fill=P.TILE_CALL if kind == "start" else P.TILE_NOTE)
+    cx, cy, g = x + 19, y + 19, P.AEGEAN_MUTED
     if kind == "start":
-        c.create_oval(cx - 6, cy - 6, cx + 6, cy + 6, fill="#e06a35", outline="")
+        c.create_oval(cx - 6, cy - 6, cx + 6, cy + 6, fill=P.CLAY_BRIGHT, outline="")
     elif kind == "end?":
         c.create_oval(cx - 8, cy - 8, cx + 8, cy + 8, outline=g, width=2)
         c.create_line(cx, cy - 4, cx, cy, cx + 3, cy + 2, fill=g, width=2, capstyle="round")
@@ -314,10 +345,18 @@ def _keycaps(c: tk.Canvas, x: float, mid: float, keys) -> float:
             c.create_text(x + 4, mid, text="+", fill=P.LINE, font=("Segoe UI", 8), anchor="w")
             x += 14
         w = f.measure(k) + 12
-        _round_rect(c, x, mid - 9, x + w, mid + 9, 5, fill="", outline="#4a5563", width=1)
+        _round_rect(c, x, mid - 9, x + w, mid + 9, 5, fill="", outline=P.KEYCAP_LINE, width=1)
         c.create_text(x + w / 2, mid, text=k, fill=P.PAPER, font=f)
         x += w
     return x
+
+
+def _mic_struck(c: tk.Canvas, cx: float, cy: float, col: str) -> None:
+    """A mic struck through, 16 px: nothing was heard (pill A, dictado-v5g)."""
+    _round_rect(c, cx - 3, cy - 7, cx + 3, cy + 2, 3, fill="", outline=col, width=1.6)
+    c.create_arc(cx - 5, cy - 5, cx + 5, cy + 5, start=180, extent=180, style="arc", outline=col, width=1.6)
+    c.create_line(cx, cy + 5, cx, cy + 7, fill=col, width=1.6)
+    c.create_line(cx - 6, cy - 6, cx + 6, cy + 6, fill=col, width=1.6, capstyle="round")
 
 
 def _round_rect(c: tk.Canvas, x0, y0, x1, y1, r, **kw):
@@ -405,7 +444,7 @@ class PromptWindow:
         for i, ((text, choice), bw) in reversed(list(enumerate(zip(labels, bws)))):
             primary = i == 0
             # the primary is light on dark, so it stands out (dictado-6oe.9)
-            fill, hover, ink = (P.PAPER, "#dfe5ea", P.INK) if primary else (P.PILL_OFF, P.INK_2, P.PAPER)
+            fill, hover, ink = (P.PAPER, P.PAPER_HOVER, P.INK) if primary else (P.PILL_OFF, P.INK_2, P.PAPER)
             tag = f"btn-{choice}"
             _round_rect(c, x - bw, y, x, y + bh, bh // 2, fill=fill, tags=(tag, tag + "-bg"))
             item = c.create_text(x - bw / 2, y + bh / 2, text=text, fill=ink, font=f_btn, tags=(tag,))
@@ -418,7 +457,7 @@ class PromptWindow:
         c.config(height=height)
         _round_rect(c, 0, 0, width, height, 20, fill=P.INK, tags=("card",))
         c.tag_lower("card")
-        self._drain = (c, c.create_line(20, height - 2, width - 20, height - 2, fill="#7fa6c4", width=3, capstyle="round"), width)
+        self._drain = (c, c.create_line(20, height - 2, width - 20, height - 2, fill=P.AEGEAN_MID, width=3, capstyle="round"), width)
         top.update_idletasks()
         hwnd = int(top.wm_frame(), 16)
         ex = u32.GetWindowLongW(hwnd, GWL_EXSTYLE)

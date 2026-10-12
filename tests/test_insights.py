@@ -27,6 +27,19 @@ def test_time_saved_against_typing():
     assert t["wpm"] == round(t["words"] / (32 / 60))
 
 
+def test_time_saved_against_your_own_typing_speed(tmp_path):
+    """dictado-d8e: the user's typing speed, saved without restarting anything."""
+    t = insights.totals(ROWS, typing_wpm=80)
+    assert t["typing_wpm"] == 80 and t["saved_s"] == max(0, round(t["words"] / 80 * 60 - 32))
+    from ecoscribe import config
+    from ecoscribe.window import Api
+    signals = []
+    api = Api(data_dir=tmp_path, config_path=tmp_path / "config.toml", signal_reload=lambda: signals.append(1) or True)
+    assert api.set_typing_wpm("75") == {"ok": True, "typing_wpm": 75}
+    assert api.set_typing_wpm(5)["typing_wpm"] == 10 and api.set_typing_wpm("fast")["ok"] is False
+    assert config.load(tmp_path / "config.toml").ui.typing_wpm == 10 and not signals
+
+
 def test_ranges_rhythm_and_streak():
     assert len(insights.in_range(ROWS, 1, NOW)) == 3
     r = insights.rhythm(ROWS, NOW)

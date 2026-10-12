@@ -162,13 +162,14 @@ function demoApi() {
       return { items, stats: { total: 312, total_words: 4210, today_words: 152 } };
     },
     copy_text: async () => ({ ok: true }),
+    get_insights: async (days) => { const d = demoInsights(days); if (window.__wpm) d.totals.typing_wpm = window.__wpm; return d; },
+    set_typing_wpm: async (n) => { window.__wpm = Math.max(10, Math.min(200, Math.round(n) || 40)); return { ok: true, typing_wpm: window.__wpm }; },
     delete_dictation: async (id, ts) => {
       const i = history.findIndex((x) => (id ? x.id === id : x.ts === ts));
       if (i >= 0) history.splice(i, 1);
       window.__deletedDictation = id || ts;
       return { ok: true, gone: i >= 0 };
     },
-    get_insights: async (days) => demoInsights(days),
     add_word: async (w) => { settings.values.vocabulary += "\n" + w; window.__added = w; return { ok: true }; },
     insights_for_claude: async () => ({ ok: true, chars: 5120 }),
     coach_me: async () => ({ ok: true, chars: 3900 }),
@@ -464,8 +465,16 @@ async function renderInsights() {
   if (!t.dictations) return;
   $("#i-saved").textContent = fmtDur(t.saved_s);
   $("#i-saved-how").textContent = t.wpm
-    ? `You talk at ${t.wpm} words a minute; typing runs about ${t.typing_wpm}. ${fmtNum(t.words)} words took ${fmtDur(t.talk_s)} to say.`
+    ? `You talk at ${t.wpm} words a minute and type at ${t.typing_wpm}. ${fmtNum(t.words)} words took ${fmtDur(t.talk_s)} to say.`
     : `Typing ${fmtNum(t.words)} words at ${t.typing_wpm} a minute takes longer than saying them.`;
+  const wpmIn = $("#i-wpm");  // dictado-d8e: measured against the user's own typing speed
+  if (document.activeElement !== wpmIn) wpmIn.value = String(t.typing_wpm);
+  wpmIn.onchange = async () => {
+    const res = await api.set_typing_wpm(Number(wpmIn.value));
+    if (!res.ok) { toast(res.error); return; }
+    wpmIn.value = String(res.typing_wpm);
+    renderInsights();
+  };
   $("#i-words").textContent = fmtNum(t.words);
   $("#i-dictations").textContent = fmtNum(t.dictations);
   $("#i-talk").textContent = fmtDur(t.talk_s);
@@ -579,12 +588,44 @@ function paintHero(s, state, short, long) {
   }
   if (s.hotkey && s.hotkey.includes("+")) {  // a combo: no tap, and no Esc cancel (tray > Cancel recording)
     $("#hero-how").textContent = `Press ${hotkeyLabel(s.hotkey)}, talk, and press it again. The text appears wherever the cursor is.`;
-    $("#tip-cancel").hidden = true;
   } else if (s.hotkey) {  // the user's own key, as a keycap
     $("#hero-how").innerHTML = `Tap <kbd class="key key-wide"></kbd>, talk, and tap it again. The text appears wherever the cursor is.`;
     $("#hero-how kbd").textContent = hotkeyLabel(s.hotkey);
-    $$(".tip-key").forEach((el) => (el.textContent = hotkeyLabel(s.hotkey)));
   }
+  paintTip(s);
+}
+
+/* Home tips (dictado-3vj): one a day from the ones that still apply; × hides a tip for good. */
+const TIPS = [
+  { id: "cancel", when: (s) => s.hotkey && !s.hotkey.includes("+"), html: (k) => `Hold <kbd>${k}</kbd> and press <kbd>Esc</kbd> to cancel a dictation.` },
+  { id: "lang-key", when: (s, v) => s.hotkey && !s.hotkey.includes("+") && String(v.languages || "").split(",").filter(Boolean).length > 1,
+    html: (k) => `Wrong language? Hold <kbd>${k}</kbd> and press <kbd>L</kbd> to pick the next dictation's.` },
+  { id: "retry", when: () => true, html: () => "A dictation came out wrong? <strong>Retry</strong> it from History, in the same or another language." },
+  { id: "replace", when: (s, v) => !(v.replacements || []).length, html: () => "A word that keeps coming out wrong? Add it to <strong>Replace</strong> in Settings › Words." },
+  { id: "snippets", when: (s, v) => !(v.snippets || []).length, html: () => "Say “my email.” on its own and Ecoscribe types the address: set up <strong>Snippets</strong> in Settings › Words." },
+  { id: "calendar", when: (s, v) => !v.calendar_url, html: () => "Recorded meetings can take their names from your calendar: Settings › Meetings." },
+  { id: "insights", when: (s, v) => !v.insights, html: () => "Turn on <strong>Insights</strong> in Settings to see how you talk and the time you save." },
+  { id: "delete", when: () => true, html: () => "Delete a dictation from History with its <strong>Delete</strong> button; you get a few seconds to undo." },
+];
+let tipValues = null;
+let tipsHidden = null;  // also kept in memory: storage may be off in a private or preview window
+function hiddenTips() {
+  if (!tipsHidden) { try { tipsHidden = new Set(JSON.parse(store("ecoscribe.tips.hidden") || "[]")); } catch { tipsHidden = new Set(); } }
+  return tipsHidden;
+}
+async function paintTip(s) {
+  if (!tipValues) { try { tipValues = (await api.get_settings()).values; } catch { return; } }
+  const hidden = hiddenTips();
+  const ok = TIPS.filter((t) => !hidden.has(t.id) && t.when(s, tipValues));
+  const box = $("#home-tip");
+  box.hidden = !ok.length;
+  if (!ok.length) return;
+  const day = Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / 864e5);
+  const t = ok[day % ok.length];
+  const key = hotkeyLabel(s.hotkey).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  $("#home-tip-text").innerHTML = `<strong>Tip</strong> · ${t.html(key)}`;
+  box.dataset.tip = t.id;
+  $("#home-tip-x").onclick = () => { hidden.add(t.id); store("ecoscribe.tips.hidden", JSON.stringify([...hidden])); paintTip(s); };
 }
 
 // dictation languages (dictado-bvf): any mix, auto-detected among them; set in Settings
@@ -741,7 +782,9 @@ function renameSpeaker(el) {
     const v = input.value.trim();
     if (save && v !== whoName(label)) {
       const out = await api.rename_speaker(r.open, label, v);
-      if (out.ok) r.names = out.names; else toast(out.error || "Couldn't rename.");
+      if (!out.ok) toast(out.error || "Couldn't rename.");
+      else if (out.merged) { toast(`Merged into ${whoName(out.merged)}.`); openSession(r.open); return; }  // dictado-gk9
+      else r.names = out.names;
     }
     for (const w of document.querySelectorAll(".r-who-edit")) if (w.dataset.label === label) w.textContent = whoName(label);
   };
@@ -769,7 +812,7 @@ function segLi(s, editable) {
   who.dataset.who = sp.startsWith("Speaker") ? "Others" : sp;
   if (editable && s.speaker) {
     who.dataset.label = s.speaker; who.tabIndex = 0; who.classList.add("r-who-edit");
-    who.title = "Click to name this speaker";
+    who.title = "Click to name this speaker. Give two speakers the same name to make them one.";
     who.onclick = () => renameSpeaker(who);
     who.onkeydown = (e) => { if (e.key === "Enter") renameSpeaker(who); };
   }
@@ -1771,7 +1814,6 @@ async function boot() {
 function macify() {
   const set = (sel, html) => { const el = $(sel); if (el) el.innerHTML = html; };
   set("#hero-how", 'Tap <kbd class="key key-wide">⌘</kbd> <span class="key-side">(right Command)</span>, talk, and tap it again. The text appears wherever the cursor is.');
-  set("#tip-cancel", '<strong>Tip</strong> · Hold <span class="tip-key">Right Command</span> and press Esc to cancel a dictation.');
   set("#hk-label", "Right Command");
   set("#hk-hint", HK_HINT);
   for (const el of $$(".tip .keys kbd.key")) if (el.textContent === "Ctrl") el.textContent = "⌘";

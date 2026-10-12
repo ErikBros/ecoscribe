@@ -126,6 +126,10 @@ async function load(query) {
   check(doc.querySelectorAll("#i-hours path.bar").length > 5 && doc.querySelectorAll("#i-days .tick").length === 3, "hour and day charts drawn");
   check(doc.querySelectorAll("#i-langs .i-hbar").length === 4 && doc.querySelector("#i-langs .i-hbar-name").textContent === "English", "languages by name");
   check([...doc.querySelectorAll("#i-apps .i-hbar-name")].some((e) => e.textContent === "Snipping Tool"), "a program name reads as words (dictado-d4h)");
+  const wpm = doc.querySelector("#i-wpm"), saved0 = doc.querySelector("#i-saved").textContent;
+  check(wpm && wpm.value === "40", "typing speed shows 40 until set (dictado-d8e)");
+  wpm.value = "80"; wpm.dispatchEvent(new window.Event("change", { bubbles: true })); await sleep(80);
+  check(window.__wpm === 80 && doc.querySelector("#i-wpm").value === "80" && doc.querySelector("#i-saved-how").textContent.includes("type at 80"), "a new typing speed is saved and used");
   check(/ words · \d+%$/.test(doc.querySelector("#i-langs .i-hbar-val").textContent)
     && / dictations?$/.test(doc.querySelector("#i-apps .i-hbar-val").textContent), "languages count words, apps dictations (dictado-7qo)");
   check(/^The dark bar is your busiest hour, \d\d:00-\d\d:00\.$/.test(doc.querySelector("#i-hours-note").textContent), "the dark hour is explained (dictado-7qo)");
@@ -380,6 +384,17 @@ async function load(query) {
   check(window.__perm === "accessibility", "Open settings opens that pane");
   check(doc.querySelector("#s-done-sub").textContent.includes("menu bar"), "Mac wording on the last step");
   check(doc.querySelector("#s-skip").hidden, "no skipping on the Mac's first run either");
+}
+{ // Home tips (dictado-3vj): one that applies, x hides it for good
+  const { window, doc } = await load("page=inicio");
+  await sleep(200);
+  const box = doc.querySelector("#home-tip"), first = box.dataset.tip;
+  check(!box.hidden && first && doc.querySelector("#home-tip-text").textContent.startsWith("Tip"), "a tip shows: " + first);
+  check(first !== "snippets", "a tip already acted on is skipped (snippets are set up in the demo)" );
+  box.querySelector("#home-tip-x").click(); await sleep(100);
+  check(box.hidden || box.dataset.tip !== first, "x hides that tip");
+  let saved = null; try { saved = window.localStorage.getItem("ecoscribe.tips.hidden"); } catch { /* no storage on file:// in jsdom */ }
+  check(saved === null || JSON.parse(saved).includes(first), "and remembers it where storage works");
 }
 { // History > Retry (dictado-a2r)
   const { window, doc } = await load("page=historial");

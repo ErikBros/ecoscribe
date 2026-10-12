@@ -122,3 +122,45 @@ def test_windows_addon_new_name_first_then_the_old_one(tmp_path):
     new.parent.mkdir(parents=True)
     new.write_bytes(b"x")
     assert addon_exe(tmp_path) == new
+
+
+def test_other_side_cap_from_the_name_or_the_invite():
+    """dictado-gk9: a 1:1 has one other person; an invite with N people has N - 1 besides the user."""
+    m = {"source": "meeting"}
+    assert diarize.other_side_cap({**m, "title": "Ana / Johan 1:1"}) == 1
+    assert diarize.other_side_cap({**m, "title": "Weekly 1-on-1"}) == 1
+    assert diarize.other_side_cap({**m, "title": "Retro", "calendar": {"attendees": ["Ana", "Johan", "Me"]}}) == 2
+    assert diarize.other_side_cap({**m, "title": "Retro"}) is None
+    assert diarize.other_side_cap({**m, "title": "Q1 11:15 sync"}) is None  # a time is not a 1:1
+    assert diarize.other_side_cap({"source": "import", "title": "1:1"}) is None
+
+
+def test_cap_folds_extra_voices_into_the_main_one_or_the_closest():
+    turns = [[0, 10, "A"], [10, 12, "B"], [12, 20, "C"], [20, 21, "D"]]
+    assert {t[2] for t in diarize.cap_turns(turns, 1)} == {"A"}
+    two = diarize.cap_turns(turns, 2, {"A": [1, 0], "B": [0.1, 1], "C": [0, 1], "D": [1, 0.1]})
+    assert [t[2] for t in two] == ["A", "C", "C", "A"]  # each folded voice joins the kept one it sounds like
+    assert diarize.cap_turns(turns, 4) == turns and diarize.cap_turns(turns, None) == turns
+
+
+def test_a_one_on_one_stays_one_other_person(tmp_path):
+    d = session(tmp_path)
+    sessions.write_meta(d, title="Ana / Johan 1:1")
+    assert diarize.run(d, fake_addon(TURNS)) == 0
+    tr = json.loads((d / "transcript.json").read_text(encoding="utf-8"))
+    assert [s["speaker"] for s in tr["segments"]] == ["Others", "Others"]
+
+
+def test_the_same_name_as_another_speaker_merges_them(tmp_path):
+    from ecoscribe.window import Api
+    root = tmp_path / "t"
+    cfg = tmp_path / "config.toml"
+    cfg.write_text(f'[transcribe]\nroot = "{root.as_posix()}"\n', encoding="utf-8")
+    d = session(tmp_path, segs=[seg(0, 2, "Speaker 1", "hola"), seg(2, 4, "Speaker 2", "va"), seg(4, 6, "Me", "sí")])
+    api = Api(data_dir=tmp_path / "data", config_path=cfg, signal_reload=lambda: True)
+    assert api.rename_speaker(d.name, "Speaker 1", "Ana")["names"] == {"Speaker 1": "Ana"}
+    out = api.rename_speaker(d.name, "Speaker 2", "ana")
+    assert out["ok"] and out["merged"] == "Speaker 1" and out["names"] == {"Speaker 1": "Ana"}
+    tr = json.loads((d / "transcript.json").read_text(encoding="utf-8"))
+    assert [s["speaker"] for s in tr["segments"]] == ["Speaker 1", "Speaker 1", "Me"]
+    assert api.rename_speaker(d.name, "Speaker 1", "Me")["merged"] == "Me"  # into the user too

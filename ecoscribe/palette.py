@@ -15,6 +15,16 @@ PILL_OFF = "#4a525c"   # unlit level bar on the ink pill; a quiet button on ink
 INK_2 = "#323a45"      # a raised surface on ink (the language menu, a pressed quiet button)
 AEGEAN_BRIGHT = "#3a77a4"  # aegean that reads on ink (a primary button on the dark box)
 
+# overlays as one family, on ink (dictado-6oe.9)
+KEYCAP_LINE = "#4a5563"   # the outline of a keycap in the pill's hint
+AEGEAN_MID = "#7fa6c4"    # the prompt's countdown line; the busy pill's middle dot
+AEGEAN_PALE = "#c9dcea"   # the busy pill's last dot
+AEGEAN_MUTED = "#9db7cc"  # the glyph on a prompt's tile (clock, mic, page)
+PAPER_HOVER = "#dfe5ea"   # the light primary button under the mouse
+CLAY_BRIGHT = "#e06a35"   # the dot on the "a call started" tile
+TILE_CALL = "#3a2a22"     # the icon tile of "a call started"
+TILE_NOTE = "#2a3542"     # the icon tile of every other prompt
+
 
 def rgb(hex_color: str) -> tuple[int, int, int]:
     h = hex_color.lstrip("#")

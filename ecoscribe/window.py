@@ -363,7 +363,8 @@ class Api:
     def get_insights(self, days: int | None = None) -> dict:
         from . import coach, insights
         days = int(days) if days else None
-        out = insights.compute(self._history_rows(), list(self._load().text.vocabulary), days)
+        c = self._load()
+        out = insights.compute(self._history_rows(), list(c.text.vocabulary), days, typing_wpm=c.ui.typing_wpm)
         out["meetings"] = coach.meetings_summary(self._recorded_meetings(), days=days)
         return out
 
@@ -391,6 +392,17 @@ class Api:
             tomlw.save(c, self._config_path)
             self._signal()
         return {"ok": True, "vocabulary": list(c.text.vocabulary)}
+
+    def set_typing_wpm(self, wpm) -> dict:
+        """Insights > your typing speed (dictado-d8e): only the window reads it, so no restart."""
+        try:
+            n = max(10, min(200, int(wpm)))
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "A number of words a minute, like 60."}
+        c = self._load()
+        c.ui.typing_wpm = n
+        tomlw.save(c, self._config_path)
+        return {"ok": True, "typing_wpm": n}
 
     def insights_for_claude(self) -> dict:
         from . import insights
@@ -602,6 +614,19 @@ class Api:
             return {"ok": False, "error": "No such speaker in this session"}
         names = dict(sessions.read_meta(d).get("speaker_names") or {})
         new = " ".join(str(new or "").split())[:40]
+        into = next((x for x in dict.fromkeys(s.get("speaker") for s in segs)
+                     if x and x != label and new and new.lower() in (str(x).lower(), str(names.get(x, "")).lower())), None)
+        if into:  # dictado-gk9: the same name as another speaker = one person: merge into that one
+            for s in segs:
+                if s.get("speaker") == label:
+                    s["speaker"] = into
+            tr = json.loads((d / "transcript.json").read_text(encoding="utf-8"))
+            tr["segments"] = segs
+            sessions._write_json(d / "transcript.json", tr)
+            names.pop(label, None)
+            sessions.write_meta(d, speaker_names=names)
+            export.write_all(d)
+            return {"ok": True, "names": names, "merged": into}
         if new and new != label:
             names[label] = new
         else:
