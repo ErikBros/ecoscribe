@@ -385,6 +385,10 @@
             <span class="cal-field"><input type="password" class="cal-url" id="f-calendar" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics" spellcheck="false" autocomplete="off">
             <button type="button" class="btn btn-ghost btn-sm" id="cal-test">Test</button></span>
             <span class="muted small" id="cal-result"></span></span></div>
+          <div class="row" id="gcal-row" hidden><span class="row-text"><span class="row-label">Google Calendar</span>
+            <span class="muted small">No secret address on a work account? Sign in instead, once and read-only: calls take their event's name, and its guests help spell names and fill Email participants.</span>
+            <span class="muted small" id="gcal-result"></span></span>
+            <button type="button" class="btn btn-ghost btn-sm" id="gcal-connect">Connect</button></div>
           <div class="row"><span class="row-text"><span class="row-label">Claude app</span>
             <span class="muted small" id="claude-help">Let the Claude desktop app read your meetings: "summarize yesterday's call", "what did Ana say about the budget?". Read-only, through a small server on this PC.</span></span>
             <button type="button" class="btn btn-ghost btn-sm" id="claude-connect">Connect</button></div>

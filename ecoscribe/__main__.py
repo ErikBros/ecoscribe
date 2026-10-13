@@ -127,12 +127,16 @@ def _calendar_feed(cfg, data, ctl, log):
     """t0u.35: the secret iCal link, if set: names meetings. Downloads in the background
     (at most every 10 min), never blocks a call."""
     from .calendar_ics import CalendarFeed
-    if not cfg.meetings.calendar_url:
-        return None
-    feed = CalendarFeed(cfg.meetings.calendar_url, data)
-    if not feed.url:
-        log.warning("calendar link in config.toml isn't a calendar link; meetings keep their default name")
-        return None
+    from .gcal import GoogleCalendar
+    if cfg.meetings.calendar_url:
+        feed = CalendarFeed(cfg.meetings.calendar_url, data)
+        if not feed.url:
+            log.warning("calendar link in config.toml isn't a calendar link; meetings keep their default name")
+            return None
+    else:  # dictado-k19: signed in to Google Calendar instead of the iCal link
+        feed = GoogleCalendar(data)
+        if not feed.connected:
+            return None
     ctl.calendar = feed
 
     def loop():

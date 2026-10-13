@@ -504,6 +504,57 @@ class Api:
         return {"lines": lines, "next": int(since) + len(lines), "session": self._row(m),
                 "notes": export.read_notes(d)}
 
+    # ---------------- Google Calendar (dictado-k19) ----------------
+    _gcal_http = None  # tests swap in a fake Google
+
+    def _gcal(self):
+        from . import gcal
+        return gcal.GoogleCalendar(self._data_dir, **({"http": self._gcal_http} if self._gcal_http else {}))
+
+    def google_calendar(self) -> dict:
+        g = self._gcal()
+        return {"connected": g.connected, "client": g.client() is not None}
+
+    def connect_google(self) -> dict:
+        """Settings > Meetings > Connect Google Calendar: the browser asks the user once, then the
+        background app restarts to read the calendar."""
+        g = self._gcal()
+        out = g.connect(self._open_url)
+        if not out["ok"]:
+            return {"ok": False, "error": {
+                "no_client": "This copy of Ecoscribe has no Google sign-in set up yet.",
+                "timeout": "No answer from Google in 3 minutes. Try again.",
+                "denied": "Google didn't give access. If your work account blocks it, ask its admin to allow Ecoscribe.",
+            }.get(out["error"], "Couldn't connect to Google. Try again.")}
+        g.refresh(force=True)
+        ev = g.lookup()
+        self._signal()
+        return {"ok": True, "today": len(g.today()), "now": ev.title if ev else None}
+
+    def disconnect_google(self) -> dict:
+        self._gcal().disconnect()
+        self._signal()
+        return {"ok": True}
+
+    def _google_event(self, name: str, meta: dict) -> dict | None:
+        """A meeting recorded without its invite: ask Google for the event at its start, keep it."""
+        from datetime import datetime
+
+        from .calendar_ics import meta_info
+        g = self._gcal()
+        if not g.connected or not meta.get("created"):
+            return None
+        try:
+            ev = g.event_at(datetime.fromisoformat(str(meta["created"])).astimezone(), meta.get("app"))
+        except Exception as e:
+            log.warning("Google Calendar lookup for an older meeting failed (%s)", type(e).__name__)
+            return None
+        if ev is None:
+            return None
+        info = meta_info(ev)
+        sessions.write_meta(self._session(name), calendar=info)
+        return info
+
     def claude_app(self) -> dict:
         from . import claude_link
         return {"connected": claude_link.is_connected(claude_link.config_files()),
@@ -669,6 +720,8 @@ class Api:
         s = self.get_session(name)
         meta = sessions.read_meta(self._session(name))
         info = meta.get("calendar") or {}
+        if not info.get("emails") and meta.get("source") == "meeting":
+            info = self._google_event(name, meta) or info
         to = [e for e in info.get("emails") or [] if "@" in e]
         title = info.get("title") or meta.get("title") or "our meeting"
         day = str(meta.get("created") or "")[:10]
