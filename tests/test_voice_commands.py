@@ -67,3 +67,24 @@ def test_settings_list_comes_from_the_matcher_table(tmp_path):
             for p in phrases:
                 out, enter = voice_commands(f"Hola. {p}.")
                 assert (enter if key == "enter" else "\n" in out), p
+
+
+# -- spoken quotes (dictado-y52): always on, needs the opening and the closing words -------------
+from ecoscribe.text import spoken_quotes  # noqa: E402
+
+
+def test_quote_end_quote_writes_quotation_marks():
+    assert spoken_quotes("We could call it, quote, the weekly review, end quote. Or not.") == \
+        'We could call it "the weekly review". Or not.'
+    assert spoken_quotes("Name it quote north star unquote and move on.") == 'Name it "north star" and move on.'
+    assert spoken_quotes("She said quote no end quote and quote yes close quote.") == 'She said "no" and "yes".'
+
+
+def test_a_lone_quote_stays_text():
+    assert spoken_quotes("Can you get a quote from them?") == "Can you get a quote from them?"
+    assert spoken_quotes("") == ""
+
+
+def test_spanish_and_swedish_quotes():
+    assert spoken_quotes("Lo llamamos abre comillas el plan cierra comillas.") == 'Lo llamamos "el plan".'
+    assert spoken_quotes("Vi kallar det citat planen slut citat.") == 'Vi kallar det "planen".'

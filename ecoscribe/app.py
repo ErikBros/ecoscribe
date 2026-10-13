@@ -365,6 +365,9 @@ class App:
                 self.press_enter()
                 log.info("voice command: enter only")
                 return
+        if res.text:  # dictado-y52: "quote ... end quote" -> "..."
+            from .text import spoken_quotes
+            res = replace(res, text=spoken_quotes(res.text))
         if res.text and getattr(self.cfg.text, "replacements", None):  # dictado-b7u
             from .text import replacements
             res = replace(res, text=replacements(res.text, self.cfg.text.replacements))
@@ -503,6 +506,9 @@ class App:
         with wave.open(str(f), "rb") as w:
             audio = np.frombuffer(w.readframes(w.getnframes()), "<i2").astype(np.float32) / 32767
         res = self.engine.transcribe(audio, lang=lang) if lang else self.engine.transcribe(audio)
+        if res.text:  # dictado-y52: "quote ... end quote" -> "..."
+            from .text import spoken_quotes
+            res = replace(res, text=spoken_quotes(res.text))
         if res.text and getattr(self.cfg.text, "replacements", None):  # dictado-b7u
             from .text import replacements
             res = replace(res, text=replacements(res.text, self.cfg.text.replacements))
