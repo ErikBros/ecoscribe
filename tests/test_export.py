@@ -93,3 +93,12 @@ def test_md_and_txt_read_in_turns_srt_keeps_every_line():
     assert "**[00:00:29] Others:** so the blue bicycle is mine" in md
     assert export.to_txt(CHOPPED).count("\n") == 3
     assert export.to_srt(CHOPPED).count("-->") == 6
+
+
+def test_your_name_replaces_me_but_a_rename_wins():
+    segs = [{"t0": 0.0, "t1": 1.0, "text": "Hello there.", "speaker": "Me"}]
+    assert "Alex Doe:** Hello there." in export.to_md(META, segs, me="Alex Doe")
+    assert "Alex Doe:** Hello there." in export.for_claude(META, segs, me="Alex Doe")
+    assert "Me:** Hello there." in export.to_md(META, segs)  # no name set: "Me" as before
+    renamed = {**META, "speaker_names": {"Me": "Host"}}
+    assert "Host:** Hello there." in export.to_md(renamed, segs, me="Alex Doe")

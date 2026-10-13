@@ -179,7 +179,7 @@ class Api:
                 "voice_commands": c.text.voice_commands,
                 "screen_names": c.text.screen_names,
                 "hold_to_talk": c.hotkey.hold_to_talk, "numpad_enter": c.hotkey.numpad_enter, "voice_memory": c.meetings.voice_memory,
-                "calendar_url": c.meetings.calendar_url, "debug_log": c.ui.debug_log,
+                "calendar_url": c.meetings.calendar_url, "my_name": c.meetings.my_name, "debug_log": c.ui.debug_log,
                 "export_dir": str(self._export_dir()), "export_default": not c.ui.export_dir,
                 "extra_languages": list(c.whisper.extra_languages),
                 "snippets": [{"trigger": k, "text": v} for k, v in c.text.snippets.items()],
@@ -261,6 +261,8 @@ class Api:
                     return {"ok": False, "error": "That isn't a calendar link: paste the secret address in iCal format "
                                                   "(it starts with https://)."}
                 c.meetings.calendar_url = url
+            if "my_name" in values:
+                c.meetings.my_name = " ".join(str(values["my_name"] or "").split())[:40]
             if "meet_lang" in values:
                 if not valid_meeting_lang(values["meet_lang"]):
                     raise ValueError("meet_lang")
@@ -452,8 +454,11 @@ class Api:
             raise FileNotFoundError(name)
         return d
 
+    def _me(self) -> str:
+        return self._load().meetings.my_name
+
     @staticmethod
-    def _row(m: dict) -> dict:
+    def _row(m: dict, me: str = "") -> dict:
         d = Path(m["dir"])
         prog = {}
         try:
@@ -465,13 +470,14 @@ class Api:
                 "duration_s": m.get("duration_s") or m.get("recorded_s"), "status": m.get("status"),
                 "source": m.get("source"), "created": m.get("created"), "error": m.get("error"),
                 "pct": prog.get("pct"), "slow": m.get("slow", False),
-                "speakers": m.get("speakers"), "speaker_names": m.get("speaker_names") or {},
+                "speakers": m.get("speakers"), "speaker_names": {**({"Me": me} if me else {}), **(m.get("speaker_names") or {})},
                 "recognised": [(m.get("speaker_names") or {}).get(x, x) for x in m.get("speakers_recognised") or []],
                 "people": list((m.get("calendar") or {}).get("attendees") or []), "app": m.get("app")}  # dictado-6oe.4
 
     def list_sessions(self, query: str = "") -> dict:
         q = str(query or "").strip().lower()
-        rows = [self._row(m) for m in sessions.list_sessions(self._root())]
+        me = self._me()
+        rows = [self._row(m, me) for m in sessions.list_sessions(self._root())]
         return {"items": [r for r in rows if not q or q in r["title"].lower()], "state": self.meetings_state()}
 
     def get_session(self, name: str) -> dict:
@@ -483,7 +489,7 @@ class Api:
             segs = json.loads((d / "transcript.json").read_text(encoding="utf-8"))["segments"]
         except (OSError, ValueError, KeyError):
             pass
-        return {"session": self._row(m), "segments": export.turns(segs),  # read in turns, like the .md
+        return {"session": self._row(m, self._me()), "segments": export.turns(segs),  # read in turns, like the .md
                 "notes": export.read_notes(d),
                 "exports": [p.name for p in d.glob("transcript.*") if p.suffix in (".txt", ".md", ".srt")]}
 
@@ -504,7 +510,7 @@ class Api:
             pass
         m = sessions.read_meta(d)
         m["dir"] = str(d)
-        return {"lines": lines, "next": int(since) + len(lines), "session": self._row(m),
+        return {"lines": lines, "next": int(since) + len(lines), "session": self._row(m, self._me()),
                 "notes": export.read_notes(d)}
 
     # ---------------- Google Calendar (dictado-k19) ----------------
@@ -679,14 +685,14 @@ class Api:
             sessions._write_json(d / "transcript.json", tr)
             names.pop(label, None)
             sessions.write_meta(d, speaker_names=names)
-            export.write_all(d)
+            export.write_all(d, self._me())
             return {"ok": True, "names": names, "merged": into}
         if new and new != label:
             names[label] = new
         else:
             names.pop(label, None)
         sessions.write_meta(d, speaker_names=names)
-        export.write_all(d)
+        export.write_all(d, self._me())
         if new and new != label and self._load().meetings.voice_memory:
             try:  # t0u.32: this voice is `new` from now on, in later calls too
                 emb = json.loads((d / "voices.json").read_text(encoding="utf-8")).get(label)
@@ -710,8 +716,8 @@ class Api:
     def copy_transcript(self, name: str, kind: str = "text") -> dict:
         s = self.get_session(name)
         meta = sessions.read_meta(self._session(name))
-        text = export.for_claude(meta, s["segments"], s["notes"]) if kind == "claude" \
-            else export.summary_prompt(meta, s["segments"], s["notes"]) if kind == "summary" else export.to_txt(s["segments"])
+        text = export.for_claude(meta, s["segments"], s["notes"], self._me()) if kind == "claude" \
+            else export.summary_prompt(meta, s["segments"], s["notes"], self._me()) if kind == "summary" else export.to_txt(s["segments"])
         self._copy(text)
         return {"ok": True, "chars": len(text)}
 
@@ -747,7 +753,7 @@ class Api:
         d = self._session(name)
         src = d / f"transcript.{fmt}"
         if (d / "transcript.json").exists():
-            export.write_all(d)  # fresh every time: a rename since the meeting must show in the file
+            export.write_all(d, self._me())  # fresh every time: a rename since the meeting must show in the file
         import shutil
         title = sessions.read_meta(d).get("title") or "transcript"
         out = self._export_dir()

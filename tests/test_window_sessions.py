@@ -155,6 +155,22 @@ def test_rename_a_speaker_everywhere(env):
     assert not api.rename_speaker(d.name, "Speaker 9", "X")["ok"]  # not a label of this session
 
 
+
+def test_your_name_shows_instead_of_me(env):
+    """Settings > Meetings > Your name: the user's lines carry it in the view, the .md and Copy for Claude."""
+    api, root, _, copied, _ = env
+    d = make(root, "Sync", 3, segs=[{"t0": 0, "t1": 2, "text": "Hello", "speaker": "Me"},
+                                    {"t0": 3, "t1": 4, "text": "Hi", "speaker": "Others"}])
+    assert api.save_settings({"my_name": "  Alex   Doe "})["ok"]
+    assert api.get_settings()["values"]["my_name"] == "Alex Doe"
+    assert api.get_session(d.name)["session"]["speaker_names"] == {"Me": "Alex Doe"}
+    api.save_export(d.name, "md")
+    assert "Alex Doe:** Hello" in (d / "transcript.md").read_text(encoding="utf-8")
+    api.copy_transcript(d.name, "claude")
+    assert "Alex Doe:** Hello" in copied[-1] and "Others:** Hi" in copied[-1]
+    assert api.rename_speaker(d.name, "Me", "Host")["ok"]  # one meeting's own name wins
+    assert api.get_session(d.name)["session"]["speaker_names"] == {"Me": "Host"}
+
 def test_speakers_setting_round_trips(env):
     api, *_ = env
     s = api.get_settings()

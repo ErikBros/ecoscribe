@@ -835,7 +835,8 @@ function segLi(s, editable) {
   p.className = "r-text"; p.textContent = s.text;
   const av = document.createElement("span");  // a conversation, not a table (dictado-6oe.4)
   av.className = "r-av"; av.dataset.who = who.dataset.who; av.setAttribute("aria-hidden", "true");
-  av.textContent = who.dataset.who === "Me" ? "Me" : (whoName(s.speaker) || "?").slice(0, 1).toUpperCase();
+  const nm = whoName(s.speaker);  // "Me" until the user gives their name in Settings
+  av.textContent = nm === "Me" ? "Me" : (nm || "?").slice(0, 1).toUpperCase();
   const head = document.createElement("span"); head.className = "r-seg-head";
   head.append(who, t);
   li.append(av, head, p);
@@ -1175,7 +1176,7 @@ function formValues() {
     meet_mode: $("#f-meet-mode").value, meet_lang: $("#f-meet-lang").value, on_demand: $("#f-on-demand").checked,
     speakers: $("#f-speakers").checked, voice_commands: $("#f-voice-commands").checked,
     screen_names: $("#f-screen-names").checked, hold_to_talk: $("#f-hold").checked, numpad_enter: $("#f-numpad-enter").checked,
-    voice_memory: $("#f-voice-memory").checked, debug_log: $("#f-debug-log").checked, calendar_url: $("#f-calendar").value.trim(),
+    voice_memory: $("#f-voice-memory").checked, debug_log: $("#f-debug-log").checked, calendar_url: $("#f-calendar").value.trim(), my_name: $("#f-my-name").value.trim(),
     vocabulary: $("#f-vocabulary").value.split("\n").map((w) => w.trim()).filter(Boolean).join("\n"),
     snippets: $$(".snip").map((r) => ({ trigger: $(".snip-trigger", r).value.trim().toLowerCase().replace(/\s+/g, " "),
                                        text: $(".snip-text", r).value }))
@@ -1310,6 +1311,7 @@ async function renderSettings() {
   $("#f-voice-memory").checked = s.values.voice_memory !== false;
   voicesRow();
   $("#f-calendar").value = s.values.calendar_url || "";
+  $("#f-my-name").value = s.values.my_name || "";
   $("#f-debug-log").checked = !!s.values.debug_log;
   const vc = $("#vc-rows"); vc.innerHTML = "";
   if (params.get("vc") === "1") $("#vc-list").open = true;  // screenshot

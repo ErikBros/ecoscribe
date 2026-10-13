@@ -453,6 +453,7 @@ select:hover { border-color: #d6d2c6; }
 .cal-url { flex: 1; min-width: 0; font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--line);
   border-radius: var(--radius-sm); padding: 8px 10px; }
 .cal-url:hover { border-color: #d6d2c6; }
+.my-name { flex: 0 0 200px; }
 #cal-result:not(:empty) { display: block; margin-top: 6px; }
 
 /* t0u.37: a crash is never silent */
