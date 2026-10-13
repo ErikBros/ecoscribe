@@ -9,6 +9,11 @@ def startfile(path: str) -> None:
     subprocess.Popen(["open", str(path)])
 
 
+def reveal(path: str) -> None:
+    """Finder on the file's folder with the file selected (dictado-yq9)."""
+    subprocess.Popen(["open", "-R", str(path)])
+
+
 def input_names() -> list[str]:
     """Names of the Core Audio input devices (what Settings offers as mics)."""
     import sounddevice as sd

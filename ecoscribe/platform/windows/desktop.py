@@ -10,6 +10,12 @@ def startfile(path: str) -> None:
     os.startfile(path)
 
 
+def reveal(path: str) -> None:
+    """Explorer on the file's folder with the file selected (dictado-yq9)."""
+    import subprocess
+    subprocess.Popen(f'explorer /select,"{os.path.normpath(path)}"')  # noqa: S602,S603,S607 (explorer wants /select,"path" as is)
+
+
 def input_names() -> list[str]:
     """Names of the MME input devices (what Settings offers as mics)."""
     import sounddevice as sd

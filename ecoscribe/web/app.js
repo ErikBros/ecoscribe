@@ -62,6 +62,7 @@ function demoApi() {
   let settings = {
     values: { hotkey: "rctrl", mic: "Anker PowerConf", languages: "en", sounds: true, overlay: true, live_text: true, insights: params.get("insights") === "1", speech_feedback: false, unmute: true, startup: true,
       meet_mode: "prompt", meet_lang: "sv", on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: false, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true,
+      export_dir: "C:/x/Downloads", export_default: true,
       snippets: [{ trigger: "my email", text: "alex@example.com" }], replacements: [{ heard: "poll request", write: "pull request" }] },
     options: {
       hotkeys: [{ value: "rctrl", label: "Right Ctrl (recommended)" }, { value: "scrolllock", label: "Scroll Lock" }, { value: "pause", label: "Pause" }, { value: "f13", label: "F13" }],
@@ -121,6 +122,10 @@ function demoApi() {
     crashes: async () => (params.get("crash") === "1" ? { items: [{ name: "2026-10-06_140325", when: "2026-10-06 140325", exit: MAC ? "unknown" : "0xC0000005 (access violation)" }], gave_up: false } : { items: [], gave_up: false }),
     copy_crash_report: async () => ({ ok: true }), dismiss_crash: async () => ({ ok: true }),
     copy_debug_info: async () => ({ ok: true }), open_logs_folder: async () => ({ ok: true }),
+    save_export: async (name, fmt) => { window.__exported = fmt; return { ok: true, path: "C:/x/Downloads/t." + fmt, name: "t." + fmt, folder: "Downloads" }; },
+    show_export: async (p) => { window.__revealed = p; return { ok: true }; },
+    pick_export_dir: async () => ({ ok: true, export_dir: "D:/Transcripts", export_default: false }),
+    set_export_dir: async (p) => ({ ok: true, export_dir: p || "C:/x/Downloads", export_default: !p }),
     google_calendar: async () => ({ connected: !!window.__gcal, client: true }),
     connect_google: async () => { window.__gcal = true; return { ok: true, today: 3, now: "Weekly sync" }; },
     disconnect_google: async () => { window.__gcal = false; return { ok: true }; },
@@ -148,7 +153,6 @@ function demoApi() {
     open_folder: async () => ({ ok: true }),
     copy_transcript: async () => ({ ok: true }),
     email_participants: async (name) => { window.__emailed = name; return { ok: true, to: ["ana@example.com", "bo@example.com"], inline: false, chars: 9000 }; },
-    save_export: async () => ({ ok: false, cancelled: true }),
     get_status: async () => (params.get("state") === "stopped" ? { state: "stopped", alive: false, version: "1.1.0" }
       : { state: params.get("state") || "ready", alive: true, device: "cuda", model: "large-v3-turbo", mic: "Microphone (Anker PowerConf C20", languages: settings.values.languages.split(","), hotkey: "rctrl", version: "1.1.0" }),
     start_app: async () => ({ ok: true }),
@@ -230,17 +234,25 @@ function toast(msg, ms = 2600) {
 }
 const UNDO_MS = Number(params.get("undo_ms")) || 5000;  // smoke tests wait less
 function toastUndo(msg, onUndo, ms = UNDO_MS) {  // a toast with Undo (dictado-vfo); false when it times out
+  return toastAction(msg, "Undo", onUndo, ms);
+}
+function toastAction(msg, label, onClick, ms) {  // a toast with one button: true when it was clicked
   const el = $("#toast");
   el.textContent = msg + " ";
   const b = document.createElement("button");
-  b.type = "button"; b.className = "toast-btn"; b.textContent = "Undo";
+  b.type = "button"; b.className = "toast-btn"; b.textContent = label;
   el.append(b);
   el.hidden = false;
   clearTimeout(toast._t);
   return new Promise((done) => {
-    b.onclick = () => { clearTimeout(toast._t); el.hidden = true; onUndo(); done(true); };
+    b.onclick = () => { clearTimeout(toast._t); el.hidden = true; onClick(); done(true); };
     toast._t = setTimeout(() => { el.hidden = true; done(false); }, ms);
   });
+}
+async function download(name, fmt) {  // dictado-yq9: say where it went, with Open folder
+  const out = await api.save_export(name, fmt);
+  if (!out.ok) { toast(out.error || "Couldn't export."); return; }
+  toastAction(`In ${out.folder}: ${out.name}`, "Open folder", () => api.show_export(out.path), 6000);
 }
 function prettyMic(n) {
   const m = /^[^(]*\((.+?)\)?$/.exec(n || "");
@@ -992,10 +1004,7 @@ function rWire() {
     toast(res.inline ? `Draft opened ${who}. Check it and press Send.` : `Draft opened ${who}. The transcript is copied: paste it in, then Send.`, 5000);
   };
   $("#r-copy-summary").onclick = async () => { await api.copy_transcript(r.open, "summary"); toast("Summary prompt copied: paste it into Claude."); };
-  for (const b of $$("[data-fmt]")) b.onclick = async () => {
-    const out = await api.save_export(r.open, b.dataset.fmt);
-    if (out.ok) toast(`In Downloads: ${out.name}`); else toast(out.error || "Couldn't export.");
-  };
+  for (const b of $$("[data-fmt]")) b.onclick = () => download(r.open, b.dataset.fmt);
   $("#r-folder").onclick = () => api.open_folder(r.open);
   $("#r-delete").onclick = async () => {
     if (!confirm("Delete this transcript and its audio? This can't be undone.")) return;
@@ -1148,7 +1157,7 @@ function meetingHistoryItem(m) {  // a meeting transcript in History: opens in M
   if (m.status === "done") {
     const dl = document.createElement("button");
     dl.className = "btn btn-ghost btn-sm"; dl.textContent = "Download .md";
-    dl.onclick = async () => { const out = await api.save_export(m.name, "md"); toast(out.ok ? `In Downloads: ${out.name}` : out.error || "Couldn't export."); };
+    dl.onclick = () => download(m.name, "md");
     btns.append(dl);
   }
   li.append(t, p, btns, meta);
@@ -1297,7 +1306,7 @@ async function renderSettings() {
   $("#f-screen-names").checked = s.values.screen_names !== false;
   $("#f-hold").checked = !!s.values.hold_to_talk; $("#f-numpad-enter").checked = !!s.values.numpad_enter;
   holdFits();
-  claudeRow(); gcalRow();
+  claudeRow(); gcalRow(); exportRow(s.values);
   $("#f-voice-memory").checked = s.values.voice_memory !== false;
   voicesRow();
   $("#f-calendar").value = s.values.calendar_url || "";
@@ -1469,6 +1478,13 @@ async function gcalRow() {  // dictado-k19: sign in to Google Calendar instead o
       : `Connected: ${r.today} event${r.today === 1 ? "" : "s"} today.` + (r.now ? ` Right now: ${r.now}.` : "");
     gcalRow();
   };
+}
+function exportRow(v) {  // dictado-yq9: where Download puts transcripts
+  $("#export-dir").textContent = v.export_dir; $("#export-dir").title = v.export_dir;
+  $("#export-reset").hidden = !!v.export_default;
+  const done = (r) => { if (r.ok) { exportRow(r); toast("Downloads now go to " + r.export_dir); } else if (r.error) toast(r.error); };
+  $("#export-change").onclick = async () => done(await api.pick_export_dir());
+  $("#export-reset").onclick = async () => done(await api.set_export_dir(""));
 }
 async function claudeRow() {
   const st = await api.claude_app().catch(() => ({ connected: false }));

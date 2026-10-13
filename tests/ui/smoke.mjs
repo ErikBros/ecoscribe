@@ -86,6 +86,15 @@ async function load(query) {
   b.click(); await sleep(100);
   check(b.textContent === "Connected" && b.disabled, "Claude app: connected after the click");
 }
+{ // ajustes: where downloads go (dictado-yq9)
+  const { doc } = await load("page=ajustes");
+  await sleep(50);
+  check(doc.querySelector("#export-dir").textContent === "C:/x/Downloads" && doc.querySelector("#export-reset").hidden, "downloads: the Downloads folder by default");
+  doc.querySelector("#export-change").click(); await sleep(80);
+  check(doc.querySelector("#export-dir").textContent === "D:/Transcripts" && !doc.querySelector("#export-reset").hidden, "downloads: a picked folder, with a way back");
+  doc.querySelector("#export-reset").click(); await sleep(80);
+  check(doc.querySelector("#export-dir").textContent === "C:/x/Downloads" && doc.querySelector("#export-reset").hidden, "downloads: back to Downloads");
+}
 { // ajustes: Google Calendar sign-in (dictado-k19)
   const { window, doc } = await load("page=ajustes");
   await sleep(50);
@@ -186,6 +195,11 @@ async function load(query) {
   check(doc.querySelectorAll(".h-meeting").length === 5, "and the 5 meeting transcripts");
   const done = [...doc.querySelectorAll(".h-meeting")].find((li) => li.textContent.includes("Planering"));
   check(done && [...done.querySelectorAll("button")].map((b) => b.textContent).join(",") === "Open,Download .md", "a finished meeting: Open + Download .md");
+  done.querySelectorAll("button")[1].click(); await sleep(80);
+  const tb = doc.querySelector("#toast .toast-btn");
+  check(doc.querySelector("#toast").textContent.startsWith("In Downloads: t.md") && tb && tb.textContent === "Open folder", "a download says where, with Open folder (dictado-yq9)");
+  tb.click(); await sleep(30);
+  check(window.__revealed === "C:/x/Downloads/t.md" && doc.querySelector("#toast").hidden, "Open folder shows the file");
   done.querySelector("button").click(); await sleep(200);
   check(!doc.querySelector("#page-reuniones").hidden && !doc.querySelector("#r-detail-view").hidden, "Open jumps to the transcript");
   doc.querySelector('.nav-item[data-page="historial"]').click(); await sleep(150);

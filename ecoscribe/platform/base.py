@@ -45,6 +45,10 @@ CAPABILITIES: dict[str, dict] = {
         "windows": "ecoscribe.engine:Engine",  # faster-whisper / CTranslate2 on CUDA
         "macos": "ecoscribe.platform.macos.mlx_engine:MlxWhisperModel",  # mlx-whisper on Metal
     },
+    "Show a download in its folder": {
+        "windows": "ecoscribe.platform.windows.desktop:reveal",
+        "macos": "ecoscribe.platform.macos.desktop:reveal",
+    },
     "Mic list in Settings": {
         "windows": "ecoscribe.platform.windows.desktop:input_names",
         "macos": "ecoscribe.platform.macos.desktop:input_names",

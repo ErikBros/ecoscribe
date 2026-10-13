@@ -68,11 +68,13 @@ def pretty_mic(name: str) -> str:
 if sys.platform == "darwin":  # ecoscribe/platform/macos/desktop.py + procs.py
     from .platform.macos.desktop import DEFAULT_MIC_LABEL, WEBVIEW_GUI
     from .platform.macos.desktop import input_names as _mme_input_names
+    from .platform.macos.desktop import reveal as _reveal
     from .platform.macos.desktop import startfile as _startfile
     from .platform.macos.procs import alive as _pid_alive
 else:  # ecoscribe/platform/windows/desktop.py + procs.py
     from .platform.windows.desktop import DEFAULT_MIC_LABEL, WEBVIEW_GUI
     from .platform.windows.desktop import input_names as _mme_input_names
+    from .platform.windows.desktop import reveal as _reveal
     from .platform.windows.desktop import startfile as _startfile
     from .platform.windows.procs import alive as _pid_alive
 
@@ -178,6 +180,7 @@ class Api:
                 "screen_names": c.text.screen_names,
                 "hold_to_talk": c.hotkey.hold_to_talk, "numpad_enter": c.hotkey.numpad_enter, "voice_memory": c.meetings.voice_memory,
                 "calendar_url": c.meetings.calendar_url, "debug_log": c.ui.debug_log,
+                "export_dir": str(self._export_dir()), "export_default": not c.ui.export_dir,
                 "extra_languages": list(c.whisper.extra_languages),
                 "snippets": [{"trigger": k, "text": v} for k, v in c.text.snippets.items()],
                 "replacements": [{"heard": k, "write": v} for k, v in c.text.replacements.items()],
@@ -747,13 +750,49 @@ class Api:
             export.write_all(d)  # fresh every time: a rename since the meeting must show in the file
         import shutil
         title = sessions.read_meta(d).get("title") or "transcript"
-        self._downloads.mkdir(parents=True, exist_ok=True)  # one click, no dialog (the user, 2026-10-05)
+        out = self._export_dir()
+        try:
+            out.mkdir(parents=True, exist_ok=True)  # one click, no dialog (the user, 2026-10-05)
+        except OSError:
+            return {"ok": False, "error": f"Can't write to {out}: pick another folder in Settings › Meetings."}
         base = f"{d.name[:16]}_{sessions.slug(title)}"
-        dest, n = self._downloads / f"{base}.{fmt}", 2
+        dest, n = out / f"{base}.{fmt}", 2
         while dest.exists():
-            dest, n = self._downloads / f"{base}-{n}.{fmt}", n + 1
+            dest, n = out / f"{base}-{n}.{fmt}", n + 1
         shutil.copyfile(src, dest)
-        return {"ok": True, "path": str(dest), "name": dest.name}
+        self._last_export = dest
+        return {"ok": True, "path": str(dest), "name": dest.name, "folder": out.name or str(out)}
+
+    def _export_dir(self) -> Path:
+        """Where Download puts files: the folder picked in Settings, else Downloads."""
+        picked = self._load().ui.export_dir
+        return Path(picked).expanduser() if picked else self._downloads
+
+    def show_export(self, path: str) -> dict:
+        """The toast's Open folder: the folder, the file selected. Only the file just saved."""
+        last = getattr(self, "_last_export", None)
+        if last is None or Path(path) != last or not last.exists():
+            return {"ok": False, "error": "That file is gone."}
+        _reveal(str(last))
+        return {"ok": True}
+
+    def pick_export_dir(self) -> dict:
+        """Settings > Meetings > Downloads go to > Change: a folder dialog, saved at once."""
+        import webview
+        got = webview.windows[0].create_file_dialog(webview.FOLDER_DIALOG, directory=str(self._export_dir()))
+        if not got:
+            return {"ok": False}
+        return self.set_export_dir(got[0] if isinstance(got, (list, tuple)) else got)
+
+    def set_export_dir(self, path: str) -> dict:
+        """Empty = back to Downloads. Only the window reads it, so no restart."""
+        path = str(path or "").strip()
+        if path and not Path(path).expanduser().is_dir():
+            return {"ok": False, "error": "That folder doesn't exist."}
+        c = self._load()
+        c.ui.export_dir = path
+        tomlw.save(c, self._config_path)
+        return {"ok": True, "export_dir": str(self._export_dir()), "export_default": not path}
 
     def _send(self, cmd: str, args: dict | None = None, **kw) -> dict:
         return self._commands(self._data_dir, cmd, args, **kw)
