@@ -121,6 +121,9 @@ function demoApi() {
     crashes: async () => (params.get("crash") === "1" ? { items: [{ name: "2026-10-06_140325", when: "2026-10-06 140325", exit: MAC ? "unknown" : "0xC0000005 (access violation)" }], gave_up: false } : { items: [], gave_up: false }),
     copy_crash_report: async () => ({ ok: true }), dismiss_crash: async () => ({ ok: true }),
     copy_debug_info: async () => ({ ok: true }), open_logs_folder: async () => ({ ok: true }),
+    google_calendar: async () => ({ connected: !!window.__gcal, client: true }),
+    connect_google: async () => { window.__gcal = true; return { ok: true, today: 3, now: "Weekly sync" }; },
+    disconnect_google: async () => { window.__gcal = false; return { ok: true }; },
     test_calendar: async (u) => (u ? { ok: true, today: 4, now: "Sprint retro" } : { ok: false, error: "Paste the secret address in iCal format first." }),
     forget_voices: async () => { window.__noVoices = true; return { ok: true }; },
     claude_app: async () => ({ connected: !!window.__claude, frozen: true }),
@@ -1294,7 +1297,7 @@ async function renderSettings() {
   $("#f-screen-names").checked = s.values.screen_names !== false;
   $("#f-hold").checked = !!s.values.hold_to_talk; $("#f-numpad-enter").checked = !!s.values.numpad_enter;
   holdFits();
-  claudeRow();
+  claudeRow(); gcalRow();
   $("#f-voice-memory").checked = s.values.voice_memory !== false;
   voicesRow();
   $("#f-calendar").value = s.values.calendar_url || "";
@@ -1448,6 +1451,24 @@ async function calendarTest() {  // t0u.35: download the link now and say what i
   b.disabled = false;
   out.textContent = !r.ok ? r.error
     : `Works: ${r.today} event${r.today === 1 ? "" : "s"} today.` + (r.now ? ` Right now: ${r.now}.` : "") + " Save to use it.";
+}
+async function gcalRow() {  // dictado-k19: sign in to Google Calendar instead of the iCal link
+  const st = await api.google_calendar().catch(() => ({ connected: false, client: false }));
+  const b = $("#gcal-connect"), out = $("#gcal-result");
+  $("#gcal-row").hidden = !st.client && !st.connected;
+  b.textContent = st.connected ? "Disconnect" : "Connect";
+  b.disabled = false;
+  b.onclick = async () => {
+    if (st.connected) {
+      if (!confirm("Disconnect Google Calendar? Meetings stop taking names and guests from it.")) return;
+      await api.disconnect_google(); out.textContent = ""; toast("Google Calendar disconnected."); gcalRow(); return;
+    }
+    b.disabled = true; out.textContent = "Sign in in the browser window that just opened…";
+    const r = await api.connect_google().catch(() => ({ ok: false, error: "Couldn't connect to Google. Try again." }));
+    out.textContent = !r.ok ? r.error
+      : `Connected: ${r.today} event${r.today === 1 ? "" : "s"} today.` + (r.now ? ` Right now: ${r.now}.` : "");
+    gcalRow();
+  };
 }
 async function claudeRow() {
   const st = await api.claude_app().catch(() => ({ connected: false }));

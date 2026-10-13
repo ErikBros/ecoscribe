@@ -33,6 +33,7 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Settings > Speech models: each model's use, size on disk, download with progress, delete to free space | done | check on Mac |
 | Email to participants: a draft in your own mail program, to the calendar invite's guests, the transcript in it or copied to paste | done | check on Mac |
 | Meeting names + attendees from a calendar (iCal link) | done | check on Mac (dictado-tjn) |
+| Meeting names, guests and Email participants from Google Calendar by signing in (no iCal link needed; an older meeting looks its event up on Email participants) | done (dictado-k19; token DPAPI-encrypted) | check on Mac (dictado-k19; token in an owner-only file) |
 | Meeting name from the Google Meet tab when the calendar has no event (no link, or the secret address is turned off) | done | check on Mac (dictado-4ar: window titles via Accessibility) |
 | File transcription (drag and drop) | done | done (installed app: Greek file on the Apple GPU, 2.4% WER) |
 | First-run setup: languages, speech models (both recommended, with download progress), mic test, dictation key, a first dictation, summary; Settings > Run setup again | done | done (checked with a fresh data folder: both models downloaded with a moving bar, the first dictation pasted into the box) |

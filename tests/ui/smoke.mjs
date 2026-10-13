@@ -86,6 +86,18 @@ async function load(query) {
   b.click(); await sleep(100);
   check(b.textContent === "Connected" && b.disabled, "Claude app: connected after the click");
 }
+{ // ajustes: Google Calendar sign-in (dictado-k19)
+  const { window, doc } = await load("page=ajustes");
+  await sleep(50);
+  const b = doc.querySelector("#gcal-connect");
+  check(!doc.querySelector("#gcal-row").hidden && b.textContent === "Connect", "Google Calendar: Connect offered");
+  b.click(); await sleep(150);
+  check(doc.querySelector("#gcal-result").textContent === "Connected: 3 events today. Right now: Weekly sync."
+    && b.textContent === "Disconnect", "Google Calendar: connected, says what it found");
+  window.confirm = () => true;
+  b.click(); await sleep(150);
+  check(b.textContent === "Connect" && !window.__gcal, "Google Calendar: disconnect");
+}
 { // ajustes: snippets (t0u.29)
   const { window, doc } = await load("page=ajustes");
   check(doc.querySelectorAll(".snip").length === 1 && doc.querySelector(".snip-trigger").value === "my email", "saved snippet shown");
