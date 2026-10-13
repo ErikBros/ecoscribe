@@ -73,8 +73,8 @@ def to_txt(segments: list[dict]) -> str:
     return "".join(s["text"] + "\n" for s in turns(segments))
 
 
-def _body(segments: list[dict], names: dict | None = None) -> str:
-    names = names or {}  # meta speaker_names: "Speaker 2" -> "Mamá" (t0u.22)
+def _body(segments: list[dict], names: dict | None = None, me: str = "") -> str:
+    names = {**({"Me": me} if me else {}), **(names or {})}  # meta speaker_names: "Speaker 2" -> "Mamá" (t0u.22)
     lines = []
     for s in turns(segments):
         text = s["text"]
@@ -94,11 +94,11 @@ def read_notes(d: Path) -> str:
         return ""
 
 
-def to_md(meta: dict, segments: list[dict], notes: str = "") -> str:
+def to_md(meta: dict, segments: list[dict], notes: str = "", me: str = "") -> str:
     head = f"# {meta.get('title', 'Transcript')}\n\n{_date(meta)} · {_lang(meta)} · {_duration(meta.get('duration_s'))}\n\n"
     if notes:
         head += f"## My notes\n\n{notes}\n\n## Transcript\n\n"
-    return head + _body(segments, meta.get("speaker_names"))
+    return head + _body(segments, meta.get("speaker_names"), me)
 
 
 def to_srt(segments: list[dict]) -> str:
@@ -108,7 +108,7 @@ def to_srt(segments: list[dict]) -> str:
     return "".join(out)
 
 
-def for_claude(meta: dict, segments: list[dict], notes: str = "") -> str:
+def for_claude(meta: dict, segments: list[dict], notes: str = "", me: str = "") -> str:
     head = [f"Transcript: {meta.get('title', '')}", f"Date: {_date(meta)}", f"App: {_app(meta)}",
             f"Duration: {_duration(meta.get('duration_s'))}", f"Language: {_lang(meta)}"]
     people = (meta.get("calendar") or {}).get("attendees")
@@ -117,7 +117,7 @@ def for_claude(meta: dict, segments: list[dict], notes: str = "") -> str:
     head.append("")
     if notes:
         head += ["My notes:", notes, ""]
-    return "\n".join(head) + "\n" + _body(segments, meta.get("speaker_names"))
+    return "\n".join(head) + "\n" + _body(segments, meta.get("speaker_names"), me)
 
 
 SUMMARY_ASK = ("Summarize this meeting for me. Give: the decisions made, the action items (who, what, by when), "
@@ -129,17 +129,17 @@ NOTES_ASK = (" I took notes during the call (My notes, below the header): use th
              "fill each point from the transcript, and say where the transcript disagrees with a note.")
 
 
-def summary_prompt(meta: dict, segments: list[dict], notes: str = "") -> str:
+def summary_prompt(meta: dict, segments: list[dict], notes: str = "", me: str = "") -> str:
     """Copy summary prompt: the request on top, then the same text as Copy for Claude."""
-    return SUMMARY_ASK + (NOTES_ASK if notes else "") + "\n\n" + for_claude(meta, segments, notes)
+    return SUMMARY_ASK + (NOTES_ASK if notes else "") + "\n\n" + for_claude(meta, segments, notes, me)
 
 
-def write_all(d: Path) -> list[Path]:
+def write_all(d: Path, me: str = "") -> list[Path]:
     d = Path(d)
     meta = json.loads((d / "meta.json").read_text(encoding="utf-8"))
     segs = json.loads((d / "transcript.json").read_text(encoding="utf-8"))["segments"]
     out = []
-    for name, text in (("transcript.txt", to_txt(segs)), ("transcript.md", to_md(meta, segs, read_notes(d))),
+    for name, text in (("transcript.txt", to_txt(segs)), ("transcript.md", to_md(meta, segs, read_notes(d), me)),
                        ("transcript.srt", to_srt(segs))):
         (d / name).write_text(text, encoding="utf-8")
         out.append(d / name)
