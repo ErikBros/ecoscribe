@@ -779,7 +779,7 @@ class Api:
     def pick_export_dir(self) -> dict:
         """Settings > Meetings > Downloads go to > Change: a folder dialog, saved at once."""
         import webview
-        got = webview.windows[0].create_file_dialog(webview.FOLDER_DIALOG, directory=str(self._export_dir()))
+        got = webview.windows[0].create_file_dialog(webview.FileDialog.FOLDER, directory=str(self._export_dir()))
         if not got:
             return {"ok": False}
         return self.set_export_dir(got[0] if isinstance(got, (list, tuple)) else got)
