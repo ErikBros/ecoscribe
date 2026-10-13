@@ -33,17 +33,19 @@ from Foundation import NSData, NSObject
 from PyObjCTools import AppHelper
 
 from ... import meetui
+from ...notice import notice
 from ... import palette as P
 
 log = logging.getLogger(__name__)
 W, H = 210, 44
 MW, MH = 380, 56  # the meeting pill opened by the mouse: label + latest live line
 CW, CH = 92, 30  # the meeting pill as it sits: a small chip, recording dot + timer (dictado-f6o)
-RW, RH = 236, 38  # the dictating pill: dot, scrolling waveform, timer (dictado-dlm)
+RW, RH = 236, 40  # the dictating pill: dot, scrolling waveform, timer (dictado-dlm); pill A: every capsule is 40 tall (dictado-v5g)
 WAVE_X, WAVE_W, WAVE_N = 38, 130, 24  # one bar per 50 ms tick, newest on the right
 LW, LH = 440, 66  # the dictating pill with the newest live words under it (dictado-ayq)
 HINT_S = 2.0  # the keycaps hint shows this long, then the waveform takes its place
 TIMER_FONT, CAP_FONT, LIVE_FONT = 13, 11, 13  # Windows' bold 10 pt / bold 8 pt, in AppKit points
+DETAIL_FONT = 12  # a notice's soft detail (Windows' 9 pt)
 NSStatusWindowLevel = 25
 BOTTOM_GAP = 80
 
@@ -157,6 +159,19 @@ class PillView(NSView):
         for cx, cy, d, col in spec.get("ovals", []):  # centred circles: the recording dot, its halo, busy dots
             color(col).setFill()
             NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(cx - d / 2, cy - d / 2, d, d)).fill()
+        for cx, cy, rad, start, extent, col in spec.get("arcs", []):  # the busy ring and its turning arc, 2 px
+            arc = NSBezierPath.bezierPath()
+            arc.appendBezierPathWithArcWithCenter_radius_startAngle_endAngle_clockwise_((cx, cy), rad, start, start + extent, False)
+            _stroke(arc, col, 2)
+        for x, y, bw, bh, text in spec.get("badges", []):  # a language badge: aegean, fully round, the code on it
+            color(P.AEGEAN).setFill()
+            NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(NSMakeRect(x, y, bw, bh), bh / 2, bh / 2).fill()
+            attrs = {NSFontAttributeName: font(CAP_FONT, True), NSForegroundColorAttributeName: color(P.PAPER)}
+            t = NSString.stringWithString_(text)
+            sz = t.sizeWithAttributes_(attrs)
+            t.drawAtPoint_withAttributes_((x + (bw - sz.width) / 2, y + (bh - sz.height) / 2), attrs)
+        for kind, cx, cy, col in spec.get("glyphs", []):  # a notice's icon: the struck mic, the warning ring
+            _glyph(kind, cx, cy, col)
         for x, top, bottom, col in spec.get("lines", []):  # the waveform: 2 px round-capped bars
             line = NSBezierPath.bezierPath()
             line.setLineWidth_(2)
@@ -241,6 +256,11 @@ def fit_tail(text: str, width: float, size: float) -> str:
     return "…" + out
 
 
+def wave_color(v: float) -> str:
+    """A waveform bar's color (pill A): pale when loud, mid when quiet, dim when silent."""
+    return (P.AEGEAN_PALE if v > 0.25 else P.AEGEAN_MID) if v > 0.04 else P.PILL_OFF
+
+
 class Overlay:
     """ui.Overlay for the Mac: same states (hidden / recording / busy + flash + meeting layer)."""
 
@@ -283,13 +303,6 @@ class Overlay:
     def _hide(self) -> None:
         self.panel.orderOut_(None)
         self.visible = False
-
-    def _pill(self, dot: str, label: str, bars=None) -> None:
-        """A flash: the words alone, centred on a pill that grows to fit them."""
-        w = max(W, int(_text_width(label, 13, False)) + 2 * 24)
-        self._size(w, RH)
-        self._drawn = None
-        self._set({"w": w, "h": RH, "texts": [(label, 0, RH / 2, 13, False, P.PAPER, True)]})
 
     def _hover(self) -> bool:
         """Is the mouse on the pill? The panel stays click-through: the mouse is polled, never caught."""
@@ -338,27 +351,27 @@ class Overlay:
         self._drawn = None
         cy = RH / 2
         lit = lvl > 0.05 or int((now - self._t0) / 0.5) % 2 == 0  # quiet: blink every 0.5 s
-        ovals = [(21, cy, 18, P.TILE_HALO), (21, cy, 10, P.TILE)] if lit else [(21, cy, 10, P.TILE_DIM)]
+        ovals = [(21, cy, 18, P.TILE_HALO), (21, cy, 10, P.CLAY_BRIGHT)] if lit else [(21, cy, 10, P.TILE_DIM)]
         timer = f"{secs // 60}:{secs % 60:02d}"
         tw = _text_width(timer, TIMER_FONT, True)
         texts = [(timer, w - 16 - tw, cy, TIMER_FONT, True, P.PAPER, False)]
-        spec = {"w": w, "h": h, "radius": 18 if self.live_text else RH / 2, "ovals": ovals, "texts": texts}
+        spec = {"w": w, "h": h, "radius": RH / 2, "ovals": ovals, "texts": texts}
         caps, tail = keycaps(self.cancel_hint)
         if caps and now - self._t0 < HINT_S:
             spec["caps"], more, x = _cap_layout(caps, WAVE_X, cy)
             texts.extend(more)
             if tail:
-                texts.append((tail, x + 2, cy, CAP_FONT, False, P.LINE, False))
+                texts.append((tail, x + 2, cy, CAP_FONT, False, P.AEGEAN_PALE, False))
         else:
             step = WAVE_W / WAVE_N
             lines = []
             for i, v in enumerate(self._wave):
                 x = WAVE_X + step * (WAVE_N - len(self._wave) + i) + step / 2
                 bh = 2 + v ** 1.5 * (RH - 18)
-                lines.append((x, cy - bh / 2, cy + bh / 2, P.PAPER if v > 0.04 else P.PILL_OFF))
+                lines.append((x, cy - bh / 2, cy + bh / 2, wave_color(v)))
             spec["lines"] = lines
         if self.live_text:
-            texts.append((fit_tail(self.live_text, w - 36, LIVE_FONT), 18, RH + 6 + 11, LIVE_FONT, False, P.PAPER, False))
+            texts.append((fit_tail(self.live_text, w - 36, LIVE_FONT), 18, RH + 12, LIVE_FONT, False, P.PAPER, False))
         self._set(spec)
 
     def _hint_width(self) -> int:
@@ -372,11 +385,42 @@ class Overlay:
         return max(RW, int(end + 14 + _text_width("8:88", TIMER_FONT, True) + 16))
 
     def _busy_pill(self) -> None:
-        """Busy: three aegean dots in their shades and "Writing it down" (dictado-6oe.9, like Windows)."""
-        self._size(W, H)
+        """Busy (pill A, dictado-v5g): a dim ring with a pale 90° arc turning once a second, and
+        "Writing it down". Redrawn every tick so the arc turns."""
+        label = "Writing it down"
+        w = int(16 + 16 + 10 + _text_width(label, TIMER_FONT, True) + 18)
+        self._size(w, RH)
         self._drawn = None
-        ovals = [(x, H / 2, 6, c) for x, c in zip((22, 33, 44), (P.AEGEAN_BRIGHT, P.AEGEAN_MID, P.AEGEAN_PALE))]
-        self._set({"w": W, "h": H, "ovals": ovals, "texts": [("Writing it down", 62, H / 2, TIMER_FONT, True, P.PAPER, False)]})
+        cy, start = RH / 2, (time.monotonic() * 360) % 360
+        arcs = [(23, cy, 7, 0, 360, P.PILL_OFF), (23, cy, 7, start, 90, P.AEGEAN_PALE)]
+        self._set({"w": w, "h": RH, "arcs": arcs, "texts": [(label, 16 + 16 + 10, cy, TIMER_FONT, True, P.PAPER, False)]})
+
+    def _notice(self, msg: str) -> None:
+        """A flash as pill A draws it (dictado-v5g): an icon (a language badge, a struck mic, a warning
+        ring), the words in bold, the mic's name softly after them. No icon: the words centred."""
+        n = notice(msg)
+        cy = RH / 2
+        badge_w = _text_width(n.badge, CAP_FONT, True) + 16 if n.icon == "lang" else 0
+        icon_w = {"nomic": 16, "warn": 16, "lang": badge_w}.get(n.icon, 0)
+        x = 8 if n.icon == "lang" else 16
+        tw = _text_width(n.text, TIMER_FONT, True)
+        dw = _text_width(n.detail, DETAIL_FONT, False) if n.detail else 0
+        w = max(120, int(x + icon_w + (10 if icon_w else 0) + tw + (10 + dw if n.detail else 0) + 18))
+        self._size(w, RH)
+        self._drawn = None
+        spec = {"w": w, "h": RH}
+        if n.icon == "lang":
+            spec["badges"] = [(x, cy - 12, badge_w, 24, n.badge)]
+        elif n.icon:
+            spec["glyphs"] = [(n.icon, x + 8, cy, P.CLAY_BRIGHT)]
+        if not n.icon:
+            spec["texts"] = [(n.text, 0, cy, TIMER_FONT, True, P.PAPER, True)]
+        else:
+            x += icon_w + 10
+            spec["texts"] = [(n.text, x, cy, TIMER_FONT, True, P.PAPER, False)]
+            if n.detail:
+                spec["texts"].append((n.detail, x + tw + 10, cy, DETAIL_FONT, False, P.AEGEAN_MUTED, False))
+        self._set(spec)
 
     # the ui.Overlay API
     def _show_layer(self) -> None:
@@ -420,7 +464,7 @@ class Overlay:
         self._flash_msg, self._flash_until = msg, time.monotonic() + seconds
         if self.mode == "recording":
             return
-        self._pill("", msg)
+        self._notice(msg)
         self._place_and_show()
 
     def tick(self) -> None:
@@ -440,6 +484,8 @@ class Overlay:
         elif self.mode == "busy" and self._flash_until and now >= self._flash_until:
             self._flash_until = 0.0
             self.busy()
+        elif self.mode == "busy" and not self._flash_until:
+            self._busy_pill()  # the arc turns
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -698,37 +744,44 @@ def _stroke(path, col: str, width: float = 1.6) -> None:
     path.stroke()
 
 
-def _glyph(kind: str, cx: float, cy: float) -> None:
+def _glyph(kind: str, cx: float, cy: float, g: str = P.AEGEAN_MUTED) -> None:
     """The icon on the prompt's tile, centred on (cx, cy): a call started = a clay dot; still there? = a
-    clock; no mic = a struck-out mic; a transcript ended = a page with lines."""
+    clock; no mic = a struck-out mic; a transcript ended = a page with lines. The pill's notices use
+    "nomic" and "warn" (a ring with "!") in clay (pill A)."""
     if kind == "start":
         color(P.CLAY_BRIGHT).setFill()
         NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(cx - 6, cy - 6, 12, 12)).fill()
     elif kind == "end?":
-        _stroke(NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(cx - 8, cy - 8, 16, 16)), P.AEGEAN_MUTED)
+        _stroke(NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(cx - 8, cy - 8, 16, 16)), g)
         hands = NSBezierPath.bezierPath()
         hands.moveToPoint_((cx, cy - 5))
         hands.lineToPoint_((cx, cy))
         hands.lineToPoint_((cx + 4, cy + 2))
-        _stroke(hands, P.AEGEAN_MUTED)
+        _stroke(hands, g)
     elif kind == "nomic":
-        _stroke(NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(NSMakeRect(cx - 3.5, cy - 9, 7, 11), 3.5, 3.5), P.AEGEAN_MUTED)
+        _stroke(NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(NSMakeRect(cx - 3.5, cy - 9, 7, 11), 3.5, 3.5), g)
         stand = NSBezierPath.bezierPath()
         stand.appendBezierPathWithArcWithCenter_radius_startAngle_endAngle_clockwise_((cx, cy - 1), 6, 0, 180, False)
         stand.moveToPoint_((cx, cy + 5))
         stand.lineToPoint_((cx, cy + 8))
-        _stroke(stand, P.AEGEAN_MUTED)
+        _stroke(stand, g)
         strike = NSBezierPath.bezierPath()
         strike.moveToPoint_((cx - 8, cy - 8))
         strike.lineToPoint_((cx + 8, cy + 8))
-        _stroke(strike, P.AEGEAN_MUTED)
+        _stroke(strike, g)
+    elif kind == "warn":
+        _stroke(NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(cx - 8, cy - 8, 16, 16)), g, 2)
+        attrs = {NSFontAttributeName: font(CAP_FONT, True), NSForegroundColorAttributeName: color(g)}
+        t = NSString.stringWithString_("!")
+        sz = t.sizeWithAttributes_(attrs)
+        t.drawAtPoint_withAttributes_((cx - sz.width / 2, cy - sz.height / 2), attrs)
     else:  # done / failed
-        _stroke(NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(NSMakeRect(cx - 6, cy - 8, 12, 16), 2, 2), P.AEGEAN_MUTED)
+        _stroke(NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(NSMakeRect(cx - 6, cy - 8, 12, 16), 2, 2), g)
         lines = NSBezierPath.bezierPath()
         for dy in (-3, 0, 3):
             lines.moveToPoint_((cx - 3, cy + dy))
             lines.lineToPoint_((cx + 3, cy + dy))
-        _stroke(lines, P.AEGEAN_MUTED, 1.2)
+        _stroke(lines, g, 1.2)
 
 
 # ---------------------------------------------------------------------------------------------------------------
