@@ -27,6 +27,8 @@ if sys.platform == "darwin":  # a MacBook has no Right Ctrl (decision D2: Right 
     HOTKEYS = [("rcmd", "Right Command (recommended)"), ("fn", "Fn / Globe"),
                ("rctrl", "Right Control (external keyboard)")] + [(f"f{n}", f"F{n}") for n in range(13, 20)]
 MEET_MODES = [("prompt", "Ask"), ("auto", "Start by itself"), ("off", "Don't detect")]
+# seconds the call app is off the mic before its meeting stops; no 20: config.load reads a saved 20 as 10 (dictado-mtc)
+MEET_ENDS = [(5, "5 seconds"), (10, "10 seconds"), (15, "15 seconds"), (30, "30 seconds"), (60, "1 minute"), (120, "2 minutes")]
 
 
 def _voice_command_list() -> list[dict]:
@@ -174,7 +176,7 @@ class Api:
                 "hotkey": c.hotkey.key, "hotkey_label": hotkeys.label(c.hotkey.key), "mic": cur, "languages": ",".join(c.whisper.languages),
                 "sounds": c.ui.sounds, "overlay": c.ui.overlay, "live_text": c.ui.live_text, "insights": c.ui.insights, "speech_feedback": c.ui.speech_feedback, "unmute": c.audio.unmute_while_recording,
                 "startup": self._startup.is_enabled(),
-                "meet_mode": c.meetings.mode, "meet_lang": c.meetings.default_lang, "on_demand": c.whisper.on_demand,
+                "meet_mode": c.meetings.mode, "meet_end": str(int(c.meetings.grace_s)), "meet_lang": c.meetings.default_lang, "on_demand": c.whisper.on_demand,
                 "speakers": c.meetings.speakers, "vocabulary": "\n".join(c.text.vocabulary),
                 "voice_commands": c.text.voice_commands,
                 "screen_names": c.text.screen_names,
@@ -195,6 +197,9 @@ class Api:
                                          if v not in available(c.whisper.extra_languages)), key=lambda o: o["label"]),
                 "base_languages": list(BASE_LANGS),
                 "meet_modes": [{"value": v, "label": l} for v, l in MEET_MODES],
+                "meet_ends": [{"value": str(v), "label": l} for v, l in MEET_ENDS]
+                + ([] if int(c.meetings.grace_s) in dict(MEET_ENDS)  # a value typed into config.toml stays selectable
+                   else [{"value": str(int(c.meetings.grace_s)), "label": f"{int(c.meetings.grace_s)} seconds"}]),
                 "meet_langs": [{"value": v, "label": l} for v, l in meeting_options(available(c.whisper.extra_languages))],
             },
             "can_startup": self._startup.app_command() is not None,
@@ -254,6 +259,11 @@ class Api:
                 if values["meet_mode"] not in dict(MEET_MODES):
                     raise ValueError("meet_mode")
                 c.meetings.mode = values["meet_mode"]
+            if "meet_end" in values:
+                end = int(str(values["meet_end"]))  # ValueError on junk
+                if end != int(c.meetings.grace_s) and end not in dict(MEET_ENDS):
+                    raise ValueError("meet_end")
+                c.meetings.grace_s = end
             if "calendar_url" in values:
                 from .calendar_ics import valid_url
                 url = str(values["calendar_url"] or "").strip()
