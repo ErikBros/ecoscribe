@@ -98,6 +98,32 @@ _LINE = re.compile(_B + f"(?:{_phrases('line')})" + _E, re.IGNORECASE)
 _ENTER = re.compile(_B + f"(?:{_phrases('enter')})" + r"\s*[.!]?\s*$", re.IGNORECASE)
 
 
+# Spoken quotes (dictado-y52): "called, quote, weekly review, end quote." -> called "weekly review".
+# Always on in dictation: it needs both the opening and the closing words, so a lone "quote"
+# ("get a quote") stays text.
+QUOTES = {"en": (["open quote", "quote"], ["end quote", "close quote", "end of quote", "unquote"]),
+          "es": (["abre comillas", "comillas"], ["cierra comillas", "fin de comillas"]),
+          "sv": (["citat"], ["slut citat", "citat slut"])}
+
+
+def _alt(ps) -> str:
+    return "|".join(r"\s+".join(map(re.escape, p.split())) for p in sorted(ps, key=len, reverse=True))
+
+
+_QUOTE = re.compile(
+    r"[,:]?\s*(?<!\w)(?:" + _alt([p for o, _ in QUOTES.values() for p in o]) + r")(?!\w)[,:.]?\s*"
+    r"(\S.*?)[,.;:]?\s*(?<!\w)(?:" + _alt([p for _, c in QUOTES.values() for p in c]) + r")(?!\w)",
+    re.IGNORECASE | re.DOTALL)
+
+
+def spoken_quotes(s: str) -> str:
+    """Words said between "quote" and "end quote" (or "unquote") come out in quotation marks."""
+    if not s:
+        return s
+    out = _QUOTE.sub(lambda m: ' "' + m.group(1).strip() + '"', s)
+    return out.lstrip() if out != s else s
+
+
 def _end(punct: str) -> str:
     return punct if punct in ".!?" else ("." if punct else "")
 
