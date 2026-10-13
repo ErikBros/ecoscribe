@@ -115,6 +115,28 @@ def test_download_goes_straight_to_downloads(env, tmp_path):
     assert (tmp_path / "Downloads" / c["name"]).read_text(encoding="utf-8").startswith("# Sprint retro")
 
 
+def test_downloads_go_to_the_picked_folder_and_open_folder_shows_only_that_file(env, tmp_path, monkeypatch):
+    """dictado-yq9: Settings picks the folder; the toast's Open folder selects the file just saved."""
+    import ecoscribe.window as w
+    api, root, *_ = env
+    api._downloads = tmp_path / "Downloads"
+    shown = []
+    monkeypatch.setattr(w, "_reveal", shown.append)
+    d = make(root, "Retro v41", 7, segs=[{"t0": 0, "t1": 2, "text": "Hej", "speaker": "Others"}])
+    assert api.get_settings()["values"]["export_default"]
+    assert not api.set_export_dir(str(tmp_path / "nope"))["ok"]
+    picked = tmp_path / "Picked"
+    picked.mkdir()
+    got = api.set_export_dir(str(picked))
+    assert got["ok"] and not got["export_default"] and api.get_settings()["values"]["export_dir"] == str(picked)
+    a = api.save_export(d.name, "md")
+    assert a["folder"] == "Picked" and (picked / a["name"]).exists()
+    assert not api.show_export(str(tmp_path / "elsewhere.md"))["ok"] and shown == []
+    assert api.show_export(a["path"])["ok"] and shown == [a["path"]]
+    assert api.set_export_dir("")["export_default"]
+    assert api.save_export(d.name, "md")["folder"] == "Downloads"
+
+
 def test_rename_a_speaker_everywhere(env):
     """t0u.22: click a label, type a name: view, .md and Copy for Claude use it."""
     api, root, _, copied, _ = env

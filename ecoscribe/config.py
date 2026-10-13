@@ -84,6 +84,7 @@ class UiCfg:
     overlay: bool = True
     live_text: bool = True  # dictado-live: the pill shows what it has heard so far while you dictate
     insights: bool = False  # dictado-3je: the Insights tab (what your dictations say about how you talk)
+    export_dir: str = ""  # dictado-yq9: where Download puts transcripts; empty = the Downloads folder
     typing_wpm: int = 40  # dictado-d8e: your typing speed, what Insights' time saved is measured against
     speech_feedback: bool = False  # dictado-9jc.3: the pill notes fillers and hedges after a message to a person
     sounds: bool = True
