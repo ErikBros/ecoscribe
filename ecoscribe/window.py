@@ -632,7 +632,7 @@ class Api:
     def pick_files(self) -> dict:
         import webview
         kinds = ("Audio and video (*.mp3;*.m4a;*.wav;*.ogg;*.opus;*.flac;*.mp4;*.webm;*.mkv;*.mov)", "All files (*.*)")
-        got = webview.windows[0].create_file_dialog(webview.OPEN_DIALOG, allow_multiple=True, file_types=kinds)
+        got = webview.windows[0].create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True, file_types=kinds)
         return {"paths": list(got or [])}
 
     def rename_session(self, name: str, title: str) -> dict:
