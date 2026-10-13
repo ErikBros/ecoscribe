@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 import math
 import time
+from collections import deque
 from pathlib import Path
 
 import objc
@@ -38,7 +39,11 @@ log = logging.getLogger(__name__)
 W, H = 210, 44
 MW, MH = 380, 56  # the meeting pill opened by the mouse: label + latest live line
 CW, CH = 92, 30  # the meeting pill as it sits: a small chip, recording dot + timer (dictado-f6o)
-LW, LH = 460, 84  # the dictating pill with live text under it (dictado-ayq, like Windows)
+RW, RH = 236, 38  # the dictating pill: dot, scrolling waveform, timer (dictado-dlm)
+WAVE_X, WAVE_W, WAVE_N = 38, 130, 24  # one bar per 50 ms tick, newest on the right
+LW, LH = 440, 66  # the dictating pill with the newest live words under it (dictado-ayq)
+HINT_S = 2.0  # the keycaps hint shows this long, then the waveform takes its place
+TIMER_FONT, CAP_FONT, LIVE_FONT = 13, 11, 13  # Windows' bold 10 pt / bold 8 pt, in AppKit points
 NSStatusWindowLevel = 25
 BOTTOM_GAP = 80
 
@@ -149,6 +154,26 @@ class PillView(NSView):
         if spec.get("dot"):
             color(spec["dot"]).setFill()
             NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(spec.get("dot_x", 16), spec.get("dot_y", r) - 6, 12, 12)).fill()
+        for cx, cy, d, col in spec.get("ovals", []):  # centred circles: the recording dot, its halo, busy dots
+            color(col).setFill()
+            NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(cx - d / 2, cy - d / 2, d, d)).fill()
+        for x, top, bottom, col in spec.get("lines", []):  # the waveform: 2 px round-capped bars
+            line = NSBezierPath.bezierPath()
+            line.setLineWidth_(2)
+            line.setLineCapStyle_(1)  # NSLineCapStyleRound
+            line.moveToPoint_((x, top))
+            line.lineToPoint_((x, bottom))
+            color(col).setStroke()
+            line.stroke()
+        for x, y, cw, chh, text in spec.get("caps", []):  # keycaps: rounded outline, bold label
+            box = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(NSMakeRect(x + 0.5, y + 0.5, cw - 1, chh - 1), 5, 5)
+            box.setLineWidth_(1)
+            color(P.KEYCAP_LINE).setStroke()
+            box.stroke()
+            attrs = {NSFontAttributeName: font(CAP_FONT, True), NSForegroundColorAttributeName: color(P.PAPER)}
+            t = NSString.stringWithString_(text)
+            sz = t.sizeWithAttributes_(attrs)
+            t.drawAtPoint_withAttributes_((x + (cw - sz.width) / 2, y + (chh - sz.height) / 2), attrs)
         for text, x, y, size, bold, col, center in spec.get("texts", []):
             attrs = {NSFontAttributeName: font(size, bold), NSForegroundColorAttributeName: color(col)}
             s = NSString.stringWithString_(text)
@@ -167,12 +192,53 @@ class PillView(NSView):
 def cancel_hint(hk) -> str:
     """The pill's second line while dictating, from the HotkeyCfg."""
     from ...hotkeys import combo_vks, label
-    key = "⌘" if hk.key == "rcmd" else label(hk.key)
+    key = "Right ⌘" if hk.key == "rcmd" else label(hk.key)
     if combo_vks(hk.key):  # a combo: press it again to finish; Esc doesn't cancel (menu bar does)
         return f"Press {key} again to finish · Cancel: menu bar"
     if hk.hold_to_talk:
         return f"Let go or tap {key} to finish · {key} + Esc cancels"
     return f"Tap {key} again to finish · Hold {key} + Esc to cancel"
+
+
+def keycaps(hint: str) -> tuple[list[str], str]:
+    """The cancel part of the hint as keycaps: "Hold Right ⌘ + Esc to cancel" -> (["Right ⌘", "Esc"], "cancels").
+    No "+" in it (a combo hotkey cancels from the menu bar): no keycaps."""
+    part = next((p for p in hint.split(" · ") if " + " in p), "")
+    if not part:
+        return [], ""
+    keys = part.split(" to ")[0].split(" cancels")[0]
+    caps = [k.strip() for k in keys.split(" + ")]
+    for verb in ("Hold ", "Tap ", "Press "):
+        if caps[0].startswith(verb):
+            caps[0] = caps[0][len(verb):]
+    return caps, "cancels"
+
+
+def _cap_layout(caps: list[str], x: float, cy: float):
+    """Keycap boxes from x, a "+" between them: (boxes, texts, the x after the last box) for PillView."""
+    boxes, texts, ch = [], [], 18
+    for i, cap in enumerate(caps):
+        if i:
+            texts.append(("+", x + 2, cy, CAP_FONT, True, P.LINE, False))
+            x += _text_width("+", CAP_FONT, True) + 4
+        cw = _text_width(cap, CAP_FONT, True) + 12
+        boxes.append((x, cy - ch / 2, cw, ch, cap))
+        x += cw + 4
+    return boxes, texts, x
+
+
+def fit_tail(text: str, width: float, size: float) -> str:
+    """The end of text that fits in width, cut on the left with "…" (the newest words stay)."""
+    text = " ".join(text.split())
+    if _text_width(text, size, False) <= width:
+        return text
+    words = text.split(" ")
+    while len(words) > 1 and _text_width("…" + " ".join(words), size, False) > width:
+        words.pop(0)
+    out = " ".join(words)
+    while out and _text_width("…" + out, size, False) > width:  # one long word: cut by characters
+        out = out[1:]
+    return "…" + out
 
 
 class Overlay:
@@ -191,9 +257,11 @@ class Overlay:
         self.meeting: dict | None = None
         self._drawn = None
         self.visible = False
-        self.cancel_hint = hint or "Tap ⌘ again to finish · Hold ⌘ + Esc to cancel"  # cancel_hint() below
+        self.cancel_hint = hint or "Tap Right ⌘ again to finish · Hold Right ⌘ + Esc to cancel"  # cancel_hint() below
         self.live_text = ""  # what the live transcript has heard so far (dictado-ayq)
         self.open = False  # the meeting chip is opened by the mouse over it (dictado-f6o)
+        self._wave: deque = deque(maxlen=WAVE_N)  # the last WAVE_N levels, oldest first
+        self._rw = RW
 
     # drawing primitives
     def _size(self, w: int, h: int) -> None:
@@ -217,12 +285,11 @@ class Overlay:
         self.visible = False
 
     def _pill(self, dot: str, label: str, bars=None) -> None:
-        tw = NSString.stringWithString_(label).sizeWithAttributes_({NSFontAttributeName: font(13)}).width
-        w = W if dot else max(W, int(tw) + 2 * 24)  # a flash grows to fit its words
-        self._size(w, H)
+        """A flash: the words alone, centred on a pill that grows to fit them."""
+        w = max(W, int(_text_width(label, 13, False)) + 2 * 24)
+        self._size(w, RH)
         self._drawn = None
-        texts = [(label, 40 if dot else 0, H / 2, 13, False, P.PAPER, not dot)]
-        self._set({"w": w, "h": H, "dot": dot, "texts": texts, "bars": bars or []})
+        self._set({"w": w, "h": RH, "texts": [(label, 0, RH / 2, 13, False, P.PAPER, True)]})
 
     def _hover(self) -> bool:
         """Is the mouse on the pill? The panel stays click-through: the mouse is polled, never caught."""
@@ -259,42 +326,57 @@ class Overlay:
         self._place_and_show()
         self._drawn = key
 
-    def _recording_pill(self, label: str, lvl: float) -> None:
-        """Two lines while dictating: the timer, and how to cancel. With live text, a wider box:
-        timer and hint on top, what it has heard so far under them (two lines, the newest words)."""
-        hint = self.cancel_hint
-        if self.live_text:
-            return self._live_pill(label, hint, lvl)
-        tw = max(NSString.stringWithString_(t).sizeWithAttributes_({NSFontAttributeName: font(12)}).width
-                 for t in (label, hint))
-        w = max(W, int(tw * 1.06) + 42 + 80)  # bold label is wider; room for the level bars
-        self._size(w, MH)
-        self._drawn = None
-        bars = []
-        for i in range(5):
-            hgt = 6 + i * 3
-            bars.append((w - 62 + i * 9, MH / 2 - hgt / 2, MH / 2 + hgt / 2, lvl > (i + 0.5) / 5))
-        texts = [(label, 42, 18, 12, True, P.PAPER, False), (hint, 42, 38, 12, False, P.LINE, False)]
-        self._set({"w": w, "h": MH, "dot": P.TILE, "dot_x": 18, "texts": texts, "bars": bars})
-
-    def _live_pill(self, label: str, hint: str, lvl: float) -> None:
-        lw = NSString.stringWithString_("Dictating 88:88").sizeWithAttributes_({NSFontAttributeName: font(12, True)}).width  # fixed: the hint doesn't move as the timer ticks
-        hx = 42 + int(lw) + 14
-        hw = NSString.stringWithString_(hint).sizeWithAttributes_({NSFontAttributeName: font(11)}).width
-        w = max(LW, hx + int(hw) + 80)  # hint never runs into the level bars
-        grew = (w, LH) != (self.w, self.h)
-        self._size(w, LH)
+    def _recording_pill(self, secs: int, lvl: float, now: float) -> None:
+        """The minimal dictation pill (dictado-dlm): a breathing dot, the waveform scrolling from the
+        right, the timer. The first HINT_S seconds show how to cancel as keycaps instead of the waveform.
+        With live text the box grows and one line under it shows the newest words, cut on the left."""
+        w, h = (LW, LH) if self.live_text else (self._rw, RH)
+        grew = (w, h) != (self.w, self.h)
+        self._size(w, h)
         if grew:
             self._place_and_show()  # stay centred at the new size
         self._drawn = None
-        bars = []
-        for i in range(5):
-            hgt = 6 + i * 3
-            bars.append((w - 62 + i * 9, 20 - hgt / 2, 20 + hgt / 2, lvl > (i + 0.5) / 5))
-        texts = [(label, 42, 20, 12, True, P.PAPER, False), (hint, hx, 20, 11, False, P.LINE, False)]
-        para = (self.live_text, 18, 36, w - 36, LH - 40, 13, P.PAPER)
-        self._set({"w": w, "h": LH, "radius": 22, "dot": P.TILE, "dot_x": 18, "dot_y": 20,
-                   "texts": texts, "bars": bars, "para": para})
+        cy = RH / 2
+        lit = lvl > 0.05 or int((now - self._t0) / 0.5) % 2 == 0  # quiet: blink every 0.5 s
+        ovals = [(21, cy, 18, P.TILE_HALO), (21, cy, 10, P.TILE)] if lit else [(21, cy, 10, P.TILE_DIM)]
+        timer = f"{secs // 60}:{secs % 60:02d}"
+        tw = _text_width(timer, TIMER_FONT, True)
+        texts = [(timer, w - 16 - tw, cy, TIMER_FONT, True, P.PAPER, False)]
+        spec = {"w": w, "h": h, "radius": 18 if self.live_text else RH / 2, "ovals": ovals, "texts": texts}
+        caps, tail = keycaps(self.cancel_hint)
+        if caps and now - self._t0 < HINT_S:
+            spec["caps"], more, x = _cap_layout(caps, WAVE_X, cy)
+            texts.extend(more)
+            if tail:
+                texts.append((tail, x + 2, cy, CAP_FONT, False, P.LINE, False))
+        else:
+            step = WAVE_W / WAVE_N
+            lines = []
+            for i, v in enumerate(self._wave):
+                x = WAVE_X + step * (WAVE_N - len(self._wave) + i) + step / 2
+                bh = 2 + v ** 1.5 * (RH - 18)
+                lines.append((x, cy - bh / 2, cy + bh / 2, P.PAPER if v > 0.04 else P.PILL_OFF))
+            spec["lines"] = lines
+        if self.live_text:
+            texts.append((fit_tail(self.live_text, w - 36, LIVE_FONT), 18, RH + 6 + 11, LIVE_FONT, False, P.PAPER, False))
+        self._set(spec)
+
+    def _hint_width(self) -> int:
+        """The pill's width while dictating: RW, or wider if the keycaps hint and the timer need it (the
+        width stays put for the whole dictation, so nothing jumps when the waveform takes over)."""
+        caps, tail = keycaps(self.cancel_hint)
+        if not caps:
+            return RW
+        _boxes, _texts, x = _cap_layout(caps, WAVE_X, 0)
+        end = x + 2 + (_text_width(tail, CAP_FONT, False) if tail else 0)
+        return max(RW, int(end + 14 + _text_width("8:88", TIMER_FONT, True) + 16))
+
+    def _busy_pill(self) -> None:
+        """Busy: three aegean dots in their shades and "Writing it down" (dictado-6oe.9, like Windows)."""
+        self._size(W, H)
+        self._drawn = None
+        ovals = [(x, H / 2, 6, c) for x, c in zip((22, 33, 44), (P.AEGEAN_BRIGHT, P.AEGEAN_MID, P.AEGEAN_PALE))]
+        self._set({"w": W, "h": H, "ovals": ovals, "texts": [("Writing it down", 62, H / 2, TIMER_FONT, True, P.PAPER, False)]})
 
     # the ui.Overlay API
     def _show_layer(self) -> None:
@@ -312,6 +394,8 @@ class Overlay:
     def recording(self, t0: float) -> None:
         self.mode, self._t0 = "recording", t0
         self.live_text = ""
+        self._wave.clear()
+        self._rw = self._hint_width()
         self._place_and_show()
         self.tick()
 
@@ -323,7 +407,7 @@ class Overlay:
     def busy(self) -> None:
         self.mode = "busy"
         self.live_text = ""
-        self._pill(P.AEGEAN_SOFT, "Transcribing…")
+        self._busy_pill()
         self._place_and_show()
 
     def idle(self) -> None:
@@ -342,9 +426,9 @@ class Overlay:
     def tick(self) -> None:
         now = time.monotonic()
         if self.mode == "recording":
-            secs = int(now - self._t0)
             lvl = min(1.0, math.sqrt(self.level_fn()) * 4)
-            self._recording_pill(f"Dictating {secs // 60}:{secs % 60:02d}", lvl)
+            self._wave.append(lvl)
+            self._recording_pill(int(now - self._t0), lvl, now)
         elif self.mode == "hidden" and self._flash_until and now >= self._flash_until:
             self._flash_until = 0.0
             self._show_layer()
@@ -394,8 +478,9 @@ class _Pressable(NSView):
         return True
 
     @objc.python_method
-    def setup(self, title: str, fill: str, hover: str, fn, chevron: bool = False, size: float = 12, bold: bool = True):
-        self._title, self._fill, self._hoverc, self._fn = title, fill, hover, fn
+    def setup(self, title: str, fill: str, hover: str, fn, chevron: bool = False, size: float = 12, bold: bool = True,
+              ink: str = P.PAPER):
+        self._title, self._fill, self._hoverc, self._fn, self._ink = title, fill, hover, fn, ink
         self._chev, self._fsize, self._bold, self._over = chevron, size, bold, False
         from AppKit import NSTrackingActiveAlways, NSTrackingArea, NSTrackingInVisibleRect, NSTrackingMouseEnteredAndExited
         self.addTrackingArea_(NSTrackingArea.alloc().initWithRect_options_owner_userInfo_(
@@ -425,7 +510,7 @@ class _Pressable(NSView):
         r = b.size.height / 2
         color(self._hoverc if self._over else self._fill).setFill()
         NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(b, r, r).fill()
-        attrs = {NSFontAttributeName: font(self._fsize, self._bold), NSForegroundColorAttributeName: color(P.PAPER)}
+        attrs = {NSFontAttributeName: font(self._fsize, self._bold), NSForegroundColorAttributeName: color(self._ink)}
         t = NSString.stringWithString_(self._title)
         sz = t.sizeWithAttributes_(attrs)
         x = 12 if self._chev else (b.size.width - sz.width) / 2
@@ -442,15 +527,17 @@ def _text_width(text: str, size: float, bold: bool) -> float:
 
 
 class PromptWindow:
-    """ui.PromptWindow for the Mac (same placement rules, countdown and answers): a rounded ink card
-    like the pill, with rounded buttons and the language as a chip with a menu (dictado-jfz)."""
+    """ui.PromptWindow for the Mac (same placement rules, countdown and answers): an ink card with an icon
+    tile, the title and question beside it, round buttons (the first one light) and a countdown line
+    draining along the bottom edge (dictado-6oe.9). The language is a chip with a menu (dictado-jfz)."""
 
-    PAD, BH, GAP, PW = 18, 30, 8, 340
+    PAD, BH, GAP, PW, TILE = 18, 32, 8, 360, 38
 
     def __init__(self, root, on_answer):
         self.root, self.on_answer = root, on_answer
         self.prompt: meetui.Prompt | None = None
         self.panel = None
+        self.box = None
         self._later: list[meetui.Prompt] = []
         self._btns: dict = {}
         self._targets: list = []
@@ -463,54 +550,57 @@ class PromptWindow:
             return
         self._close()
         self.prompt = prompt
-        pad, bh, gap = self.PAD, self.BH, self.GAP
+        pad, bh, gap, tile = self.PAD, self.BH, self.GAP, self.TILE
+        tx = pad + tile + 14  # the text column, right of the icon tile
         now = time.monotonic()
         labels = [(prompt.button_text(c, now), c) for _l, c in prompt.buttons]  # "Not now (10)": the widest
         bws = [int(_text_width(t, 12, True)) + 32 for t, _c in labels]
-        title = _label(prompt.title, 14, True, P.PAPER)
-        width = int(max(self.PW, sum(bws) + gap * (len(bws) - 1) + 2 * pad, title.frame().size.width + 2 * pad))
-        # layout top-down (the content view is flipped)
-        content = _Box.alloc().initWithFrame_(NSMakeRect(0, 0, width, 10))
+        title = _label(prompt.title, 14.5, True, P.PAPER)
+        width = int(max(self.PW, sum(bws) + gap * (len(bws) - 1) + 2 * pad, tx + title.frame().size.width + pad))
+        content = _Box.alloc().initWithFrame_(NSMakeRect(0, 0, width, 10))  # laid out top-down (flipped)
+        content.kind = prompt.kind
         y = pad
-        title.setFrameOrigin_((pad - 2, y))
+        title.setFrameOrigin_((tx - 2, y))
         content.addSubview_(title)
-        y += title.frame().size.height + 4
+        y += title.frame().size.height + 2
         if prompt.question:
             q = NSTextField.wrappingLabelWithString_(prompt.question)
-            q.setFont_(font(12))
+            q.setFont_(font(13))
             q.setTextColor_(color(P.LINE))
-            q.setPreferredMaxLayoutWidth_(width - 2 * pad)
+            q.setPreferredMaxLayoutWidth_(width - tx - pad)
             q.setFrameSize_(q.fittingSize())
-            q.setFrameOrigin_((pad - 2, y))
+            q.setFrameOrigin_((tx - 2, y))
             content.addSubview_(q)
-            y += q.frame().size.height + 4
+            y += q.frame().size.height
+        y = max(y, pad + tile)
         self.lang, self.lang_chip = None, None
         if prompt.kind == "start":  # the language: a rounded chip that opens a menu
             self.lang = dict(meetui.LANGS).get(prompt.lang or "sv", "Swedish")
             cw = int(max(_text_width(n, 12, False) for _, n in meetui.LANGS)) + 44
-            chip = _Pressable.alloc().initWithFrame_(NSMakeRect(pad, y + 4, cw, 28)).setup(
+            chip = _Pressable.alloc().initWithFrame_(NSMakeRect(tx, y + 10, cw, 28)).setup(
                 self.lang, P.INK_2, P.PILL_OFF, self._lang_menu, chevron=True, bold=False)
             content.addSubview_(chip)
             self.lang_chip = chip
-            y += 28 + 12
-        y += 10
+            y += 10 + 28
+        y += 14
         self._btns = {}
         x = width - pad
         for i, ((text, choice), bw) in reversed(list(enumerate(zip(labels, bws)))):
-            fill, hover = (P.AEGEAN_BRIGHT, P.AEGEAN) if i == 0 else (P.PILL_OFF, P.INK_2)
+            fill, hover, ink = (P.PAPER, P.PAPER_HOVER, P.INK) if i == 0 else (P.PILL_OFF, P.INK_2, P.PAPER)
             b = _Pressable.alloc().initWithFrame_(NSMakeRect(x - bw, y, bw, bh)).setup(
-                text, fill, hover, lambda _v, c=choice: self._answer(c))
+                text, fill, hover, lambda _v, c=choice: self._answer(c), ink=ink)
             content.addSubview_(b)
             self._btns[choice] = b
             x -= bw + gap
         height = int(y + bh + pad)
         content.setFrameSize_((width, height))
+        content.left = 1.0
         panel = _panel(width, height, clickable=True)
         panel.setContentView_(content)
         px, py = _bottom_center(width, height, lift=MH + 12)
         panel.setFrameOrigin_((px, py))
         panel.orderFrontRegardless()
-        self.panel = panel
+        self.panel, self.box = panel, content
 
     def _lang_menu(self, chip) -> None:
         menu = NSMenu.alloc().init()
@@ -549,7 +639,7 @@ class PromptWindow:
     def _close(self) -> None:
         if self.panel is not None:
             self.panel.orderOut_(None)
-        self.panel, self.prompt = None, None
+        self.panel, self.prompt, self.box = None, None, None
 
     def hide(self) -> None:
         self._close()
@@ -569,17 +659,76 @@ class PromptWindow:
                 text = self.prompt.button_text(choice, now)
                 if str(b.title()) != text:
                     b.setTitle_(text)
+            if self.box is not None:  # the countdown line drains every tick
+                self.box.left = max(0.0, 1 - (now - self.prompt.opened_at) / self.prompt.timeout_s)
+                self.box.setNeedsDisplay_(True)
 
 
 class _Box(NSView):
-    """The prompt's card: rounded ink, like the pill (dictado-jfz). Flipped: laid out top-down."""
+    """The prompt's card: ink, radius 20, the icon tile for its kind and the countdown line along the
+    bottom (dictado-6oe.9). Flipped: laid out top-down."""
 
     def isFlipped(self):
         return True
 
     def drawRect_(self, rect):
+        b = self.bounds()
+        w, h = b.size.width, b.size.height
         color(P.INK, 0.97).setFill()
-        NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(self.bounds(), 16, 16).fill()
+        NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(b, 20, 20).fill()
+        kind = getattr(self, "kind", "")
+        color(P.TILE_CALL if kind == "start" else P.TILE_NOTE).setFill()
+        NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(NSMakeRect(18, 18, 38, 38), 11, 11).fill()
+        _glyph(kind, 18 + 19, 18 + 19)
+        left = getattr(self, "left", 1.0)
+        if left > 0:
+            line = NSBezierPath.bezierPath()
+            line.setLineWidth_(3)
+            line.setLineCapStyle_(1)  # round
+            line.moveToPoint_((20, h - 2))
+            line.lineToPoint_((20 + (w - 40) * left, h - 2))
+            color(P.AEGEAN_MID).setStroke()
+            line.stroke()
+
+
+def _stroke(path, col: str, width: float = 1.6) -> None:
+    path.setLineWidth_(width)
+    path.setLineCapStyle_(1)
+    color(col).setStroke()
+    path.stroke()
+
+
+def _glyph(kind: str, cx: float, cy: float) -> None:
+    """The icon on the prompt's tile, centred on (cx, cy): a call started = a clay dot; still there? = a
+    clock; no mic = a struck-out mic; a transcript ended = a page with lines."""
+    if kind == "start":
+        color(P.CLAY_BRIGHT).setFill()
+        NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(cx - 6, cy - 6, 12, 12)).fill()
+    elif kind == "end?":
+        _stroke(NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(cx - 8, cy - 8, 16, 16)), P.AEGEAN_MUTED)
+        hands = NSBezierPath.bezierPath()
+        hands.moveToPoint_((cx, cy - 5))
+        hands.lineToPoint_((cx, cy))
+        hands.lineToPoint_((cx + 4, cy + 2))
+        _stroke(hands, P.AEGEAN_MUTED)
+    elif kind == "nomic":
+        _stroke(NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(NSMakeRect(cx - 3.5, cy - 9, 7, 11), 3.5, 3.5), P.AEGEAN_MUTED)
+        stand = NSBezierPath.bezierPath()
+        stand.appendBezierPathWithArcWithCenter_radius_startAngle_endAngle_clockwise_((cx, cy - 1), 6, 0, 180, False)
+        stand.moveToPoint_((cx, cy + 5))
+        stand.lineToPoint_((cx, cy + 8))
+        _stroke(stand, P.AEGEAN_MUTED)
+        strike = NSBezierPath.bezierPath()
+        strike.moveToPoint_((cx - 8, cy - 8))
+        strike.lineToPoint_((cx + 8, cy + 8))
+        _stroke(strike, P.AEGEAN_MUTED)
+    else:  # done / failed
+        _stroke(NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(NSMakeRect(cx - 6, cy - 8, 12, 16), 2, 2), P.AEGEAN_MUTED)
+        lines = NSBezierPath.bezierPath()
+        for dy in (-3, 0, 3):
+            lines.moveToPoint_((cx - 3, cy + dy))
+            lines.lineToPoint_((cx + 3, cy + dy))
+        _stroke(lines, P.AEGEAN_MUTED, 1.2)
 
 
 # ---------------------------------------------------------------------------------------------------------------

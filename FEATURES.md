@@ -16,7 +16,7 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Feature | Windows | macOS |
 |---|---|---|
 | Dictation: tap or hold, paste, cancel with key + Esc | done | done |
-| Pill with timer, level and cancel hint | done (minimal: dot, waveform, timer; the hint for 2 s) | done (dictado-dlm: the minimal design) |
+| Pill with timer, level and cancel hint | done (minimal: dot, waveform, timer; the hint for 2 s) | done (dictado-dlm: breathing dot, 24-bar waveform, timer; keycaps hint for 2 s; busy = three dots + Writing it down) |
 | Pill A: every state and notice is one 40 px dark capsule (turning arc for Writing it down, a language badge, a struck mic + the mic's name, a warning ring); notice.py turns a flash into icon + words + detail | done (dictado-v5g) | to do (dictado-v5g, Mac session) |
 | Window: Home, History, Meetings, Settings | done | done |
 | Languages: English + Swedish built in, "Add a language" for any of Whisper's 100; dictation auto-detects among the ticked ones | done | done (auto-detect: English + Spanish at the Mac desktop, 100 % recall; "Add a language": German + Finnish added in the real Settings page, saved, in the menu bar and meeting lists, removed again (tools/mac_lang_check.py); dictated at the desktop, 100 % recall, Finnish moves dictation to large-v3) |
@@ -28,7 +28,7 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Meetings: live transcript, notes, Me / Others, exports, Copy for Claude | done | check on Mac (dictado-tjn): needs the System Audio Recording permission |
 | Meeting / file languages incl. Greek + Spanish mixed | done | done (GPU test passes on mlx) |
 | Meeting pill: a small chip (dot + timer) that shows the live line when the mouse is on it | done | done (dictado-f6o: polls the mouse, stays click-through; checked on screen) |
-| Meeting prompt box: a rounded dark card that says which meeting, rounded buttons, language as a chip with a menu | done | done (dictado-jfz, checked on screen) |
+| Meeting prompt box: a rounded dark card that says which meeting, rounded buttons, language as a chip with a menu | done | done (dictado-jfz; 6oe.9: icon tile per kind, light primary button, countdown line along the bottom) |
 | History: Retry a recent dictation (again, or in a chosen language); the last 20 keep their audio on this computer | done | check on Mac |
 | Settings > Speech models: each model's use, size on disk, download with progress, delete to free space | done | check on Mac |
 | Email to participants: a draft in your own mail program, to the calendar invite's guests, the transcript in it or copied to paste | done | check on Mac |
@@ -62,7 +62,7 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | System audio for meetings (the other side of a call) | done (WASAPI loopback) | done (Core Audio process tap; real capture: check on Mac, dictado-tjn) |
 | Call detection (who uses the mic, call windows) | done | done (real-call check: dictado-nhn) |
 | Tray / menu bar, pill and prompt box | done | done (AppKit) |
-| Live text on the pill while dictating | done (a quick pass every 2 s; the careful one is still what gets pasted) | done (Overlay.live: timer + hint on top, the newest two lines under them; 15 s preview on the Apple GPU 0.7 s with turbo, 1.9 s with large-v3) |
+| Live text on the pill while dictating | done (a quick pass every 2 s; the careful one is still what gets pasted) | done (Overlay.live: the pill grows to 440x66, the newest words on one line cut on the left; 15 s preview on the Apple GPU 0.7 s with turbo, 1.9 s with large-v3) |
 | Start at login | done (Run key; the old "Dictado" value moves to "Ecoscribe") | done (LaunchAgent com.erikbros.ecoscribe; the old com.erikbros.dictado one moves over) |
 | Single instance | done | done |
 | Settings saved -> restart signal | done | done |
