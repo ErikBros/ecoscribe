@@ -73,6 +73,10 @@ CAPABILITIES: dict[str, dict] = {
         "windows": "ecoscribe.platform.windows.shell:Overlay",  # Overlay.live: two lines under the timer
         "macos": "ecoscribe.platform.macos.shell:Overlay",  # Overlay.live: a 460x84 box, the newest two lines under the timer
     },
+    "Speakers pass during a call (when the GPU has room)": {
+        "windows": "ecoscribe.platform.windows.speakers:gpu_room",  # nvidia-smi free memory >= 3 GB
+        "macos": ("ticket", "dictado-692"),  # gpu_room() is False: the pass waits for the call to end
+    },
     "Start at login": {
         "windows": "ecoscribe.platform.windows.startup:enable,disable,is_enabled",
         "macos": "ecoscribe.platform.macos.startup:enable,disable,is_enabled",

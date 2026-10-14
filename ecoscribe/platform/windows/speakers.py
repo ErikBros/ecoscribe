@@ -19,3 +19,20 @@ def addon_exe(localappdata: Path | None = None) -> Path:
         if (progs / folder / exe).is_file():
             return progs / folder / exe
     return progs / NEW[0] / NEW[1]  # not installed: where it will be
+
+
+MIN_FREE_MB = 3000  # the add-on peaks ~2.6 GB on CUDA next to a live meeting (measured dictado-ngp)
+
+
+def gpu_room(min_free_mb: int = MIN_FREE_MB, run=None) -> bool:
+    """True when the NVIDIA GPU has room for the speakers pass next to a recording call (dictado-ngp).
+    No NVIDIA GPU, or nvidia-smi fails: False, and the pass waits for the call to end."""
+    import subprocess
+    run = run or subprocess.run
+    try:
+        out = run(["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"],
+                  capture_output=True, text=True, timeout=5,
+                  creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout
+        return int(out.strip().splitlines()[0]) >= min_free_mb
+    except Exception:
+        return False

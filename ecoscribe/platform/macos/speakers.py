@@ -20,3 +20,9 @@ def addon_exe(home: Path | None = None) -> Path:
             if (p / b).is_file():
                 return p / b
     return places[0] / BINARY  # not installed: where it will be
+
+
+def gpu_room() -> bool:
+    """Room for the speakers pass next to a recording call? Not measured on the Apple GPU yet
+    (dictado-692): False, so the pass waits for the call to end as before."""
+    return False

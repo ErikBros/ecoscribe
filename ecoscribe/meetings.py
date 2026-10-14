@@ -9,7 +9,9 @@ the pill; workers are detached, so a restarted background app adopts them by pid
 
 A session that ends done gets a speakers pass (`ecoscribe --speakers DIR`, t0u.22) when
 the speaker add-on is installed: a queued job like a file, run by meta `speakers:
-pending`, never touching the session's status (the transcript is usable meanwhile).
+pending`, never touching the session's status (the transcript is usable meanwhile). The pass
+is the one job that may run while a call records (dictado-ngp): back-to-back calls held it for
+hours, and it needs ~1 min and ~2.6 GB of GPU. Only when the GPU has room; else after the call.
 """
 from __future__ import annotations
 
@@ -23,9 +25,15 @@ from pathlib import Path
 
 from . import sessions
 
+if sys.platform == "darwin":
+    from .platform.macos.speakers import gpu_room as _gpu_room
+else:
+    from .platform.windows.speakers import gpu_room as _gpu_room
+
 log = logging.getLogger(__name__)
 STATE = "meetings.json"
 STOP_EVENT = "Local\\EcoscribeMeetingStop"
+ROOM_EVERY_S = 30
 ACTIVE = {"new", "queued", "recording", "finalizing", "running", "downloading"}
 
 
@@ -59,7 +67,7 @@ def _default_spawn(args):
 
 class Controller:
     def __init__(self, data_dir: Path, cfg, spawn=_default_spawn, clock=time.time, on_change=None,
-                 stop_event=None, attach=attach_pid, speakers_ok=None):
+                 stop_event=None, attach=attach_pid, speakers_ok=None, speakers_room=_gpu_room):
         self.data = Path(data_dir)
         self.data.mkdir(parents=True, exist_ok=True)
         self.root = sessions.root_dir(cfg.transcribe.root)
@@ -68,6 +76,8 @@ class Controller:
             from . import diarize
             speakers_ok = lambda: diarize.available(cfg)  # noqa: E731  (checked each time: the add-on may be installed later)
         self.speakers_ok = speakers_ok
+        self.speakers_room = speakers_room  # () -> bool: GPU room for the pass next to a call
+        self._room_at: tuple[float, bool] | None = None  # (when, answer): nvidia-smi at most every ROOM_EVERY_S
         self.calendar = None  # calendar_ics.CalendarFeed: names a meeting from the event happening now (t0u.35)
         self.name_now = None  # () -> str | None: the Meet tab's event name, when the calendar has none (dictado-4ar)
         self._stop_ev = stop_event if stop_event is not None else _StopEvent()
@@ -164,8 +174,11 @@ class Controller:
             return self._spawn_meeting(self._create(title, lang, ev), lang, app)
 
     def _spawn_meeting(self, d: Path, lang: str, app: str | None) -> Path:
-        """Lock held. Kill a running job (a call can't wait), then start recording into d."""
-        if self.job is not None:  # the job restarts after the meeting
+        """Lock held. Kill a running job (a call can't wait), then start recording into d. A speakers
+        pass keeps running when the GPU has room for the call too (dictado-ngp)."""
+        if self.job is not None and self.job.get("kind") == "speakers" and self._room(fresh=True):
+            log.info("meeting starts next to the speakers pass of %s", self.job["dir"])
+        elif self.job is not None:  # the job restarts after the meeting
             jd = self.job["dir"]
             log.info("meeting starts: killing %s job %s, back to the queue front", self.job.get("kind"), jd)
             self._kill(self.job["proc"])
@@ -302,8 +315,14 @@ class Controller:
 
     # -- internals (lock held) --------------------------------------------------------------
     def _next(self) -> None:
-        while self.meeting is None and self.job is None and self.queue:
-            d = self.queue.pop(0)
+        while self.job is None and self.queue:
+            if self.meeting is None:
+                d = self.queue.pop(0)
+            else:  # a call records: only a speakers pass, and only with room on the GPU (dictado-ngp)
+                d = next((q for q in self.queue if self._kind(q) == "speakers"), None)
+                if d is None or not self._room():
+                    return
+                self.queue.remove(d)
             kind = self._kind(d)
             try:
                 proc = self.spawn([f"--{kind}", str(d)])
@@ -316,6 +335,17 @@ class Controller:
                 continue
             self.job = {"dir": d, "proc": proc, "kind": kind}
             log.info("%s job started %s pid=%s", kind, d, getattr(proc, "pid", None))
+
+    def _room(self, fresh: bool = False) -> bool:
+        now = self.clock()
+        if fresh or self._room_at is None or now - self._room_at[0] >= ROOM_EVERY_S:
+            try:
+                ok = bool(self.speakers_room())
+            except Exception:
+                log.exception("GPU room check failed")
+                ok = False
+            self._room_at = (now, ok)
+        return self._room_at[1]
 
     def _reaped(self, d: Path, rc: int, what: str) -> None:
         status = self._meta_status(d)
