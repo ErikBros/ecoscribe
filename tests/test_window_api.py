@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from ecoscribe import config, status
+from ecoscribe import config, status, tomlw
 from ecoscribe.window import Api
 
 
@@ -234,6 +234,27 @@ def test_meeting_settings_and_on_demand_round_trip(api):
     assert c.meetings.mode == "auto" and c.meetings.default_lang == "el" and c.whisper.on_demand is False
     assert not api.save_settings({"meet_mode": "siempre"})["ok"]
     assert not api.save_settings({"meet_lang": "xx"})["ok"]  # any Whisper language is fine; nonsense isn't
+
+
+def test_meeting_end_wait_is_a_setting(api):
+    v = api.get_settings()
+    assert v["values"]["meet_end"] == "10"
+    assert [o["value"] for o in v["options"]["meet_ends"]] == ["5", "10", "15", "30", "60", "120"]
+    assert api.save_settings({"meet_end": "30"})["ok"]
+    assert config.load(api._config_path).meetings.grace_s == 30
+    assert not api.save_settings({"meet_end": "7"})["ok"]
+    assert not api.save_settings({"meet_end": None})["ok"]
+    assert config.load(api._config_path).meetings.grace_s == 30
+
+
+def test_meeting_end_wait_keeps_a_hand_typed_value(api):
+    c = config.load(api._config_path)
+    c.meetings.grace_s = 45
+    tomlw.save(c, api._config_path)
+    v = api.get_settings()
+    assert v["values"]["meet_end"] == "45" and v["options"]["meet_ends"][-1] == {"value": "45", "label": "45 seconds"}
+    assert api.save_settings({"meet_end": "45", "meet_mode": "auto"})["ok"]  # saving the rest keeps it
+    assert config.load(api._config_path).meetings.grace_s == 45
 
 
 

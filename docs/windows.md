@@ -65,7 +65,7 @@ Version 1.12.0 (October 2026). The interface is in English.
 ### Meetings
 - When a call app takes the mic, a box asks **"Are you in a meeting? Take notes?"** with a language choice. It disappears after 10 seconds if you ignore it, and counts as "Not now".
 - **While recording**, the pill says "Taking notes" with the latest words and the tray icon turns red. **Ecoscribe > Meetings** shows the live transcript and a **Stop** button.
-- **When the call ends** (the app releases the mic for 10 s) it stops by itself and makes the final, better transcript, with each line labelled **Me** (your mic) or **Others** (the computer's sound).
+- **When the call ends** (the app releases the mic for 10 s; change it in Settings > Meetings > Stop recording after the call ends) it stops by itself and makes the final, better transcript, with each line labelled **Me** (your mic) or **Others** (the computer's sound).
 - **Start or stop by hand:** tray icon > *Transcribe meeting now* / *Stop meeting*, or the button on the Meetings page.
 - **Your notes:** while the call runs (or after), type in the notes box above the transcript. It saves itself, and Copy for Claude, the summary prompt and the .md download include it, so Claude's summary follows what you cared about.
 - **Afterwards:** open a session for Copy all, **Copy for Claude** (the transcript with date, app and language, ready to paste into Claude for a summary), downloads as .txt / .md / .srt, rename, delete.
