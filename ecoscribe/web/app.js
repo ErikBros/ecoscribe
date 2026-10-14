@@ -876,7 +876,8 @@ async function renderDetail(name) {
   $("#r-d-meta").textContent = [when(s.created), s.lang_name, fmtDur(s.duration_s),
     s.source === "import" ? "imported file" : "mic and the computer's audio",
     s.recovered ? `recovered (${s.recovered}): the text ends where the recording stopped` : "",
-    s.speakers === "pending" || s.speakers === "running" ? "identifying speakers…" : "",
+    s.speakers === "running" ? "identifying speakers…" : "",
+    s.speakers === "pending" ? "speakers: waiting to start" : "",
     s.speakers === "failed" ? "couldn't tell the speakers apart" : "",
     s.recognised?.length ? `recognised by voice: ${s.recognised.join(", ")}` : ""].filter(Boolean).join(" · ");
   const recording = s.status === "recording";

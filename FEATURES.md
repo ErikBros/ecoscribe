@@ -72,6 +72,7 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Watchdog: watch, restart, kill a frozen app | done | done |
 | A frozen app can't lag the computer's input | done (hooks in their own process) | not needed: macOS times out a stuck event tap by itself |
 | Speakers + Remember voices (add-on) | done (Ecoscribe Speakers; the old Dictado Speakers still found) | done (Ecoscribe Speakers.app, the old Dictado Speakers.app still found; pyannote on the Apple GPU, same results as CPU, 2x faster) |
+| Speakers pass during a call (when the GPU has room) | done (runs next to a recording call when the NVIDIA GPU has 3 GB free; else after the call) | ticket dictado-692 (waits for the call to end, as before) |
 | Claude app connection (MCP) | done | done (~/Library/Application Support/Claude) |
 | Word confidence for Insights (clarity, words it wasn't sure of) | done (a second pass with word timestamps after the paste, ~0.3 s on the GPU, only with Insights on and nothing waiting) | done (the dictation's own tokens aligned to the audio, ~0.56 s on large-v3-turbo; the first after a load ~1 s) |
 | Window title at the paste (who a dictation was for: people / AI app) | done (GetWindowText; only the label is saved) | done (Accessibility: the focused window's title; desktop check: dictado-9jc.7) |

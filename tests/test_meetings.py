@@ -48,13 +48,14 @@ class Event:
         self.reset_n += 1
 
 
-def make(tmp_path, attach=None, speakers=False):
+def make(tmp_path, attach=None, speakers=False, room=False):
     cfg = Config()
     cfg.transcribe.root = str(tmp_path / "tr")
     sp, ev = Spawner(), Event()
     changes = []
     c = meetings.Controller(tmp_path / "data", cfg, spawn=sp, on_change=changes.append, stop_event=ev,
-                            attach=attach or (lambda pid: None), speakers_ok=lambda: speakers)
+                            attach=attach or (lambda pid: None), speakers_ok=lambda: speakers,
+                            speakers_room=room if callable(room) else (lambda: room))
     return c, sp, ev, changes
 
 
@@ -366,6 +367,91 @@ def test_a_call_kills_the_speakers_pass_which_reruns_after_without_touching_stat
     sp.procs[-1].rc = 0
     c.poll()
     assert sp.procs[-1].args == ["--speakers", str(a)]
+
+
+# -- speakers pass during a call (dictado-ngp) ------------------------------------------------
+def test_back_to_back_calls_get_their_speakers_pass_during_the_next_call(tmp_path):
+    c, sp, _, _ = make(tmp_path, speakers=True, room=True)
+    a = c.start_meeting("en")
+    c.stop_meeting()
+    b = c.start_meeting("sv")  # the next call starts while the first one saves
+    finish(sp.procs[0], a)
+    c.poll()
+    st = c.state()
+    assert st["meeting"]["dir"] == str(b) and st["meeting"]["status"] == "recording"
+    assert st["job"]["kind"] == "speakers" and sp.procs[-1].args == ["--speakers", str(a)]
+
+
+def test_no_gpu_room_the_pass_waits_for_the_call(tmp_path):
+    c, sp, _, _ = make(tmp_path, speakers=True, room=False)
+    a = c.start_meeting("en")
+    c.stop_meeting()
+    b = c.start_meeting("sv")
+    finish(sp.procs[0], a)
+    c.poll()
+    assert c.state()["job"] is None and c.state()["queue"] == [str(a)]
+    assert sessions.read_meta(a)["speakers"] == "pending"
+    finish(sp.procs[-1], b)
+    c.poll()  # the call that just ended goes first, then the one that waited
+    assert sp.procs[-1].args == ["--speakers", str(b)] and c.state()["queue"] == [str(a)]
+
+
+def test_a_transcription_job_still_waits_for_the_call(tmp_path):
+    c, sp, _, _ = make(tmp_path, speakers=True, room=True)
+    m = c.start_meeting("en")
+    f = c.enqueue_file(audio(tmp_path, "a.m4a"), "sv")
+    c.poll()
+    assert c.state()["job"] is None and c.state()["queue"] == [str(f)] and len(sp.procs) == 1
+
+
+def test_a_call_leaves_a_running_speakers_pass_alone_when_there_is_room(tmp_path):
+    c, sp, _, _ = make(tmp_path, speakers=True, room=True)
+    a = c.enqueue_file(audio(tmp_path, "a.m4a"), "sv")
+    finish(sp.procs[0], a)
+    c.poll()
+    pass_proc = sp.procs[-1]
+    c.start_meeting("en")
+    assert not pass_proc.killed and c.state()["job"]["dir"] == str(a) and c.state()["meeting"]
+
+
+def test_the_gpu_is_asked_at_most_every_30_s(tmp_path):
+    asked = []
+    c, sp, _, _ = make(tmp_path, speakers=True, room=lambda: asked.append(1) or False)
+    t = [1000.0]
+    c.clock = lambda: t[0]
+    a = c.start_meeting("en")
+    c.stop_meeting()
+    c.start_meeting("sv")
+    finish(sp.procs[0], a)
+    for _ in range(10):
+        c.poll()
+    assert len(asked) == 1
+    t[0] += meetings.ROOM_EVERY_S
+    c.poll()
+    assert len(asked) == 2
+
+
+def test_a_failing_gpu_check_means_no_room(tmp_path):
+    def boom():
+        raise OSError("no nvidia-smi")
+    c, sp, _, _ = make(tmp_path, speakers=True, room=boom)
+    a = c.start_meeting("en")
+    c.stop_meeting()
+    c.start_meeting("sv")
+    finish(sp.procs[0], a)
+    c.poll()
+    assert c.state()["job"] is None
+
+
+def test_windows_gpu_room_reads_nvidia_smi_free_memory():
+    from ecoscribe.platform.windows.speakers import gpu_room
+    run = lambda free: (lambda *a, **k: SimpleNamespace(stdout=f"{free}\n"))  # noqa: E731
+    assert gpu_room(run=run(4200)) is True
+    assert gpu_room(run=run(1800)) is False
+
+    def missing(*a, **k):
+        raise FileNotFoundError("nvidia-smi")
+    assert gpu_room(run=missing) is False
 
 
 def test_a_speakers_worker_that_dies_marks_only_the_pass_failed(tmp_path):
