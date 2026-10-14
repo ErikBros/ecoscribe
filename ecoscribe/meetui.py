@@ -134,7 +134,8 @@ def last_live_line(d, tail_bytes: int = 4096) -> str | None:
 
 
 class Tracker:
-    """Notices sessions that leave the controller (meeting or job ended): done / failed."""
+    """Notices sessions that leave the controller (meeting or job ended): done / failed. A speakers
+    pass is not tracked: its session was already "ready" once, when its transcript ended (dictado-bvh)."""
 
     def __init__(self):
         self._seen: set[str] = set()
@@ -143,7 +144,7 @@ class Tracker:
         now = set()
         if state.get("meeting"):
             now.add(state["meeting"]["dir"])
-        if state.get("job"):
+        if state.get("job") and state["job"].get("kind") != "speakers":
             now.add(state["job"]["dir"])
         out = []
         for d in sorted(self._seen - now):

@@ -63,6 +63,18 @@ def test_tracker_job_done(tmp_path):
     assert tr.update(EMPTY) == [("done", str(d))]
 
 
+def test_tracker_says_nothing_when_a_speakers_pass_ends(tmp_path):
+    """The meeting was announced ready when its transcript ended; the speakers pass is quiet (dictado-bvh)."""
+    d = sessions.create("Reunión", "sv", "meeting", tmp_path)
+    tr = meetui.Tracker()
+    tr.update(st(d=str(d)))
+    sessions.write_meta(d, status="done", speakers="pending")
+    assert tr.update(EMPTY) == [("done", str(d))]
+    tr.update({"meeting": None, "job": {"dir": str(d), "pct": 0, "kind": "speakers"}, "queue": []})
+    sessions.write_meta(d, speakers="done")
+    assert tr.update(EMPTY) == []
+
+
 def test_tray_label_and_state():
     assert meetui.tray_meeting_label(EMPTY) == "Transcribe meeting now"
     assert meetui.tray_meeting_label(st()) == "Stop meeting"
