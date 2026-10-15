@@ -1,4 +1,4 @@
-"""dictado-uee: on the Mac, Coach me's people / AI split goes by bundle id, so a translated app name still counts."""
+"""dictado-uee: on the Mac, the people / AI split (fillers, hedges, pace) goes by bundle id, so a translated app name still counts."""
 import sys
 
 import pytest

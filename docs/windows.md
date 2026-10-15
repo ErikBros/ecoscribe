@@ -82,7 +82,6 @@ Settings > **Insights tab** adds a tab with what your dictations say about how y
 - **In your messages to people:** filler words and hedges ("maybe", "I think", "kind of") per 100 words in what you dictate to people (chat, email), not in prompts to AI apps. Switch on **Note filler words after a message** and the pill shows them right after such a message.
 - **Pace and pauses:** words a minute and how much of the time you pause, to people and to AI apps. 130-160 words a minute is where listeners follow most easily: information, not a goal.
 - **In your meetings:** your share of the talking, turns of yours over 90 seconds, the questions you ask.
-- **Coach me:** copies your recent messages to people as a prompt; paste it into Claude for your three recurring patterns, before → after rewrites of your own sentences and one habit to try. Nothing leaves your PC unless you paste it.
 
 ### Files
 Drag an mp3, m4a, wav, ogg, opus, flac, mp4 or webm onto the window, or use **Import file**. One job runs at a time; the rest wait in the queue.

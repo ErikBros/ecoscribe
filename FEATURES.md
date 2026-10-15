@@ -44,7 +44,6 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Insights: in your meetings (your share of the talking, turns over 90 s, questions, hedges) | done | done (needs recorded meetings with the call's sound: dictado-qkg) |
 | Insights: pace (words a minute of speech) and pauses, to people vs to AI apps, with the 130-160 range as information | done | done (people / AI split: dictado-9jc.7) |
 | Insights: filler words and hedges in messages to people (per 100 words, weekly), optional note on the pill after such a message | done | done (pill note: check on Mac, dictado-9jc.7) |
-| Insights: Coach me (recent messages and emails to people, not AI prompts, as one prompt for Claude) | done | done (people / AI split: check on Mac, dictado-9jc.7) |
 | Insights: how clearly you speak (share of words heard clearly per week, words it wasn't sure of per language) | done | done (word confidence from mlx) |
 
 ## Platform-specific
