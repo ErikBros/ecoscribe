@@ -176,6 +176,8 @@ def run(session_dir: Path, cfg: TranscribeCfg, recorder_factory=_default_recorde
                             replacements=replacements)
         if rc == 0:
             _label(d)
+            from .after_hook import launch
+            launch(cfg.after_transcribe, d)
         return rc
     except Exception as e:
         log.exception("meeting failed")

@@ -296,6 +296,9 @@ def run_session(session_dir: Path, cfg: TranscribeCfg, **kw) -> int:
             _label(d)
         except Exception:  # the transcript is there, only without speakers
             log.exception("labels failed for %s", d)
+    if rc == 0:
+        from .after_hook import launch
+        launch(cfg.after_transcribe, d)
     return rc
 
 

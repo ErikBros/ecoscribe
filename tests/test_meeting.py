@@ -174,3 +174,17 @@ def test_an_imported_file_is_not_labelled(tmp_path):
                                 resolve=lambda name, cfg: Path("M:/") / name.replace("/", "--"))
     tr = json.loads((d / "transcript.json").read_text(encoding="utf-8"))
     assert rc == 0 and all(s["speaker"] is None for s in tr["segments"])
+
+
+def test_the_after_transcribe_command_gets_the_finished_session(tmp_path, monkeypatch):
+    from ecoscribe import after_hook, transcribe
+    got = []
+    monkeypatch.setattr(after_hook, "launch", lambda cmd, d: got.append((cmd, d, sessions.read_meta(d)["status"])))
+    d = sessions.create("x", "sv", "import", tmp_path / "t")
+    w = FlacWriter(d / "audio" / "x.flac")
+    w.write(np.full(2 * SR, 0.2, np.float32))
+    w.close()
+    rc = transcribe.run_session(d, TranscribeCfg(after_transcribe=["py", "a.py"]),
+                                factory=lambda path, device, ct: FakeModel(),
+                                resolve=lambda name, cfg: Path("M:/") / name.replace("/", "--"))
+    assert rc == 0 and got == [(["py", "a.py"], d, "done")]

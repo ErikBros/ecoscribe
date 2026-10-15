@@ -121,6 +121,8 @@ class TranscribeCfg:
     # Where the big transcription models live (HF cache in <models_root>\hf, mirrors next to it,
     # one drive so the mirror can hard-link). Empty: %LOCALAPPDATA%\ecoscribe\models.
     models_root: str = ""
+    # Your own command, started with the session folder once a transcript is done (after_hook.py)
+    after_transcribe: list = field(default_factory=list)
 
 
 @dataclass
