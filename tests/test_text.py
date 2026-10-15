@@ -1,5 +1,5 @@
 from ecoscribe.choose import pick_device, pick_language
-from ecoscribe.text import clean, is_hallucination
+from ecoscribe.text import clean, is_hallucination, strip_credits
 
 
 def test_fillers():
@@ -55,6 +55,16 @@ def test_short_real_thanks_kept():
 def test_halluc_when_whisper_says_no_speech():
     assert is_hallucination("Thank you.", 0.8, no_speech_prob=0.8)
     assert not is_hallucination("Send the report.", 0.8, no_speech_prob=0.8)
+
+
+def test_subtitle_credits_stripped_anywhere():
+    # credits nobody dictates: dropped even after real speech, with no speech gate
+    assert strip_credits("Υπότιτλοι AUTHORWAVE") == ""
+    assert strip_credits("Θα πάω στο σπίτι. Υπότιτλοι AUTHORWAVE") == "Θα πάω στο σπίτι."
+    assert strip_credits("Send the report. Subtitles by the Amara.org community") == "Send the report."
+    assert strip_credits("Υπότιτλοι από την κοινότητα Amara.org") == ""
+    assert strip_credits("Οι υπότιτλοι είναι καλοί.") == "Οι υπότιτλοι είναι καλοί."
+    assert strip_credits("Send the report.") == "Send the report."
 
 
 def test_lang_allow():
