@@ -175,6 +175,16 @@ def _norm(s: str) -> str:
 _HALLUCINATIONS = {_norm(x) for x in _HALLUCINATION_PHRASES}
 
 
+# Subtitle credits Whisper learned from video captions. Nobody dictates them, so they go wherever
+# they appear, even tacked onto real speech, with no speech gate.
+_CREDITS_RE = re.compile(
+    r"\s*(?:Υπότιτλοι\s+AUTHORWAVE|[^.!?]*\bAmara\.org\b[^.!?]*)[.!?]?", re.IGNORECASE)
+
+
+def strip_credits(s: str) -> str:
+    return _CREDITS_RE.sub("", s).strip()
+
+
 def is_hallucination(s: str, speech_s: float, no_speech_prob: float = 0.0) -> bool:
     """True for Whisper's classic silence inventions ("Thank you.", "Gracias.").
 

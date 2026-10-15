@@ -16,7 +16,7 @@ import numpy as np
 
 from .choose import pick_language
 from .config import TextCfg, WhisperCfg
-from .text import clean, is_hallucination, vocab_prompt
+from .text import clean, is_hallucination, strip_credits, vocab_prompt
 
 log = logging.getLogger(__name__)
 SR = 16000
@@ -184,7 +184,7 @@ class Engine:
                 initial_prompt=prompt, **_timestamps(words_out))
             segments = list(segments)
             _collect(segments, words_out)
-            raw = "".join(s.text for s in segments).strip()
+            raw = strip_credits("".join(s.text for s in segments))
             run_s = float(getattr(info, "duration_after_vad", info.duration))
             no_speech = max((getattr(s, "no_speech_prob", 0.0) for s in segments), default=1.0)
             speech_s += run_s
@@ -286,7 +286,7 @@ class Engine:
             initial_prompt=vocab_prompt([*self.text_cfg.vocabulary, *(words or [])]), **_timestamps(words_out))
         segments = list(segments)
         _collect(segments, words_out)
-        raw = "".join(s.text for s in segments).strip()
+        raw = strip_credits("".join(s.text for s in segments))
         speech_s = float(getattr(info, "duration_after_vad", info.duration))
         no_speech = max((getattr(s, "no_speech_prob", 0.0) for s in segments), default=1.0)
         if is_hallucination(raw, speech_s, no_speech):
