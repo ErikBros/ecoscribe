@@ -5,9 +5,8 @@ Everything is worked out here, on this computer, from the dictation history (his
 - Clarity (9jc.1): after the paste, a second look at the recording says how sure Whisper was of each word
   (ASR confidence follows how intelligible speech is). Clarity is the share of words heard clearly; the
   words it wasn't sure of are kept, so the ones you keep swallowing show up.
-- Coach me (9jc.2): your recent dictations to people (messages, email; not prompts to AI apps) as one
-  prompt asking Claude for your recurring patterns, before -> after rewrites of your own sentences
-  and one habit to try. The text leaves the computer only when you paste it.
+- Who it was for (9jc.2): messages and email to people vs prompts to AI apps, which the fillers, hedges
+  and pace below keep apart. (Its "Coach me" prompt was removed in dictado-7r2.)
 - Fillers and hedges (9jc.3): per 100 words in your messages to people, week by week, and (opt-in) a
   short note on the pill right after such a message: immediate feedback cuts fillers without making
   people anxious. Neutral on purpose: fillers are normal discourse markers in speech; in writing to
@@ -133,7 +132,6 @@ PEOPLE_SITES = ("gmail", "inbox", "outlook", "mail", "slack", "whatsapp", "messe
 AI_SITES = ("claude", "chatgpt", "gemini", "perplexity", "copilot", "le chat", "mistral", "grok", "deepseek",
             "notebooklm", "poe")
 TITLE_SEP = re.compile(r"\s+[-–—|·]\s+")
-COACH_DAYS = 14
 
 
 def _app(name) -> str:
@@ -163,48 +161,6 @@ def audience(target, title: str = "") -> str:
 def row_audience(r: dict) -> str:
     """Saved at the paste from 9jc.2 on; older dictations go by the app alone."""
     return r.get("to") or audience(r.get("target"))
-
-
-def _recent_people(rows: list[dict], now: datetime, days: int = COACH_DAYS) -> list[dict]:
-    since = now - timedelta(days=days)
-    return [r for r in rows if (t := _ts(r)) and t >= since and row_audience(r) == "people"
-            and str(r.get("text", "")).strip()]
-
-
-def people_count(rows: list[dict], now: datetime | None = None) -> int:
-    return len(_recent_people(rows, now or datetime.now()))
-
-
-def coach_prompt(rows: list[dict], now: datetime | None = None, max_words: int = 4000) -> str:
-    """The last two weeks of dictations to people as a coaching prompt for Claude: the newest that fit
-    in `max_words`, oldest first."""
-    now = now or datetime.now()
-    keep, n = [], 0
-    for r in sorted(_recent_people(rows, now), key=lambda r: str(r.get("ts")), reverse=True):
-        k = len(WORD.findall(r["text"]))
-        if keep and n + k > max_words:
-            break
-        keep.append(r)
-        n += k
-    lines = [
-        "Below are messages I dictated to people (chat and email) in the last two weeks, written out by "
-        "speech-to-text exactly as I said them. I want to speak more clearly and more confidently.",
-        "",
-        "1. Name my 3 recurring patterns that make me less clear or less confident (filler words, hedges, "
-        "long run-ups, vague words, repeating myself, sentences that never land). Quote two short examples of mine for each.",
-        "2. For each pattern, rewrite two of my own sentences: before -> after, in my voice, same meaning.",
-        "3. Give me one habit to try this week, concrete enough to notice when I do it.",
-        "",
-        "Ignore speech-to-text slips (misheard words, punctuation): judge how I talk, not the transcription. "
-        "Be direct and brief.",
-        "",
-        "---",
-    ]
-    for r in reversed(keep):
-        t = _ts(r)
-        app = str(r.get("target") or "").removesuffix(".exe")
-        lines.append(f"- [{t.strftime('%a %H:%M') if t else ''}{', ' + app if app else ''}] {r['text'].strip()}")
-    return "\n".join(lines) + "\n"
 
 
 def count(text: str, phrases: list[str]) -> dict[str, int]:

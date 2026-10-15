@@ -38,7 +38,6 @@ function demoInsights(days) {  // invented numbers and text for the demo and scr
       }),
       words: [{ lang: "en", words: [{ word: "particularly", unsure: 4, said: 6 }, { word: "Kristineberg", unsure: 3, said: 3 }, { word: "rural", unsure: 2, said: 5 }] },
         { lang: "sv", words: [{ word: "sjuksköterska", unsure: 2, said: 2 }] }] },
-    coach: { people: Math.round(64 * k), days: 14 },
     markers: { words: Math.round(3100 * k), dictations: Math.round(64 * k), fillers_per_100: 1.2, hedges_per_100: 2.4,
       weeks: [null, null, 3.6, 3.1, 2.9, null, 2.2, 1.8].map((h, i) => {
         const d = new Date(today); d.setDate(today.getDate() - today.getDay() + 1 - 7 * (7 - i));
@@ -180,7 +179,6 @@ function demoApi() {
     },
     add_word: async (w) => { settings.values.vocabulary += "\n" + w; window.__added = w; return { ok: true }; },
     insights_for_claude: async () => ({ ok: true, chars: 5120 }),
-    coach_me: async () => ({ ok: true, chars: 3900 }),
     clear_history: async () => { history.length = 0; return { ok: true }; },
     open_log: async () => ({ ok: true }),
     get_welcome: async () => ({ done: params.get("welcome") !== "1" }),
@@ -459,7 +457,7 @@ function renderClarity(c) {  // dictado-9jc.1
   }
   if (!c.words.length) box.textContent = "None so far: every word came through clearly.";
 }
-function iWeek(m, coach) {  // the one-line "this week" from the hedges per week (dictado-6oe.6)
+function iWeek(m) {  // the one-line "this week" from the hedges per week (dictado-6oe.6)
   const box = $("#i-week");
   const weeks = ((m && m.weeks) || []).filter((w) => w.hedges_per_100 != null);
   box.hidden = weeks.length < 2;
@@ -470,7 +468,6 @@ function iWeek(m, coach) {  // the one-line "this week" from the hedges per week
   $("#i-week-text").innerHTML = `<b>This week:</b> you hedged ${dir === "as much as before" ? dir : dir + ` in messages to people, ${a} → ${b} per 100 words`}.`
     + (top ? ` <span></span>` : "");
   if (top) $("#i-week-text span").textContent = `"${top.word}" is still the one you use most.`;
-  $("#i-week-coach").disabled = !(coach && coach.people);
 }
 async function renderInsights() {
   for (const b of $$("#i-range .seg")) b.setAttribute("aria-checked", String((b.dataset.days || null) === iDays));
@@ -527,11 +524,7 @@ async function renderInsights() {
   renderMarkers(d.markers);
   renderPace(d.pace);
   renderMeetings(d.meetings);
-  iWeek(d.markers, d.coach);
-  const people = d.coach ? d.coach.people : 0;  // dictado-9jc.2
-  $("#i-coach").disabled = !people;
-  $("#i-coach").title = people ? `${people} ${people === 1 ? "message" : "messages"} to people in the last ${d.coach.days} days`
-    : "Nothing dictated to people (messages, email) in the last two weeks yet";
+  iWeek(d.markers);
   const ph = $("#i-phrases"); ph.textContent = "";
   for (const p of d.phrases) ph.append(iChip(p.phrase, p.count));
   if (!d.phrases.length) ph.append(iChip("Nothing repeated three times yet"));
@@ -1800,11 +1793,6 @@ async function boot() {
   for (const b of $$(".nav-item")) b.onclick = () => { if (b.dataset.page === "reuniones") r.open = null; show(b.dataset.page); };
   try { $("#nav-insights").hidden = !(await api.get_settings()).values.insights; } catch {}
   for (const b of $$("#i-range .seg")) b.onclick = () => { iDays = b.dataset.days || null; renderInsights(); };
-  $("#i-week-coach").onclick = () => $("#i-coach").click();
-  $("#i-coach").onclick = async () => {
-    const r = await api.coach_me();
-    toast(r.ok ? "Copied: paste it into Claude." : "Nothing dictated to people in the last two weeks yet.");
-  };
   $("#i-claude").onclick = async () => {
     const r = await api.insights_for_claude();
     if (r.ok) toast("Copied: paste it into Claude.");
