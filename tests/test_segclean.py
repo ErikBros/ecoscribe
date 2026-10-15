@@ -41,3 +41,8 @@ def test_drop_silent_keeps_speech_on_either_track():
 def test_drop_silent_keeps_segments_past_the_audio():
     segs = [{"t0": 20.0, "t1": 21.0, "text": "x"}]  # no audio to judge it by: keep, never lose text
     assert segclean.drop_silent(segs, np.zeros(SR), np.zeros(SR)) == segs
+
+
+def test_greek_subtitle_credit_dropped_anywhere():
+    segs = [{"text": "Υπότιτλοι AUTHORWAVE"}, {"text": "Καλημέρα. Υπότιτλοι AUTHORWAVE"}]
+    assert segclean.clean_segments(segs) == [{"text": "Καλημέρα."}]

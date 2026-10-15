@@ -12,6 +12,8 @@ import re
 
 import numpy as np
 
+from .text import strip_credits
+
 SR = 16000
 SILENT_RMS = 1e-3  # about -60 dBFS: a typical mic noise floor is ~2e-4, speech on either track is 1e-2 or more
 
@@ -35,7 +37,7 @@ def clean_segments(segments: list[dict]) -> list[dict]:
     """Strip tags from every segment; drop credits and segments left empty."""
     out = []
     for s in segments:
-        text = strip_tags(s["text"])
+        text = strip_credits(strip_tags(s["text"]))
         if text and re.search(r"\w", text) and not is_credit(text):
             out.append({**s, "text": text})
     return out
