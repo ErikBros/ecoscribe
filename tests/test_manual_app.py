@@ -14,6 +14,9 @@ def test_the_call_app_on_the_mic():
     assert call_app_now([use("signal"), use("chrome")], {"signal", "chrome"}) == "signal"
     assert call_app_now([use("signal", in_use=False)], {"signal"}) is None
     assert call_app_now([use("spotify")], {"spotify"}) is None  # not a call app
+    talk = MicUse(app="chrome", in_use=True, start=1, stop=0, talking=True)
+    assert call_app_now([talk], {"chrome"}) == "chrome"  # a call in a tab (mic in + sound out)
+    assert call_app_now([use("chrome")], {"chrome"}) is None  # a tab only holding the mic
 
 
 def test_foreground_wins_then_the_newest():

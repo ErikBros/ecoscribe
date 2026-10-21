@@ -2,8 +2,10 @@
 ecoscribe/platform/windows/detect.py, Core Audio on macOS) and the rules on top.
 
 A call app holding the mic is a meeting. A browser holding the mic is a meeting
-only with a second signal (a meeting window title): a Chrome tab can sit on the
-mic for hours with no call. The meeting ends when its app has let go for
+only with a second signal: a meeting window title, or (macOS) the browser playing
+sound from the same process that captures the mic, i.e. two-way audio. A Chrome tab
+can sit on the mic for hours with no call; the Meet tab's title is only in the window
+while that tab is in front. The meeting ends when its app has let go for
 grace_s in a row (mute toggles and quick rejoins must not end it). A start needs
 debounce_polls polls in a row (a Telegram voice note is not a call). A meeting
 title only counts in a window owned by a browser. A desktop app's entry that says
@@ -35,6 +37,7 @@ class MicUse:
     start: int
     stop: int
     nonpackaged: bool = False  # desktop app: `app` is its exe name, checkable against running processes
+    talking: bool = False  # the process capturing the mic also plays sound right now (macOS Core Audio)
 
 
 @dataclass(frozen=True)
@@ -92,8 +95,9 @@ def uses_from_entries(entries) -> list[MicUse]:
 
 def call_app_now(uses: list[MicUse], running: set[str] | None = None, foreground: str = "") -> str | None:
     """The call app holding the mic right now (t0u.33, for meetings started by hand): the
-    foreground one if several, else the one that took the mic last. None if no call app has it."""
-    live = [u for u in uses if u.in_use and is_call_app(u.app)
+    foreground one if several, else the one that took the mic last. None if no call app has it.
+    A browser counts when it talks (mic in + sound out): a call in a tab."""
+    live = [u for u in uses if u.in_use and (is_call_app(u.app) or (u.talking and u.app in BROWSERS))
             and not (running is not None and u.nonpackaged and u.app not in running)]
     if not live:
         return None
@@ -126,22 +130,23 @@ class Detector:
         self._cand: str | None = None
         self._cand_n = 0
 
-    def _active(self, app: str, in_use: set[str], titled: bool) -> bool:
+    def _active(self, app: str, in_use: set[str], titled: bool, talking: set[str]) -> bool:
         if app not in in_use:
             return False
-        # a browser meeting needs its title too: the tab may keep the mic after the call
-        return titled if app in BROWSERS else True
+        # a browser meeting needs its title or two-way audio too: the tab may keep the mic after the call
+        return (titled or app in talking) if app in BROWSERS else True
 
     def update(self, uses: list[MicUse], titles: list, now: float, running: set[str] | None = None) -> Event | None:
         """titles: (title, exe) pairs, or bare titles (owner unknown, treated as a browser's)."""
         in_use = {u.app for u in uses if u.in_use and u.app not in self.own
                   and not (running is not None and u.nonpackaged and u.app not in running)}
+        talking = {u.app for u in uses if u.in_use and u.talking}
         titled = any(MEETING_TITLE.search(t if isinstance(t, str) else t[0])
                      for t in titles if isinstance(t, str) or t[1] in BROWSERS)
         if self.app is None:
             calls = sorted(a for a in in_use if is_call_app(a))
-            browsers = sorted(a for a in in_use if a in BROWSERS)
-            app = calls[0] if calls else (browsers[0] if browsers and titled else None)
+            browsers = sorted(a for a in in_use if a in BROWSERS and (titled or a in talking))
+            app = calls[0] if calls else (browsers[0] if browsers else None)
             if app is None or app != self._cand:
                 self._cand, self._cand_n = app, (1 if app else 0)
             else:
@@ -150,7 +155,7 @@ class Detector:
                 return None
             self.app, self.released_at, self._cand, self._cand_n = app, None, None, 0
             return Event("start", app, now)
-        if self._active(self.app, in_use, titled):
+        if self._active(self.app, in_use, titled, talking):
             self.released_at = None
             return None
         if self.released_at is None:

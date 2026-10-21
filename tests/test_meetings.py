@@ -479,3 +479,13 @@ def test_the_call_app_is_written_into_the_session(tmp_path):
     c, sp, _, _ = make(tmp_path)
     d = c.start_meeting("es", app="signal")
     assert sessions.read_meta(d)["app"] == "signal"
+
+
+def test_a_meeting_started_by_hand_takes_the_call_app_once(tmp_path):
+    c, sp, _, _ = make(tmp_path)
+    d = c.start_meeting("sv")
+    assert c.set_app("chrome") and c.state()["meeting"]["app"] == "chrome"
+    assert sessions.read_meta(d)["app"] == "chrome"
+    assert not c.set_app("slack")  # it already belongs to a call
+    c.stop_meeting()
+    assert not c.set_app("zoom")

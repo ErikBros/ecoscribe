@@ -4,8 +4,9 @@ Every 2 s it reads who holds the mic (ConsentStore), the window titles and the
 running exes, and feeds detect.Detector. A call start either asks near the pill
 ("prompt") or starts recording ("auto"); "Not now" ignores that call until its
 end. A call end stops the meeting the detector started for that app, and one started
-by hand during that call (it records the call's app, dictado-2s7); a meeting started
-by hand with no call is the user's to stop. Backup for a missed end: both tracks
+by hand during that call (it records the call's app, dictado-2s7), or shortly before it (it
+joins the call when the detector sees it start); a meeting started by hand with no call is
+the user's to stop. Backup for a missed end: both tracks
 silent for silence_stop_s asks "Did the meeting end?" and stops 60 s later unless
 the user says Keep going. Each app remembers its last language (meeting_langs.json). Every
 event and answer goes to detect.log, to audit the detector against real calls.
@@ -24,6 +25,7 @@ from . import detect, paths
 log = logging.getLogger(__name__)
 LANGS = "meeting_langs.json"
 END_ANSWER_S = 60  # no answer to "Did the meeting end?" in this long: stop
+JOIN_S = 300  # a meeting started by hand this recently joins the call that starts now
 SILENT = 1e-3
 
 
@@ -135,12 +137,25 @@ class MeetWatch(threading.Thread):
         m = st.get("meeting")
         return bool(st.get("next_meeting")) or (m is not None and m.get("status") == "recording")
 
+    def _just_started_by_hand(self) -> bool:
+        m = self._meeting()
+        if m is None or m.get("app") or m.get("status") != "recording" or not m.get("started"):
+            return False
+        try:
+            age = (datetime.now() - datetime.fromisoformat(m["started"])).total_seconds()
+        except (TypeError, ValueError):
+            return False
+        return age <= JOIN_S
+
     def _on_event(self, ev) -> None:
         if ev.kind == "start":
             self.call = ev.app
             lang = self.lang_for(ev.app)
             if self._recording():
-                self._audit(f"start {ev.app}: a meeting already records, nothing to do")
+                if self._just_started_by_hand() and self.ctl.set_app(ev.app):
+                    self._audit(f"start {ev.app}: the meeting started by hand joins this call")
+                else:
+                    self._audit(f"start {ev.app}: a meeting already records, nothing to do")
                 return
             if self.cfg.mode == "auto":
                 self._audit(f"start {ev.app}: auto start lang={lang}")

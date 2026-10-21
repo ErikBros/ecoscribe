@@ -1,7 +1,9 @@
 """Who holds the mic on macOS (uat.9): detect.py's readers, for the shared Detector.
 
 Windows reads the ConsentStore registry. macOS 14+ lists audio "process objects" (kAudioHardwarePropertyProcessObjectList)
-and says per process whether it is capturing right now (kAudioProcessPropertyIsRunningInput) plus its bundle id.
+and says per process whether it is capturing right now (kAudioProcessPropertyIsRunningInput), playing
+(kAudioProcessPropertyIsRunningOutput) plus its bundle id. A browser's audio process doing both is a call in a tab,
+even when the Meet tab isn't the one in front (its title is then not in any window).
 Read-only, no permission needed. Bundle ids map to the same short app names the Windows detector uses
 (msteams, slack, zoom, signal, chrome...), so Detector, the prompt texts and meeting_langs.json are shared.
 Browser meeting tabs: window titles of running browsers, read through Accessibility.
@@ -84,8 +86,8 @@ def _cfstring(ptr: int) -> str:
     return out
 
 
-def mic_users() -> list[tuple[int, str]]:
-    """(pid, bundle id) of every process capturing audio right now."""
+def mic_users() -> list[tuple[int, str, bool]]:
+    """(pid, bundle id, plays sound too) of every process capturing audio right now."""
     out = []
     for obj in _get(SYSTEM, "prs#", ctypes.c_uint32) or []:
         running = _get(obj, "piri", ctypes.c_uint32, 1)
@@ -93,7 +95,8 @@ def mic_users() -> list[tuple[int, str]]:
             continue
         pid = (_get(obj, "ppid", ctypes.c_int32, 1) or [0])[0]
         bundle = _cfstring((_get(obj, "pbid", ctypes.c_void_p, 1) or [0])[0] or 0)
-        out.append((int(pid), bundle))
+        playing = _get(obj, "piro", ctypes.c_uint32, 1)
+        out.append((int(pid), bundle, bool(playing and playing[0])))
     return out
 
 
@@ -109,17 +112,20 @@ def read_consent() -> list:
     """detect.read_consent for the Mac: one MicUse per app capturing now (start = when we first saw it)."""
     from ...detect import MicUse
     now = time.time()
-    apps = {}
-    for pid, bundle in mic_users():
+    apps, talking = {}, set()
+    for pid, bundle, playing in mic_users():
         app = app_of_bundle(bundle) if bundle else _exe(pid)  # no bundle (a CLI, dev Python): its exe name
         if app:
             apps[app] = pid
+            if playing:
+                talking.add(app)
     for gone in [a for a in _first_seen if a not in apps]:
         del _first_seen[gone]
     uses = []
     for app in apps:
         start = _first_seen.setdefault(app, now)
-        uses.append(MicUse(app=app, in_use=True, start=int(start * 1000), stop=0, nonpackaged=False))
+        uses.append(MicUse(app=app, in_use=True, start=int(start * 1000), stop=0, nonpackaged=False,
+                           talking=app in talking))
     return uses
 
 
