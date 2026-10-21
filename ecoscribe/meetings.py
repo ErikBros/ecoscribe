@@ -7,6 +7,11 @@ job (its session goes back to the FRONT of the queue and restarts from scratch
 after the meeting). The state lives in <data>/meetings.json for the window and
 the pill; workers are detached, so a restarted background app adopts them by pid.
 
+A call that starts while the last meeting is saving waits only until that worker has finished
+its audio files (status finalizing, seconds after the stop); then the old worker's final pass is
+killed and goes back to the queue front, and the new call records. The call can't wait; the old
+transcript can (it reruns after the call, from the saved audio).
+
 A session that ends done gets a speakers pass (`ecoscribe --speakers DIR`, t0u.22) when
 the speaker add-on is installed: a queued job like a file, run by meta `speakers:
 pending`, never touching the session's status (the transcript is usable meanwhile). The pass
@@ -85,7 +90,7 @@ class Controller:
         self.meeting: dict | None = None  # dir, app, lang, started, proc, stopping
         self.job: dict | None = None  # dir, proc, kind (transcribe | speakers)
         # a call that starts while the last meeting is still saving: its session waits here and
-        # records as soon as the old worker exits (never two meeting workers at once)
+        # records as soon as the old worker's audio is on disk (never two meeting workers at once)
         self.next_meeting: dict | None = None  # dir, app, lang
         self.queue: list[Path] = []
         self._last: dict | None = None
@@ -170,7 +175,9 @@ class Controller:
                     self.next_meeting = {"dir": d, "app": app, "lang": lang}
                     log.info("meeting %s waits for %s to finish saving", d, self.meeting["dir"])
                     self._publish()
-                return self.next_meeting["dir"]
+                d = self.next_meeting["dir"]
+                self._hand_over()
+                return d
             return self._spawn_meeting(self._create(title, lang, ev), lang, app)
 
     def _spawn_meeting(self, d: Path, lang: str, app: str | None) -> Path:
@@ -253,6 +260,7 @@ class Controller:
     def poll(self) -> None:
         """Call every second: reap finished or dead workers, start the next job."""
         with self._lock:
+            self._hand_over()
             if self.meeting is not None:
                 rc = self.meeting["proc"].poll()
                 if rc is not None:
@@ -314,6 +322,22 @@ class Controller:
             return {"meeting": m, "job": j, "queue": [str(d) for d in self.queue], "next_meeting": nxt}
 
     # -- internals (lock held) --------------------------------------------------------------
+    def _hand_over(self) -> None:
+        """A call waits for a meeting that is saving: once the old worker's audio files are done
+        (finalizing), kill its final pass, queue that pass at the front and record the new call."""
+        if self.next_meeting is None or self.meeting is None or not self.meeting["stopping"]:
+            return
+        old = self.meeting["dir"]
+        if self._meta_status(old) != "finalizing" or self.meeting["proc"].poll() is not None:
+            return  # still finishing its FLACs (or just exited: poll reaps it)
+        log.info("a call waits: final pass of %s stopped, it reruns after the call", old)
+        self._kill(self.meeting["proc"])
+        self.meeting = None
+        self._requeue_front(old)
+        self._stop_ev.reset()
+        nm, self.next_meeting = self.next_meeting, None
+        self._spawn_meeting(nm["dir"], nm["lang"], nm["app"])
+
     def _next(self) -> None:
         while self.job is None and self.queue:
             if self.meeting is None:

@@ -230,6 +230,34 @@ def test_a_call_while_the_last_meeting_saves_waits_then_records(tmp_path):
     assert sp.procs[-1].args == ["--meeting", str(d2)] and c.state()["next_meeting"] is None
 
 
+def test_a_call_records_as_soon_as_the_last_meeting_has_its_audio(tmp_path):
+    c, sp, ev, _ = make(tmp_path)
+    d1 = c.start_meeting("sv", app="msteams")
+    c.stop_meeting()
+    d2 = c.start_meeting("en", app="slack")  # old worker still finishing its FLACs: wait
+    assert c.state()["next_meeting"]["dir"] == str(d2) and len(sp.procs) == 1
+    sessions.write_meta(d1, status="finalizing")  # audio on disk, the final pass runs
+    c.poll()
+    assert sp.procs[0].killed  # the old final pass stops: the call can't wait
+    st = c.state()
+    assert st["meeting"]["dir"] == str(d2) and st["meeting"]["status"] == "recording"
+    assert st["next_meeting"] is None and st["queue"] == [str(d1)] and st["job"] is None
+    assert sessions.read_meta(d1)["status"] == "queued"
+    finish(sp.procs[-1], d2)
+    c.poll()  # call over: the old meeting's final pass reruns from its audio
+    assert sp.procs[-1].args == ["--transcribe", str(d1)]
+
+
+def test_a_call_after_the_last_meeting_has_its_audio_records_at_once(tmp_path):
+    c, sp, _, _ = make(tmp_path)
+    d1 = c.start_meeting("sv")
+    c.stop_meeting()
+    sessions.write_meta(d1, status="finalizing")
+    d2 = c.start_meeting("en", app="slack")
+    assert c.state()["meeting"]["dir"] == str(d2) and sp.procs[0].killed
+    assert sp.procs[-1].args == ["--meeting", str(d2)]
+
+
 def test_stopping_a_waiting_meeting_cancels_it(tmp_path):
     c, sp, ev, _ = make(tmp_path)
     d1 = c.start_meeting("sv")
