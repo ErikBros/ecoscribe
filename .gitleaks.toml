@@ -1,0 +1,43 @@
+# Privacy guard rules (dictado-05h). The repo is public: keys, personal paths and private files
+# never get in. tools/privacy_guard.py runs gitleaks with this file before every commit and push,
+# and CI runs it on every pull request. Names and words that are personal live in a local file
+# that extends this one (see tools/privacy_guard.py); never write them here.
+title = "ecoscribe privacy rules"
+
+[extend]
+useDefault = true  # gitleaks' own secret rules (API keys, tokens, private keys)
+
+[[rules]]
+id = "personal-home-path"
+description = "A real user's home folder (Windows, WSL, macOS or Linux)"
+regex = '''(?i)(?:[a-z]:[\\/]+users|/mnt/[a-z]/users|/users|/home)[\\/]+([a-z0-9][a-z0-9._-]{1,})'''
+secretGroup = 1
+keywords = ["users", "home"]
+[[rules.allowlists]]
+regexTarget = "secret"
+regexes = ['''(?i)^(me|you|user|username|name|runner|runneradmin|public|default|shared|someone|example|alice|bob|test|tester|dev|ubuntu|vscode|appdata|x|a|b)$''']
+
+[[rules]]
+id = "private-calendar-link"
+description = "A secret calendar address (anyone with it reads the calendar)"
+regex = '''calendar/ical/[^/\s"']+/private-[0-9a-f]{16,}'''
+keywords = ["calendar/ical"]
+
+[[rules]]
+id = "personal-data-file"
+description = "A file the app writes with someone's dictations, transcripts, recordings or settings"
+path = '''(?i)(^|/)(history[^/]*\.jsonl|history[^/]*\.bak|transcript\.json|config\.toml|vocabulary\.txt|snippets\.json|voice_memory[^/]*)$'''
+
+[[rules]]
+id = "recording-outside-fixtures"
+description = "An audio recording outside tests/fixtures (the only recordings allowed are scripted test ones)"
+path = '''(?i)^(?:[^t]|t[^e]|te[^s]|tes[^t]|test[^s]|tests[^/]|tests/[^f]).*\.(wav|flac|mp3|m4a|ogg|opus|webm)$'''
+
+[[rules]]
+id = "private-local-file"
+description = "Local-only notes and settings (session handoffs, .env, *.local.*, private/ folders)"
+path = '''(?i)(^|/)(\.env(\..*)?|[^/]*\.local\.[^/]+|next-session\.md|private/.*|personal/.*)$'''
+
+[allowlist]
+description = "Files that only describe the rules"
+paths = ['''^\.gitleaks\.toml$''', '''^tests/test_privacy_guard\.py$''']

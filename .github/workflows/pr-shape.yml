@@ -39,3 +39,11 @@ jobs:
             fi
           done
           exit $bad
+      - name: Nothing personal or secret (gitleaks, .gitleaks.toml)
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          v=8.30.1
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v$v/gitleaks_${v}_linux_x64.tar.gz" | tar -xz gitleaks
+          ./gitleaks git --no-banner --redact -c .gitleaks.toml --log-opts="origin/main..$HEAD_SHA" .
