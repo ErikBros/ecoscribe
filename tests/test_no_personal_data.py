@@ -63,17 +63,33 @@ def _transcripts() -> list[str]:
     return [t for t in out if t.strip()]
 
 
-def _repo_text() -> str:
-    out = []
+def _files():
+    """What could be committed: tracked + untracked files git doesn't ignore (build output holds
+    third-party libraries whose comments share common phrases). Every file when git can't say."""
+    try:
+        r = subprocess.run(["git", "ls-files", "-co", "--exclude-standard", "-z"], cwd=REPO, capture_output=True,
+                           timeout=20)
+        if r.returncode == 0:
+            for rel in r.stdout.decode("utf-8", "ignore").split("\0"):
+                if rel and not SKIP_DIRS & set(Path(rel).parts):
+                    yield REPO / rel
+            return
+    except (OSError, subprocess.SubprocessError):
+        pass
     for root, dirs, files in os.walk(REPO):
         dirs[:] = [x for x in dirs if x not in SKIP_DIRS]
         for name in files:
-            p = Path(root) / name
-            if p.suffix.lower() in TEXT_EXT and p.stat().st_size < 5_000_000:
-                try:
-                    out.append(p.read_text(encoding="utf-8", errors="ignore"))
-                except OSError:
-                    pass
+            yield Path(root) / name
+
+
+def _repo_text() -> str:
+    out = []
+    for p in _files():
+        if p.is_file() and p.suffix.lower() in TEXT_EXT and p.stat().st_size < 5_000_000:
+            try:
+                out.append(p.read_text(encoding="utf-8", errors="ignore"))
+            except OSError:
+                pass
     try:  # commits not on GitHub yet (their messages); git may not read a WSL folder from Windows
         log = subprocess.run(["git", "log", "@{upstream}..HEAD", "--format=%B"], cwd=REPO, capture_output=True,
                              text=True, encoding="utf-8", errors="ignore", timeout=20)
