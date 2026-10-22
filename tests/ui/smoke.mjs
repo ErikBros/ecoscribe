@@ -479,6 +479,23 @@ async function load(query) {
   await sleep(200);
   check(mac.doc.querySelector("#row-command-mode").hidden, "no command mode switch on the Mac yet");
 }
+{ // Meetings > the checked summary above the transcript (dictado-nl5)
+  const { doc } = await load("page=reuniones/2026-10-05_0915_planering");
+  await sleep(300);
+  const box = doc.querySelector("#r-summary");
+  check(box && !box.hidden && doc.querySelector("#r-sum-check").textContent === "2 of 3 points found in the call", "a done summary shows, with how many points were found");
+  const miss = [...doc.querySelectorAll("#r-sum-lists li.unchecked")];
+  check(miss.length === 1 && miss[0].querySelector(".r-sum-miss")?.textContent === "Not found in the call", "the point not found in the call is marked");
+  const at = doc.querySelector("#r-sum-lists .r-sum-at");
+  at.click(); await sleep(50);
+  check(doc.querySelector("#r-segs .r-seg-hit") !== null, "a point's time jumps to that line of the transcript");
+  const writing = await load("page=reuniones/2026-10-04_1600_kund");
+  await sleep(300);
+  check(!writing.doc.querySelector("#r-summary").hidden && writing.doc.querySelector("#r-sum-text").textContent.startsWith("Writing the summary"), "a summary being written says so");
+  const none = await load("page=reuniones/2026-10-05_1130_podcast");
+  await sleep(300);
+  check(none.doc.querySelector("#r-summary").hidden, "no summary: no card");
+}
 { // Settings in sections (dictado-6oe.7)
   const { window, doc } = await load("page=ajustes");
   await sleep(150);

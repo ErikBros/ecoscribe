@@ -498,7 +498,8 @@ class Api:
                 "pct": prog.get("pct"), "slow": m.get("slow", False),
                 "speakers": m.get("speakers"), "speaker_names": {**({"Me": me} if me else {}), **(m.get("speaker_names") or {})},
                 "recognised": [(m.get("speaker_names") or {}).get(x, x) for x in m.get("speakers_recognised") or []],
-                "people": list((m.get("calendar") or {}).get("attendees") or []), "app": m.get("app")}  # dictado-6oe.4
+                "people": list((m.get("calendar") or {}).get("attendees") or []), "app": m.get("app"),  # dictado-6oe.4
+                "summary": m.get("summary")}  # dictado-nl5: running / done / failed, or None
 
     def list_sessions(self, query: str = "") -> dict:
         """The search box finds a title or anything said in the call, accents and case ignored (dictado-8h8)."""
@@ -528,8 +529,14 @@ class Api:
             segs = json.loads((d / "transcript.json").read_text(encoding="utf-8"))["segments"]
         except (OSError, ValueError, KeyError):
             pass
+        summ = None
+        try:  # dictado-nl5: the checked summary, shown above the transcript
+            from .summary import JSON
+            summ = json.loads((d / JSON).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            pass
         return {"session": self._row(m, self._me()), "segments": export.turns(segs),  # read in turns, like the .md
-                "notes": export.read_notes(d),
+                "notes": export.read_notes(d), "summary": summ,
                 "exports": [p.name for p in d.glob("transcript.*") if p.suffix in (".txt", ".md", ".srt")]}
 
     def get_live(self, name: str, since: int = 0) -> dict:
