@@ -120,7 +120,7 @@ MAILTO_MAX = 1800  # longer mailto: links get cut by Windows and some mail progr
 
 
 def _open_url(url: str) -> None:
-    """Hand a link (mailto:) to the system: the user's own mail program opens a draft."""
+    """Hand a link to the system: mailto: opens a draft in the user's mail program, https: the browser."""
     if sys.platform == "darwin":
         import subprocess
         subprocess.Popen(["open", url])
@@ -216,6 +216,7 @@ class Api:
                 "screen_names": c.text.screen_names,
                 "hold_to_talk": c.hotkey.hold_to_talk, "numpad_enter": c.hotkey.numpad_enter, "voice_memory": c.meetings.voice_memory,
                 "calendar_url": c.meetings.calendar_url, "my_name": c.meetings.my_name, "debug_log": c.ui.debug_log,
+                "update_check": c.ui.update_check,
                 "export_dir": str(self._export_dir()), "export_default": not c.ui.export_dir,
                 "extra_languages": list(c.whisper.extra_languages),
                 "snippets": [{"trigger": k, "text": v} for k, v in c.text.snippets.items()],
@@ -321,7 +322,7 @@ class Api:
                                          "screen_names": ("text", "screen_names"),
                                          "hold_to_talk": ("hotkey", "hold_to_talk"), "numpad_enter": ("hotkey", "numpad_enter"),
                                          "voice_memory": ("meetings", "voice_memory"),
-                                         "debug_log": ("ui", "debug_log")}.items():
+                                         "debug_log": ("ui", "debug_log"), "update_check": ("ui", "update_check")}.items():
                 if key in values:
                     setattr(getattr(c, section), name, bool(values[key]))
         except ValueError as e:
@@ -975,6 +976,28 @@ class Api:
 
     def open_log(self) -> dict:
         _startfile(str(self._data_dir / "ecoscribe.log"))
+        return {"ok": True}
+
+    # ---------- a newer version (dictado-cjk) ----------
+    def update_notice(self) -> dict:
+        """Home: {"version", "url"} when a newer release is out and not dismissed; {} otherwise.
+        Only reads what the app's daily check saved (updates.py): never waits on the network."""
+        from . import updates
+        if not self._load().ui.update_check:
+            return {}
+        return updates.notice(updates.load(self._data_dir), __version__) or {}
+
+    def open_update(self) -> dict:
+        from . import updates
+        n = updates.notice(updates.load(self._data_dir), __version__)
+        if not n:
+            return {"ok": False}
+        self._open_url(n["url"])  # the release page: the .exe and the .dmg are both there
+        return {"ok": True}
+
+    def dismiss_update(self, version: str = "") -> dict:
+        from . import updates
+        updates.dismiss(self._data_dir, version)
         return {"ok": True}
 
     def get_welcome(self) -> dict:

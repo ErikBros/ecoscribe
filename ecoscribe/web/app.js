@@ -60,7 +60,7 @@ function demoApi() {
   const dl = { running: false, error: null, models: {} };  // the demo model download
   let settings = {
     values: { hotkey: "rctrl", mic: "Anker PowerConf", languages: "en", sounds: true, overlay: true, live_text: true, insights: params.get("insights") === "1", speech_feedback: false, unmute: true, startup: true,
-      meet_mode: "prompt", meet_end: "10", meet_lang: "sv", on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: false, self_corrections: false, command_mode: false, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true,
+      meet_mode: "prompt", meet_end: "10", meet_lang: "sv", on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: false, self_corrections: false, command_mode: false, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, update_check: true,
       export_dir: "C:/x/Downloads", export_default: true,
       snippets: [{ trigger: "my email", text: "alex@example.com" }], replacements: [{ heard: "poll request", write: "pull request" }] },
     options: {
@@ -130,6 +130,9 @@ function demoApi() {
     voices_info: async () => window.__noVoices ? { count: 0, names: [], on: true } : { count: 2, names: ["Ana", "Tom"], on: true },
     crashes: async () => (params.get("crash") === "1" ? { items: [{ name: "2026-10-06_140325", when: "2026-10-06 140325", exit: MAC ? "unknown" : "0xC0000005 (access violation)" }], gave_up: false } : { items: [], gave_up: false }),
     copy_crash_report: async () => ({ ok: true }), dismiss_crash: async () => ({ ok: true }),
+    update_notice: async () => (params.get("update") === "1" && !window.__updDismissed ? { version: "1.18.0", url: "https://github.com/ErikBros/ecoscribe/releases/tag/v1.18.0" } : {}),
+    open_update: async () => { window.__updOpened = true; return { ok: true }; },
+    dismiss_update: async (v) => { window.__updDismissed = v; return { ok: true }; },
     copy_debug_info: async () => ({ ok: true }), open_logs_folder: async () => ({ ok: true }),
     save_export: async (name, fmt) => { window.__exported = fmt; return { ok: true, path: "C:/x/Downloads/t." + fmt, name: "t." + fmt, folder: "Downloads" }; },
     show_export: async (p) => { window.__revealed = p; return { ok: true }; },
@@ -692,12 +695,24 @@ async function crashCard() {  // t0u.37: a crash is never silent
   $("#crash-dismiss").onclick = async () => { for (const i of c.items) await api.dismiss_crash(i.name); crashCard(); };
 }
 
+async function updateNote() {  // dictado-cjk: a newer version is out (the app checks once a day)
+  const n = await api.update_notice().catch(() => ({}));
+  const box = $("#update-note");
+  box.hidden = !n.version;
+  if (box.hidden) return;
+  $("#update-title").textContent = `Ecoscribe ${n.version} is out`;
+  $("#update-sub").textContent = `You have ${lastStatus?.version || "an older version"}. Your settings and history stay as they are.`;
+  $("#update-get").onclick = () => api.open_update();
+  $("#update-x").onclick = async () => { await api.dismiss_update(n.version); updateNote(); };
+}
+
 async function renderInicio() {  // the dictate banner, today's numbers, recent dictations (dictado-6oe.3)
   crashCard();
   const hour = new Date().getHours();
   $("#home-hello").textContent = hour < 5 ? "Good night" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   $("#home-date").textContent = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
   await refreshStatus();
+  updateNote();  // after the status: it says which version you have
   const h = await api.get_history(200, "");
   const today = new Date().toISOString().slice(0, 10);
   const todays = h.items.filter((x) => String(x.ts || "").startsWith(today));
@@ -1321,7 +1336,7 @@ function formValues() {
     speakers: $("#f-speakers").checked, voice_commands: $("#f-voice-commands").checked,
     self_corrections: $("#f-self-corrections").checked, command_mode: $("#f-command-mode").checked,
     screen_names: $("#f-screen-names").checked, hold_to_talk: $("#f-hold").checked, numpad_enter: $("#f-numpad-enter").checked,
-    voice_memory: $("#f-voice-memory").checked, debug_log: $("#f-debug-log").checked, calendar_url: $("#f-calendar").value.trim(), my_name: $("#f-my-name").value.trim(),
+    voice_memory: $("#f-voice-memory").checked, debug_log: $("#f-debug-log").checked, update_check: $("#f-update-check").checked, calendar_url: $("#f-calendar").value.trim(), my_name: $("#f-my-name").value.trim(),
     vocabulary: $("#f-vocabulary").value.split("\n").map((w) => w.trim()).filter(Boolean).join("\n"),
     snippets: $$(".snip").map((r) => ({ trigger: $(".snip-trigger", r).value.trim().toLowerCase().replace(/\s+/g, " "),
                                        text: $(".snip-text", r).value }))
@@ -1463,6 +1478,7 @@ async function renderSettings() {
   $("#f-calendar").value = s.values.calendar_url || "";
   $("#f-my-name").value = s.values.my_name || "";
   $("#f-debug-log").checked = !!s.values.debug_log;
+  $("#f-update-check").checked = s.values.update_check !== false;
   const vc = $("#vc-rows"); vc.innerHTML = "";
   if (params.get("vc") === "1") $("#vc-list").open = true;  // screenshot
   for (const r of s.voice_command_list || []) {

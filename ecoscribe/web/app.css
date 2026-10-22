@@ -115,6 +115,13 @@ h3 { margin: 0; font: 700 16px/1.3 var(--font-display); letter-spacing: -.01em; 
 .hero-wave { width: 170px; height: 70px; flex: none; fill: none; stroke: #7fa6c4; stroke-width: 5; stroke-linecap: round; }
 .hero-wave circle { fill: #e58a5f; stroke: none; }
 .hero:not([data-state="ready"]) .hero-wave { opacity: .35; }
+/* dictado-cjk: a newer version is out; quiet, one line, above the hero */
+.update-note { display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 16px; margin-bottom: 14px; border-radius: 14px;
+  background: var(--aegean-soft); color: var(--ink); font-size: 13.5px; }
+.update-icon { width: 18px; height: 18px; flex: none; fill: none; stroke: var(--aegean); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.update-text { flex: 1; min-width: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0 10px; align-items: baseline; }
+.update-text span { color: var(--ink-soft); }
+.update-note .home-tip-x { margin-top: 0; }
 .today { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
 .today-stat { padding: 16px 20px; display: flex; flex-direction: column; gap: 2px; }
 .today-stat .card-title { margin: 0; }

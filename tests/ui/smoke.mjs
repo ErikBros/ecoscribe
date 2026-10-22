@@ -53,6 +53,17 @@ async function load(query) {
   doc.querySelector("#save").click(); await sleep(100);
   check(sent && sent.vocabulary === "Göteborg\npyannote\nKristineberg" && Object.keys(sent).length === 1, "saves only the word list, trimmed: " + JSON.stringify(sent));
 }
+{ // ajustes: Check for new versions (dictado-cjk), on by default
+  const { window, doc } = await load("page=ajustes");
+  const sw = doc.querySelector("#f-update-check");
+  check(sw?.checked === true, "Check for new versions is on by default");
+  sw.checked = false; sw.dispatchEvent(new window.Event("change", { bubbles: true }));
+  let sent = null;
+  const api = window.__ecoscribe.api, orig = api.save_settings;
+  api.save_settings = async (x) => { sent = x; return orig(x); };
+  doc.querySelector("#save").click(); await sleep(100);
+  check(sent && sent.update_check === false && Object.keys(sent).length === 1, "turning it off saves only that: " + JSON.stringify(sent));
+}
 { // ajustes: Replace, heard -> write (dictado-b7u)
   const { window, doc } = await load("page=ajustes");
   const rows = () => [...doc.querySelectorAll("#reps .rep")];
@@ -188,7 +199,20 @@ async function load(query) {
   check(doc.querySelector("#last-text").textContent.startsWith("Can you check"), "last dictation shown");
   check(doc.querySelector(".nav-item.active").dataset.page === "inicio", "nav highlights inicio");
   check(doc.querySelector("#setup").hidden, "no setup when done");
+  check(doc.querySelector("#update-note").hidden, "no new-version notice when there's none");
   check(errors.length === 0, "no JS errors: " + errors.join("; "));
+}
+{ // dictado-cjk: a newer version is out
+  const { window, doc, errors } = await load("page=inicio&update=1");
+  await sleep(50);
+  const note = doc.querySelector("#update-note");
+  check(!note.hidden && doc.querySelector("#update-title").textContent === "Ecoscribe 1.18.0 is out", "Home says a newer version is out");
+  check(/You have \d+\.\d+/.test(doc.querySelector("#update-sub").textContent), "and which one you have");
+  doc.querySelector("#update-get").click(); await sleep(20);
+  check(window.__updOpened === true, "Download opens the release page");
+  doc.querySelector("#update-x").click(); await sleep(50);
+  check(note.hidden && window.__updDismissed === "1.18.0", "× hides it for that version");
+  check(errors.length === 0, "no JS errors with the update notice: " + errors.join("; "));
 }
 { // stopped
   const { doc } = await load("page=inicio&state=stopped");
