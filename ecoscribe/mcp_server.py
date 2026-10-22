@@ -2,7 +2,8 @@
 
 Claude desktop (or any MCP client) starts it as a child process and talks newline-delimited
 JSON-RPC 2.0 over stdin/stdout. Three read-only tools over the transcripts folder:
-list_meetings, read_meeting, search_meetings. Nothing is written, nothing is sent anywhere:
+list_meetings, read_meeting, search_meetings. Nothing is sent anywhere and nothing is changed (only
+search.py's index, a cache next to the transcripts, is written):
 the client gets only what it asks for. No SDK: the protocol subset is small and stable.
 """
 from __future__ import annotations
@@ -13,7 +14,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from . import __version__, export, sessions
+from . import __version__, export, search, sessions
 
 log = logging.getLogger(__name__)
 VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
@@ -35,10 +36,15 @@ TOOLS = [
                     "'Me' is the user (the mic); 'Others' or 'Speaker N' (or a name the user gave) the other side.",
      "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}},
     {"name": "search_meetings", "annotations": RO,
-     "description": "Find the lines where some words were said, across all sessions: session id and title, "
-                    "timestamp, speaker and the line. Case-insensitive.",
+     "description": "Find the calls where some words were said, ranked best first and grouped by call: id, title, date, "
+                    "how many lines matched, and up to 3 of the best lines with time and speaker. Case and accents don't "
+                    "matter (Greek too). Every word must appear in the call; a word also finds longer words that start "
+                    "with it; put an exact phrase in double quotes. Calls are mostly in Swedish, English and Spanish: "
+                    "when looking for a topic, search again with the words in each of those languages.",
      "inputSchema": {"type": "object", "properties": {
-         "text": {"type": "string"}, "limit": {"type": "integer", "description": "At most this many lines (default 40)"}},
+         "text": {"type": "string"},
+         "since": {"type": "string", "description": "Only sessions on or after this date, YYYY-MM-DD"},
+         "limit": {"type": "integer", "description": "At most this many calls (default 10)"}},
          "required": ["text"]}},
 ]
 
@@ -102,23 +108,16 @@ def read_meeting(root: Path, sid: str) -> str:
         return text
 
 
-def search_meetings(root: Path, text: str, limit: int = 40) -> list[dict]:
-    needle = " ".join(str(text or "").lower().split())
-    if not needle:
+def search_meetings(root: Path, text: str, limit: int = 10, since: str = "") -> list[dict]:
+    """dictado-8h8: ranked, accent-proof, grouped by call (search.py)."""
+    if not str(text or "").strip():
         raise ValueError("say what to look for")
-    hits = []
-    for m in sessions.list_sessions(root):
-        if not _visible(m):
-            continue
-        d, names = Path(m["dir"]), m.get("speaker_names") or {}
-        for s in export.turns(_segments(d)):
-            if needle in " ".join(s["text"].lower().split()):
-                spk = s.get("speaker")
-                hits.append({"id": d.name, "title": m.get("title", ""), "date": export._date(m), "at": export._hms(s["t0"]),
-                             "speaker": names.get(spk) or export._SPEAKER.get(spk, spk) or "", "text": s["text"]})
-                if len(hits) >= max(1, int(limit or 40)):
-                    return hits
-    return hits
+    keep = lambda m: _visible(m) and (not since or str(m.get("created", ""))[:10] >= since[:10])  # noqa: E731
+    idx = search.open_index(root)
+    try:
+        return idx.search(text, limit=limit or 10, keep=keep)
+    finally:
+        idx.close()
 
 
 def _call(root: Path, name: str, args: dict) -> dict:
@@ -129,7 +128,8 @@ def _call(root: Path, name: str, args: dict) -> dict:
         elif name == "read_meeting":
             out = read_meeting(root, args.get("id", ""))
         elif name == "search_meetings":
-            out = json.dumps(search_meetings(root, args.get("text", ""), args.get("limit", 40)), ensure_ascii=False, indent=1)
+            out = json.dumps(search_meetings(root, args.get("text", ""), args.get("limit", 10), args.get("since", "")),
+                             ensure_ascii=False, indent=1)
         else:
             return {"content": [{"type": "text", "text": f"unknown tool {name}"}], "isError": True}
     except (OSError, ValueError) as e:
