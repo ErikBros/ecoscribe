@@ -466,6 +466,18 @@ async function load(query) {
   check(window.__emailed === "2026-10-05_0915_planering" && doc.querySelector("#toast").textContent.includes("to 2 people")
     && doc.querySelector("#toast").textContent.includes("paste it in"), "opens a draft to the participants, says to paste");
 }
+{ // Settings > the two switches that use Claude (dictado-bd6)
+  const { doc } = await load("page=ajustes");
+  await sleep(200);
+  check(doc.querySelector("#f-self-corrections") && doc.querySelector("#f-command-mode") && !doc.querySelector("#row-command-mode").hidden, "self-corrections and command mode have switches");
+  check(doc.querySelectorAll("#sc-rows tr").length === 2 && doc.querySelector("#sc-rows").textContent.includes("scratch that"), "the phrases are listed");
+  check([...doc.querySelectorAll(".cm-key")].every((k) => k.textContent === "Right Ctrl"), "command mode names the dictation key");
+  doc.querySelector("#f-command-mode").click(); await sleep(50);
+  check(!doc.querySelector("#savebar").hidden, "turning one on offers Save");
+  const mac = await load("page=ajustes&mac=1");
+  await sleep(200);
+  check(mac.doc.querySelector("#row-command-mode").hidden, "no command mode switch on the Mac yet");
+}
 { // Settings in sections (dictado-6oe.7)
   const { window, doc } = await load("page=ajustes");
   await sleep(150);

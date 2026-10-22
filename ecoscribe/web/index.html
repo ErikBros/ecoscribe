@@ -412,6 +412,17 @@
               <tbody id="vc-rows"></tbody></table>
             <p class="muted small">A command only counts on its own: at the start, or after a pause or punctuation, and before one or the end. "We need a new line of products" stays text. Saying only "send it" presses Enter on what's already in the box.</p>
           </details>
+          <!-- dictado-bd6: the two features that send text to Claude, through the user's own Claude Code login -->
+          <label class="row toggle-row"><span class="row-text"><span class="row-label">Fix it when you correct yourself</span><span class="muted small">Say "scratch that" to drop the sentence before it. Say "no wait" or "sorry, I mean" and Claude fixes that dictation before it's pasted: "on Tuesday, no wait, on Thursday" becomes "on Thursday", about 3 seconds later. If Claude doesn't answer in 5 seconds, the text goes in as you said it.</span></span>
+            <input type="checkbox" class="switch" name="self_corrections" id="f-self-corrections"></label>
+          <details class="vc-list" id="sc-list"><summary>See all phrases</summary>
+            <table class="vc-table"><thead><tr><th>What it does</th><th>English</th><th>Spanish</th><th>Swedish</th><th>Greek</th></tr></thead>
+              <tbody id="sc-rows"></tbody></table>
+            <p class="muted small">A phrase only counts on its own, after a pause or punctuation: "scratch that itch" stays text. Only dictations with one of these phrases go to Claude.</p>
+          </details>
+          <label class="row toggle-row" id="row-command-mode"><span class="row-text"><span class="row-label">Change selected text by voice</span><span class="muted small">Select text anywhere, press <kbd class="cm-key">Right Ctrl</kbd> + <kbd>E</kbd>, say what to change ("make it shorter", "translate to Swedish") and tap <kbd class="cm-key">Right Ctrl</kbd>. Claude rewrites it in place; Ctrl+Z brings the old text back.</span></span>
+            <input type="checkbox" class="switch" name="command_mode" id="f-command-mode"></label>
+          <p class="muted small claude-note" id="claude-note">Both use your Claude Code login on this PC: the text goes to Claude, nothing else does.</p>
           <label class="row toggle-row"><span class="row-text"><span class="row-label">On-screen pill</span><span class="muted small">"Dictating 0:07" at the bottom center while you record.</span></span>
             <input type="checkbox" class="switch" name="overlay" id="f-overlay"></label>
           <label class="row toggle-row"><span class="row-text"><span class="row-label">Live text on the pill</span><span class="muted small">Shows what Ecoscribe hears while you talk, a few seconds behind. A quick draft: the careful transcription is still what gets pasted.</span></span>
