@@ -1033,18 +1033,29 @@ def web_dir() -> Path:
     return Path(__file__).resolve().parent / "web"
 
 
+# Tests only (dictado-0up): ECOSCRIBE_QUIET_WINDOW=<port> opens a test copy off-screen that never takes
+# focus, next to the user's own window, with WebView2's debug port on localhost:<port> for Playwright.
+QUIET_ENV = "ECOSCRIBE_QUIET_WINDOW"
+OFF_SCREEN = -32000
+
+
 def main(page: str | None = None) -> int:
     from . import palette as P
     from . import winutil
     winutil.setup_logging(paths.data_dir() / "window.log")
-    if not winutil.single_instance(ipc.UI_MUTEX):
+    quiet = os.environ.get(QUIET_ENV)
+    if not quiet and not winutil.single_instance(ipc.UI_MUTEX):
         ipc.focus_ui()
         return 0
     import webview
     api = Api(page=page)
     url = (web_dir() / "index.html").as_uri()
+    kw = {}
+    if quiet:
+        webview.settings["REMOTE_DEBUGGING_PORT"] = int(quiet)
+        kw = {"x": OFF_SCREEN, "y": OFF_SCREEN, "focus": False, "hidden": True}
     win = webview.create_window(ipc.UI_TITLE, url, js_api=api, width=980, height=720, min_size=(820, 560),
-                                background_color=P.PAPER, text_select=True)
+                                background_color=P.PAPER, text_select=True, **kw)
     win.events.closed += lambda: api.mic_test_stop()
 
     def on_drop(e):  # pywebview fills pywebviewFullPath only for drops handled from Python
