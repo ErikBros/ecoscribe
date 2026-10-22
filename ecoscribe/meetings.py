@@ -205,6 +205,18 @@ class Controller:
         self._publish()
         return d
 
+    def set_app(self, app: str) -> bool:
+        """A meeting started by hand with no call app yet joins the call the detector just saw:
+        the call's end stops it, like one started during the call."""
+        with self._lock:
+            if self.meeting is None or self.meeting["stopping"] or self.meeting["app"] or not app:
+                return False
+            sessions.write_meta(self.meeting["dir"], app=app)
+            self.meeting["app"] = app
+            log.info("meeting joins the %s call %s", app, self.meeting["dir"])
+            self._publish()
+            return True
+
     def set_lang(self, lang: str) -> bool:
         """Switch the recording meeting's language: live chunks from now on, and the final pass."""
         with self._lock:

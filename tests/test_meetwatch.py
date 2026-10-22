@@ -16,6 +16,12 @@ class FakeController:
         self.meeting = {"dir": "D", "app": app, "lang": lang, "status": "recording"}
         return Path("D")
 
+    def set_app(self, app):
+        if not self.meeting or self.meeting.get("app"):
+            return False
+        self.meeting["app"] = app
+        return True
+
     def stop_meeting(self):
         self.stopped += 1
         if self.meeting:
@@ -33,9 +39,10 @@ class World:
 
     def __init__(self):
         self.mic, self.titles, self.running = set(), [], {"msteams", "chrome", "slack"}
+        self.talking = set()  # mic in + sound out in the same process (macOS)
 
     def read(self):
-        uses = [MicUse(app=a, in_use=True, start=1, stop=0) for a in self.mic]
+        uses = [MicUse(app=a, in_use=True, start=1, stop=0, talking=a in self.talking) for a in self.mic]
         return uses, list(self.titles), set(self.running)
 
 
@@ -151,6 +158,45 @@ def test_end_does_not_stop_a_manual_meeting(tmp_path):
     world.mic = set()
     run(w, clock, 30)
     assert ctl.stopped == 0
+
+
+def test_a_meeting_started_by_hand_just_before_the_call_joins_it(tmp_path):
+    """Transcribe meeting now in the Meet waiting room, then the call starts: its end stops the meeting."""
+    from datetime import datetime
+    w, ctl, world, clock, prompts = make(tmp_path)
+    ctl.start_meeting("sv")
+    ctl.meeting["started"] = datetime.now().isoformat(timespec="seconds")
+    world.mic, world.talking = {"chrome"}, {"chrome"}
+    run(w, clock, 6)
+    assert ctl.meeting["app"] == "chrome" and prompts == []
+    world.mic = world.talking = set()
+    run(w, clock, 30)
+    assert ctl.stopped == 1
+
+
+def test_an_older_meeting_started_by_hand_does_not_join_a_call(tmp_path):
+    w, ctl, world, clock, prompts = make(tmp_path)
+    ctl.start_meeting("sv")
+    ctl.meeting["started"] = "2020-01-01T09:00:00"  # an in-person meeting, recording for a while
+    world.mic = {"msteams"}
+    run(w, clock, 6)
+    assert ctl.meeting["app"] is None
+    world.mic = set()
+    run(w, clock, 30)
+    assert ctl.stopped == 0
+
+
+def test_browser_call_without_a_meet_title_prompts_when_it_talks(tmp_path):
+    """macOS: the Meet tab isn't in front, but Chrome's audio process captures and plays: a call."""
+    w, ctl, world, clock, prompts = make(tmp_path)
+    world.mic, world.talking = {"chrome"}, {"chrome"}
+    world.titles = [("Docs - Google Chrome", "chrome")]
+    run(w, clock, 6)
+    assert prompts == [("start", "chrome", "sv")]
+    w.answer("transcribir")
+    world.talking = set()  # left the call; the tab keeps the mic
+    run(w, clock, 30)
+    assert ctl.stopped == 1
 
 
 def test_ahora_no_suppresses_until_end(tmp_path):

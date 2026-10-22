@@ -35,6 +35,22 @@ def test_browser_with_meet_title_starts():
     assert ev.kind == "start" and ev.app == "chrome"
 
 
+def test_browser_that_talks_starts_without_a_title():
+    d = Detector(debounce_polls=1)
+    talk = MicUse(app="chrome", in_use=True, start=1, stop=0, talking=True)
+    ev = d.update([talk], ["Docs - Google Chrome"], 0.0)
+    assert ev.kind == "start" and ev.app == "chrome"
+    assert d.update([talk], [], 2.0) is None  # still in the call
+    d.update([use("chrome")], [], 4.0)  # call over, the tab keeps the mic
+    assert d.update([use("chrome")], [], 20.0).kind == "end"
+
+
+def test_a_call_app_that_talks_is_still_just_a_call_app():
+    d = Detector(debounce_polls=1)
+    ev = d.update([MicUse(app="spotify", in_use=True, start=1, stop=0, talking=True)], [], 0.0)
+    assert ev is None  # neither a call app nor a browser
+
+
 def test_own_process_excluded():
     d = Detector(debounce_polls=1)
     frames = [([use("ecoscribe"), use("pythonw")], ["Microsoft Teams"])] * 50
