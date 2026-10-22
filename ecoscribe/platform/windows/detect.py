@@ -123,3 +123,9 @@ def running_apps() -> set[str]:
     finally:
         k32.CloseHandle(snap)
     return out
+
+
+def health() -> dict[str, str]:
+    """What could keep the detector blind (macOS reports its Core Audio and Accessibility state here).
+    Windows' consent store and window titles need no permission: nothing to report."""
+    return {}

@@ -36,16 +36,46 @@ def _foreground() -> str:
         return ""
 
 
+_failing: dict[str, str] = {}  # reader -> its last error, logged once until it works again
+
+
+def _reader(name: str, fn, default):
+    """One reader's result, or `default` when it fails: a broken window-title read (say, no Accessibility on
+    the Mac) must not also hide who holds the mic (dictado-nhn). Each failure is logged once, and its recovery."""
+    try:
+        out = fn()
+    except Exception as e:
+        err = f"{type(e).__name__}: {e}"
+        if _failing.get(name) != err:
+            _failing[name] = err
+            log.warning("meetwatch: %s failed (%s)", name, err, exc_info=True)
+        return default
+    if _failing.pop(name, None) is not None:
+        log.info("meetwatch: %s works again", name)
+    return out
+
+
 def _read_world():
-    return detect.read_consent(), detect.window_titles(), detect.running_apps()
+    return (_reader("mic reader", detect.read_consent, []), _reader("window titles", detect.window_titles, []),
+            _reader("running apps", detect.running_apps, None))
+
+
+def _health() -> dict:
+    try:
+        h = dict(detect.health())
+    except Exception:
+        h = {}
+    for name, err in _failing.items():
+        h[name.replace(" ", "_")] = "failing"
+    return h
 
 
 class MeetWatch(threading.Thread):
     def __init__(self, controller, cfg, ui_prompt, read=_read_world, clock=time.monotonic,
-                 data_dir: Path | None = None, interval_s: float = 2.0):
+                 data_dir: Path | None = None, interval_s: float = 2.0, health=_health):
         super().__init__(name="ecoscribe-meetwatch", daemon=True)
         self.ctl, self.cfg, self.ui_prompt = controller, cfg.meetings, ui_prompt
-        self.read, self.clock, self.interval = read, clock, interval_s
+        self.read, self.clock, self.interval, self.health = read, clock, interval_s, health
         self.data = Path(data_dir) if data_dir else paths.data_dir()
         self.detector = detect.Detector(grace_s=self.cfg.grace_s)
         self.call: str | None = None  # app of the call the detector sees right now
@@ -56,6 +86,8 @@ class MeetWatch(threading.Thread):
         self.end_asked_at: float | None = None
         self._lock = threading.RLock()
         self._halt = threading.Event()
+        self._signal: str | None = None  # the last signal line written to detect.log
+        self._tick_error: str | None = None
 
     # -- language memory ------------------------------------------------------------------
     def _langs(self) -> dict:
@@ -110,8 +142,13 @@ class MeetWatch(threading.Thread):
         while not self._halt.wait(self.interval):
             try:
                 self.tick()
-            except Exception:
+                self._tick_error = None
+            except Exception as e:
                 log.exception("meetwatch tick failed")
+                err = f"{type(e).__name__}: {e}"
+                if err != self._tick_error:  # once per kind of failure, in the log the user's checks read
+                    self._tick_error = err
+                    self._audit(f"tick failed: {type(e).__name__}")
 
     def stop(self) -> None:
         self._halt.set()
@@ -122,10 +159,24 @@ class MeetWatch(threading.Thread):
         with self._lock:
             uses, titles, running = self.read()
             now = self.clock()
+            self._note_signal(uses, titles, running)
             ev = self.detector.update(uses, titles, now, running)
             if ev is not None:
                 self._on_event(ev)
             self._silence(now)
+
+    def _note_signal(self, uses, titles, running) -> None:
+        """detect.log gets a line each time what the detector sees changes: app names on the mic, whether
+        they play sound, a meeting tab title yes/no, and a reader or permission that is failing (dictado-nhn).
+        A missed call then shows why in the log (app names only, never a window title)."""
+        try:
+            line = detect.signal_summary(uses, titles, running, self.health())
+        except Exception:
+            log.debug("signal summary failed", exc_info=True)
+            return
+        if line != self._signal:
+            self._signal = line
+            self._audit("signal " + line)
 
     def _meeting(self) -> dict | None:
         return self.ctl.state().get("meeting")

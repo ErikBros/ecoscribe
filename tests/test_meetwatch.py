@@ -331,3 +331,62 @@ def test_back_to_back_calls_with_the_real_controller(tmp_path):
     tm.finish(sp.procs[0], Path(ctl.state()["meeting"]["dir"]))
     ctl.poll()
     assert ctl.state()["meeting"]["app"] == "slack" and ctl.state()["meeting"]["status"] == "recording"
+
+
+# ---------- dictado-nhn: one broken reader must not blind the detector; detect.log says what it sees ----------
+def test_a_failing_window_title_reader_does_not_hide_a_call_app(tmp_path, monkeypatch):
+    from ecoscribe import detect
+
+    def no_titles():
+        raise RuntimeError("Accessibility off")
+    monkeypatch.setattr(meetwatch, "_failing", {})
+    monkeypatch.setattr(detect, "read_consent", lambda: [MicUse(app="zoom", in_use=True, start=1, stop=0)])
+    monkeypatch.setattr(detect, "window_titles", no_titles)
+    monkeypatch.setattr(detect, "running_apps", lambda: {"zoom"})
+    cfg = Config()
+    prompts, clock = [], Clock()
+    w = meetwatch.MeetWatch(FakeController(), cfg, lambda kind, app=None, lang=None: prompts.append((kind, app)),
+                            clock=clock, data_dir=tmp_path, health=meetwatch._health)
+    run(w, clock, 6)
+    assert prompts == [("start", "zoom")]
+    log_text = (tmp_path / "detect.log").read_text(encoding="utf-8")
+    assert "signal mic=zoom" in log_text and "window_titles=failing" in log_text
+    monkeypatch.setattr(detect, "window_titles", lambda: [])  # it works again: the flag goes
+    run(w, clock, 2)
+    assert meetwatch._failing == {}
+
+
+def test_detect_log_has_a_signal_line_per_change(tmp_path):
+    w, ctl, world, clock, prompts = make(tmp_path)
+    w.health = lambda: {"accessibility": "not granted"}
+    run(w, clock, 4)
+    world.mic, world.talking = {"chrome"}, {"chrome"}
+    world.titles = [("Meet - Private planning", "chrome")]
+    run(w, clock, 6)
+    world.mic, world.talking = set(), set()
+    run(w, clock, 4)
+    signals = [ln.split(" ", 1)[1] for ln in (tmp_path / "detect.log").read_text(encoding="utf-8").splitlines()
+               if " signal " in ln]
+    assert signals == ["signal mic=- accessibility=not-granted",
+                       "signal mic=chrome+sound title=yes accessibility=not-granted",
+                       "signal mic=- accessibility=not-granted"]
+    assert "Private" not in (tmp_path / "detect.log").read_text(encoding="utf-8")
+    assert prompts[0] == ("start", "chrome", "sv")
+
+
+def test_a_failing_tick_is_written_to_detect_log_once(tmp_path):
+    w, ctl, world, clock, prompts = make(tmp_path)
+
+    def broken():
+        raise ValueError("bad read")
+    w.read, w.interval = broken, 0.001
+    calls = []
+    real_wait = w._halt.wait
+
+    def wait(t):
+        calls.append(t)
+        return len(calls) > 3 or real_wait(0)
+    w._halt.wait = wait
+    w.run()
+    text = (tmp_path / "detect.log").read_text(encoding="utf-8")
+    assert text.count("tick failed: ValueError") == 1
