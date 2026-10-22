@@ -185,6 +185,15 @@ def strip_credits(s: str) -> str:
     return _CREDITS_RE.sub("", s).strip()
 
 
+def only_credits(s: str) -> bool:
+    """True when Whisper's text is nothing but a subtitle credit. With the word list as a prompt it can
+    turn a whole stretch of real speech into one ("Υπότιτλοι AUTHORWAVE" for 12 s of Greek); the
+    stretch is then done again without the prompt (dictado-u34)."""
+    from .segclean import is_credit, strip_tags
+    s = strip_tags(s or "")
+    return bool(s) and (not re.search(r"\w", strip_credits(s)) or is_credit(s))
+
+
 def is_hallucination(s: str, speech_s: float, no_speech_prob: float = 0.0) -> bool:
     """True for Whisper's classic silence inventions ("Thank you.", "Gracias.").
 
