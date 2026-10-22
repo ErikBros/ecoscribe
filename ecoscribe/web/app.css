@@ -469,7 +469,6 @@ select:hover { border-color: #d6d2c6; }
 .vc-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px; }
 .vc-table th { text-align: left; font-weight: 600; color: var(--ink-soft, #5b6470); padding: 6px 8px; border-bottom: 1px solid var(--line); }
 .vc-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
-.claude-note { margin: 2px 0 10px; }  /* dictado-bd6 */
 
 /* dictation-languages: tick any mix */
 .lang-checks { display: flex; flex-wrap: wrap; gap: 8px; }
