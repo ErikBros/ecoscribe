@@ -1034,6 +1034,7 @@ class Api:
                  f"Version: {__version__}", f"Platform: {_platform()}", f"GPU: {_gpu()}", f"Status: {json.dumps(status.read(d / 'status.json') or {}, ensure_ascii=False)}", "",
                  "Recent crashes: " + (", ".join(p.name for p in reps) or "none"),
                  "Freezes recorded: " + (", ".join(p.name for p in live[-5:]) or "none"), "",
+                 crash.health_text(crash.health(d)).replace("# Ecoscribe health", "## Health"),
                  "## config.toml (calendar link removed)", "```", cfg.strip(), "```", ""]
         logs = (("ecoscribe.log", 200), ("engine-worker.log", 40), ("engine-worker-fault.log", 60),
                 ("gpu-failed.json", 5), ("supervisor.log", 30), ("detect.log", 20))

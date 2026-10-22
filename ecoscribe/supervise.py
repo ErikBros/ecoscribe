@@ -10,7 +10,9 @@ gets the real exit code:
 - a crash                                          -> crash report, restart within ~2 s
   with --after-crash <report> so the app says so on the pill and recovers the audio;
   the 3rd crash in 10 minutes stops the restarts (state "crashed": Home says so).
-- with hang_s (both platforms, 60 s): frozen longer than that (FreezeWatch's marker) -> report, kill, restart.
+- with hang_s (both platforms, 60 s): frozen longer than that (FreezeWatch's marker) -> a last snapshot
+  (dictado-dhr: up to SNAPSHOT_S for the app's every-thread dump), report, kill, restart.
+Every crash, frozen restart and give-up is counted by version in crashes/health.json (counts only).
 
 On macOS the "handle" is the pid (MacProc): the watchdog isn't the app's parent, so there is
 no exit code; crash.is_crash then goes by the fault trace and the log.
@@ -31,6 +33,7 @@ MUTEX = "Local\\EcoscribeSupervisor"
 MAX_CRASHES, WINDOW_S = 3, 600
 RESTART_WAIT_S = 30
 HANG_S = 60.0  # a main thread frozen this long (as watched by the watchdog) is killed and restarted
+SNAPSHOT_S = 3.0  # how long a frozen app gets to write its last every-thread snapshot before the kill
 
 
 def _read(p: Path) -> dict:
@@ -53,6 +56,7 @@ class Supervisor:
         self.waiting_since: float | None = None
         self.hang_s = hang_s
         self._frozen_seen: tuple | None = None  # (pid, when this watchdog first saw its frozen marker)
+        self._snapshot_asked: float | None = None  # when the last snapshot was asked for (the kill waits for it)
 
     def _status(self) -> dict:
         return _read(self.data / "status.json")
@@ -99,9 +103,13 @@ class Supervisor:
     def _check_hang(self) -> str:
         if not self.hang_s:
             return "ok"
-        m = crash.crashes_dir(self.data) / "live" / f"frozen-{self.pid}"
+        live = crash.crashes_dir(self.data) / "live"
+        m, req, final = live / f"frozen-{self.pid}", live / f"dump-{self.pid}", live / f"freeze-{self.pid}-final.log"
         if not m.exists():
-            self._frozen_seen = None
+            if self._snapshot_asked is not None:
+                log.info("Ecoscribe pid=%s answered again before the restart: not killed", self.pid)
+                req.unlink(missing_ok=True)
+            self._frozen_seen = self._snapshot_asked = None
             return "ok"
         # Count the freeze from when WE first saw it, not from the app's last beat: after the
         # PC sleeps the last beat is hours old, and a just-woken healthy app would be killed.
@@ -111,12 +119,29 @@ class Supervisor:
             return "ok"
         if now - self._frozen_seen[1] < self.hang_s:
             return "ok"
-        self._frozen_seen = None
+        if self._snapshot_asked is None:  # first a last look at every thread, then the kill
+            self._snapshot_asked = now
+            req.write_text(str(time.time()), encoding="utf-8")
+            dump = getattr(self.proc, "dump", None)
+            if dump:
+                try:
+                    dump(self.handle)  # macOS: SIGUSR1, faulthandler's native-level dump into the fault file
+                except Exception:
+                    log.exception("no native snapshot")
+            log.warning("Ecoscribe pid=%s frozen for %.0f s (watched): last snapshot, then a restart", self.pid,
+                        self.hang_s)
+            return "ok"
+        if not final.exists() and now - self._snapshot_asked < SNAPSHOT_S:
+            return "ok"
+        if not final.exists():
+            log.warning("no last snapshot from pid=%s within %.0f s (the whole app is stuck)", self.pid, SNAPSHOT_S)
+        self._frozen_seen = self._snapshot_asked = None
         old = self.pid
         log.error("Ecoscribe pid=%s frozen for %.0f s (watched): killing it", old, self.hang_s)
         self.proc.kill(self.handle)
         self.handle = None
         m.unlink(missing_ok=True)
+        req.unlink(missing_ok=True)
         return self._crashed(old, None, frozen=True)
 
     def _crashed(self, old: int, code: int | None, frozen: bool = False) -> str:
@@ -125,9 +150,18 @@ class Supervisor:
         gave_up = len(self.crashes) >= MAX_CRASHES
         report = crash.make_report(self.data, old, code, self.log_path, self.config_path, self.version, now, gave_up)
         if frozen:
+            last = (report / f"freeze-{old}-final.log").exists()
             with open(report / "report.md", "a", encoding="utf-8") as f:
                 f.write(f"\nFrozen (no answer from the main thread for {self.hang_s:.0f} s): killed by the watchdog. "
-                        "The freeze-*.log files here hold every thread's stack.\n")
+                        "The freeze-*.log files here hold every thread's stack"
+                        + (f"; freeze-{old}-final.log is the last snapshot, right before the restart.\n" if last else
+                           ". No last snapshot came before the restart (the whole app was stuck).\n"))
+        try:
+            crash.record(self.data, self.version, "freezes_restarted" if frozen else "crashes")
+            if gave_up:
+                crash.record(self.data, self.version, "gave_up")
+        except (OSError, ValueError):
+            log.exception("crash not counted")
         log.error("Ecoscribe %s pid=%s exit=%s report=%s", "froze" if frozen else "crashed", old,
                   crash.exit_name(code), report)
         if gave_up:
@@ -209,6 +243,15 @@ class MacProc:
         import signal
         try:
             os.kill(int(h), signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+    def dump(self, h) -> None:
+        """A last snapshot of a frozen app: crash.enable registered SIGUSR1 to dump every thread's stack
+        into its fault file, from native code (works even when the stuck thread holds Python's lock)."""
+        import signal
+        try:
+            os.kill(int(h), signal.SIGUSR1)
         except ProcessLookupError:
             pass
 

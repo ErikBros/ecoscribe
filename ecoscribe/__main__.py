@@ -301,6 +301,8 @@ def main(argv=None) -> int:
     try:  # t0u.37: a native crash leaves every thread's Python stack in crashes/live/fault-<pid>.log
         from . import crash
         crash.enable(data, os.getpid())
+        if not args.test:
+            crash.record(data, __version__, "starts")  # dictado-dhr: the health counts' denominator
     except Exception:
         log.exception("crash logging not enabled")
     winutil.add_cuda_dll_dirs()
@@ -542,7 +544,7 @@ def main(argv=None) -> int:
         root.after(2000, keep_watchdog)
     try:  # t0u.37: a frozen main thread leaves every thread's stack in crashes/live/
         from .crash import FreezeWatch
-        freeze = FreezeWatch(data, os.getpid()).start()
+        freeze = FreezeWatch(data, os.getpid(), version=None if args.test else __version__).start()
 
         def beat():
             freeze.beat()

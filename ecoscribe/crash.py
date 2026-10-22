@@ -14,11 +14,23 @@ turns that into a report folder crashes/<time>/ and restarts it:
 
 Two markers: `seen-user` (dismissed on Home), `seen-claude` (Claude read it; a Claude Code
 SessionStart hook can announce reports without it).
+
+Before the watchdog kills a frozen app it asks for a last snapshot (dictado-dhr): it drops
+crashes/live/dump-<pid>, the app's FreezeWatch thread answers with freeze-<pid>-final.log (every
+thread's stack right before the restart; on macOS SIGUSR1 also adds the native-level dump to the fault
+file). Reports are kept bounded (the newest KEEP_REPORTS, at most MAX_BYTES together).
+
+crashes/health.json + health.md: counts only, by version (starts, crashes, freezes, freezes the watchdog
+had to restart, give-ups, first and last day). No log text, no transcripts, nothing personal: a quick
+health check Claude or the user can read locally.
 """
 from __future__ import annotations
 
 import faulthandler
+import json
 import logging
+import os
+import platform
 import re
 import shutil
 import sys
@@ -32,6 +44,10 @@ EXIT_NAMES = {0xC0000005: "access violation", 0xC0000409: "stack buffer overrun"
               0xC0000374: "heap corruption", 0xC0000135: "DLL not found", 0x40010004: "killed by Windows",
               0xC000013A: "Ctrl+C / console closed", 1: "exit code 1"}
 _fault_file = None  # kept open for the life of the process: faulthandler writes to its fd
+KEEP_REPORTS = 20  # report folders kept (newest first)
+MAX_BYTES = 50 * 1024 * 1024  # all report folders together
+KEEP_FREEZES = 20  # freeze-*.log dumps left in live/ by freezes the app came back from
+HEALTH_KINDS = ("starts", "crashes", "freezes", "freezes_restarted", "gave_up")
 
 
 def crashes_dir(data: Path) -> Path:
@@ -134,7 +150,8 @@ def make_report(data: Path, pid: int, code: int | None, log_path: Path, config_p
     last = [l for l in tail.splitlines() if l.strip()][-1:] or ["(empty log)"]
     where = _where(fault)
     lines = [f"# Ecoscribe crash {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(now))}", "",
-             f"- Version: {version or '?'}", f"- Process: {pid}", f"- Exit: {exit_name(code)}",
+             f"- Version: {version or '?'}", f"- System: {_system()}", f"- Process: {pid}",
+             f"- Exit: {exit_name(code)}",
              f"- Crashed in: {where or 'no Python frame (see fault.log)'}",
              f"- Last log line: `{last[0][:300]}`",
              f"- Restarted: {'no, 3 crashes in 10 minutes: Ecoscribe stopped restarting itself' if gave_up else 'yes'}",
@@ -143,7 +160,99 @@ def make_report(data: Path, pid: int, code: int | None, log_path: Path, config_p
     if fault.strip():
         lines += ["## fault.log", "", "```", fault.strip()[:6000], "```", ""]
     (d / "report.md").write_text("\n".join(lines), encoding="utf-8")
+    try:
+        prune(data, keep=d)
+    except OSError:
+        log.exception("old crash reports not pruned")
     return d
+
+
+def _system() -> str:
+    """Versions that matter for a crash: the OS and Python (no machine or user name)."""
+    return f"{platform.system()} {platform.release()} ({platform.version()}), Python {platform.python_version()}"
+
+
+def _size(d: Path) -> int:
+    return sum(f.stat().st_size for f in Path(d).rglob("*") if f.is_file())
+
+
+def prune(data: Path, keep: Path | None = None, max_reports: int = KEEP_REPORTS, max_bytes: int = MAX_BYTES) -> list[Path]:
+    """Keeps crashes/ bounded: the newest max_reports report folders, at most max_bytes together (the
+    report just made, `keep`, always stays), and the newest KEEP_FREEZES freeze dumps in live/."""
+    gone = []
+    reps = reports(data)  # newest first
+    total = 0
+    for i, r in enumerate(reps):
+        size = _size(r)
+        if r != keep and (i >= max_reports or total + size > max_bytes):
+            shutil.rmtree(r, ignore_errors=True)
+            gone.append(r)
+            continue
+        total += size
+    live = crashes_dir(data) / "live"
+    if live.exists():
+        dumps = sorted(live.glob("freeze-*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
+        for p in dumps[KEEP_FREEZES:]:
+            p.unlink(missing_ok=True)
+            gone.append(p)
+    return gone
+
+
+def health_path(data: Path) -> Path:
+    return crashes_dir(data) / "health.json"
+
+
+def health(data: Path) -> dict:
+    """{version: {starts, crashes, freezes, freezes_restarted, gave_up, first, last}}."""
+    try:
+        h = json.loads(health_path(data).read_text(encoding="utf-8"))
+        return h if isinstance(h, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def record(data: Path, version: str, kind: str, now: float | None = None) -> dict:
+    """Counts one event for this version in health.json and rewrites health.md. Counts and days only."""
+    if kind not in HEALTH_KINDS:
+        raise ValueError(kind)
+    day = time.strftime("%Y-%m-%d", time.localtime(time.time() if now is None else now))
+    h = health(data)
+    v = h.setdefault(version or "?", {})
+    for k in HEALTH_KINDS:
+        v.setdefault(k, 0)
+    v[kind] += 1
+    v.setdefault("first", day)
+    v["last"] = day
+    p = health_path(data)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_name(f"health.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(h, indent=1, sort_keys=True), encoding="utf-8")
+    os.replace(tmp, p)
+    try:
+        (p.parent / "health.md").write_text(health_text(h), encoding="utf-8")
+    except OSError:
+        pass
+    return h
+
+
+def _vkey(v: str):
+    return tuple(int(x) if x.isdigit() else -1 for x in re.split(r"[.\-]", v))
+
+
+def health_text(h: dict) -> str:
+    """The counts as a small table, newest version first."""
+    lines = ["# Ecoscribe health, by version", "",
+             "Counts only. starts: the background app started (restarts too). crashes: it died and the "
+             "watchdog restarted it. freezes: the window's thread stopped answering for 3 s or more. "
+             "restarted: frozen 60 s, so the watchdog restarted it. gave up: 3 crashes in 10 minutes.", "",
+             "| Version | Starts | Crashes | Freezes | Restarted frozen | Gave up | First | Last |",
+             "|---|---|---|---|---|---|---|---|"]
+    for ver in sorted(h, key=_vkey, reverse=True):
+        v = h[ver]
+        lines.append(f"| {ver} | {v.get('starts', 0)} | {v.get('crashes', 0)} | {v.get('freezes', 0)} | "
+                     f"{v.get('freezes_restarted', 0)} | {v.get('gave_up', 0)} | {v.get('first', '')} | "
+                     f"{v.get('last', '')} |")
+    return "\n".join(lines) + "\n"
 
 
 def reports(data: Path) -> list[Path]:
@@ -211,9 +320,10 @@ class FreezeWatch:
     The main loop calls beat() every 0.5 s; if no beat comes for `limit_s`, every thread's
     stack goes to crashes/live/freeze-<pid>-<n>.log and the log says so. Once per freeze."""
 
-    def __init__(self, data: Path, pid: int, limit_s: float = 3.0, clock=None):
+    def __init__(self, data: Path, pid: int, limit_s: float = 3.0, clock=None, version: str | None = None):
         self.dir, self.pid, self.limit, self.clock = crashes_dir(data) / "live", pid, limit_s, clock or awake_clock()
-        self.last = clock()
+        self.data, self.version = Path(data), version  # version: count freezes in health.json (None: don't)
+        self.last = self.clock()
         self.frozen = False
         self.count = 0
         self._stop = threading.Event()
@@ -229,21 +339,44 @@ class FreezeWatch:
             self.marker().unlink(missing_ok=True)
         self.last = self.clock()
 
+    def request(self) -> Path:
+        """The watchdog drops this file to ask for a last snapshot before it restarts the app."""
+        return self.dir / f"dump-{self.pid}"
+
+    def final(self) -> Path:
+        return self.dir / f"freeze-{self.pid}-final.log"
+
+    def _dump(self, p: Path, head: str) -> None:
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(head + "\n\n")
+            f.flush()
+            faulthandler.dump_traceback(f, all_threads=True)
+
     def check(self) -> Path | None:
         """One look; returns the dump file when it just wrote one."""
         stale = self.clock() - self.last
+        if self.frozen and self.request().exists():  # the watchdog is about to restart us
+            p = self.final()
+            self._dump(p, f"Snapshot before the watchdog's restart: main thread not answering for {stale:.1f} s "
+                          f"at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+            self.request().unlink(missing_ok=True)
+            log.error("FREEZE: last snapshot before the restart in %s", p)
+            return p
         if stale < self.limit or self.frozen:
             return None
         self.frozen = True
         self.count += 1
         self.dir.mkdir(parents=True, exist_ok=True)
         p = self.dir / f"freeze-{self.pid}-{self.count}.log"
-        with open(p, "w", encoding="utf-8") as f:
-            f.write(f"Main thread not answering for {stale:.1f} s at {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-            f.flush()
-            faulthandler.dump_traceback(f, all_threads=True)
+        self._dump(p, f"Main thread not answering for {stale:.1f} s at {time.strftime('%Y-%m-%d %H:%M:%S')}")
         log.error("FREEZE: main thread not answering for %.1f s; every thread's stack in %s", stale, p)
         self.marker().write_text(str(time.time() - stale), encoding="utf-8")
+        if self.version is not None:
+            try:
+                record(self.data, self.version, "freezes")
+                prune(self.data)
+            except (OSError, ValueError):
+                log.exception("freeze not counted")
         return p
 
     def start(self) -> "FreezeWatch":
