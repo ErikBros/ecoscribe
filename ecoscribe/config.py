@@ -99,6 +99,7 @@ class UiCfg:
     speech_feedback: bool = False  # dictado-9jc.3: the pill notes fillers and hedges after a message to a person
     sounds: bool = True
     debug_log: bool = False  # t0u.37: Settings > Troubleshooting > Detailed logging (DEBUG level)
+    update_check: bool = True  # dictado-cjk: once a day, ask GitHub if a newer release is out (updates.py)
 
 
 @dataclass

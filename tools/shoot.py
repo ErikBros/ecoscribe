@@ -14,6 +14,7 @@ SHOTS = {
     "bienvenida": "page=bienvenida&welcome=1",
     **{f"setup-{k}": f"page=bienvenida&welcome=1&sstep={k}{q}" for k, q in
        (("permissions", "&mac=1"), ("models", ""), ("mic", ""), ("shortcut", ""), ("try", ""), ("done", ""))},
+    "inicio-version": "page=inicio&update=1",
     "detenido": "page=inicio&state=stopped",
     "cargando": "page=inicio&state=loading",
     "ajustes-cambios": "page=ajustes&dirty=1",

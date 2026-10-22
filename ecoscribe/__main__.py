@@ -529,6 +529,9 @@ def main(argv=None) -> int:
         recover_spool()
 
     threading.Thread(target=load_model, name="ecoscribe-load", daemon=True).start()
+    if not args.test:  # dictado-cjk: a newer version? once a day, in the background; Home shows it
+        from . import updates
+        updates.start(data, cfg.ui.update_check)
     if not args.test and (sys.platform == "darwin" or getattr(sys, "frozen", False)
                           or os.environ.get("ECOSCRIBE_SUPERVISE")):
         from . import supervise
