@@ -1,9 +1,9 @@
 """Local MCP server (t0u.31): `Ecoscribe.exe --mcp` lets the Claude app read your meetings.
 
 Claude desktop (or any MCP client) starts it as a child process and talks newline-delimited
-JSON-RPC 2.0 over stdin/stdout. Three read-only tools over the transcripts folder:
-list_meetings, read_meeting, search_meetings. Nothing is sent anywhere and nothing is changed (only
-search.py's index, a cache next to the transcripts, is written):
+JSON-RPC 2.0 over stdin/stdout. Four read-only tools over the transcripts folder:
+list_meetings, read_meeting, search_meetings, calls_with_person. Nothing is sent anywhere and
+nothing is changed (only search.py's index, a cache next to the transcripts, is written):
 the client gets only what it asks for. No SDK: the protocol subset is small and stable.
 """
 from __future__ import annotations
@@ -23,7 +23,7 @@ TOOLS = [
     {"name": "list_meetings", "annotations": RO,
      "description": "List your recorded meetings, calls and transcribed files from Ecoscribe, newest first: "
                     "id, title, date, app (signal, msteams, slack...), duration, language, status, speaker names, "
-                    "whether a checked summary exists.",
+                    "calendar guests, whether a checked summary exists.",
      "inputSchema": {"type": "object", "properties": {
          "query": {"type": "string", "description": "Only titles containing this text"},
          "since": {"type": "string", "description": "Only sessions on or after this date, YYYY-MM-DD"},
@@ -46,6 +46,18 @@ TOOLS = [
          "since": {"type": "string", "description": "Only sessions on or after this date, YYYY-MM-DD"},
          "limit": {"type": "integer", "description": "At most this many calls (default 10)"}},
          "required": ["text"]}},
+    {"name": "calls_with_person", "annotations": RO,
+     "description": "Find the calls with someone, newest first: the calls where they are a named speaker (a name the "
+                    "user gave a voice, or one Ecoscribe recognised) or a guest of the calendar invite, plus calls "
+                    "with their name in the title. Each row says how it matched. Part of a name is enough (\"ana\" "
+                    "finds \"Ana María\"; every word given must start a word of the name); case and accents don't "
+                    "matter. Unnamed voices ('Others', 'Speaker N') can't match: when this finds nothing, try "
+                    "search_meetings with the name to find calls where it was said.",
+     "inputSchema": {"type": "object", "properties": {
+         "name": {"type": "string", "description": "The person's name, or part of it"},
+         "since": {"type": "string", "description": "Only sessions on or after this date, YYYY-MM-DD"},
+         "limit": {"type": "integer", "description": "At most this many calls (default 30)"}},
+         "required": ["name"]}},
 ]
 
 
@@ -74,6 +86,7 @@ def _row(m: dict) -> dict:
     return {"id": Path(m["dir"]).name, "title": m.get("title", ""), "date": export._date(m), "app": export._app(m),
             "duration": export._duration(m.get("duration_s") or m.get("recorded_s")), "language": export._lang(m),
             "status": m.get("status"), "speakers": m.get("speaker_names") or {},
+            "guests": list((m.get("calendar") or {}).get("attendees") or []),
             "summary": (Path(m["dir"]) / "summary.md").is_file()}
 
 
@@ -88,6 +101,39 @@ def list_meetings(root: Path, query: str = "", since: str = "", limit: int = 30)
         rows.append(_row(m))
         if len(rows) >= max(1, int(limit or 30)):
             break
+    return rows
+
+
+def _name_matches(name: str, words: list[str]) -> bool:
+    """Every query word starts a word of the name, accents and case ignored ("ana g" -> "Ana García")."""
+    have = re.findall(r"\w+", search.fold(name))
+    return bool(words) and all(any(h.startswith(w) for h in have) for w in words)
+
+
+def _people(m: dict) -> dict[str, list[str]]:
+    """Who a session says was in it: names given to its voices, its invite's guests (and their addresses)."""
+    cal = m.get("calendar") or {}
+    return {"speaker": [str(v) for v in (m.get("speaker_names") or {}).values() if v],
+            "guest": [str(v) for v in list(cal.get("attendees") or []) + list(cal.get("emails") or []) if v],
+            "title": [str(m.get("title") or "")]}
+
+
+def calls_with_person(root: Path, name: str, since: str = "", limit: int = 30) -> list[dict]:
+    """dictado-igs: the calls with someone, by named speaker, calendar guest or title, newest first."""
+    words = re.findall(r"\w+", search.fold(name))
+    if not words:
+        raise ValueError("say whose calls to find")
+    rows = []
+    for m in sessions.list_sessions(root):
+        if not _visible(m) or (since and str(m.get("created", ""))[:10] < since[:10]):
+            continue
+        matched = {how: sorted({n for n in names if _name_matches(n, words)})
+                   for how, names in _people(m).items()}
+        matched = {how: names for how, names in matched.items() if names}
+        if matched:
+            rows.append({**_row(m), "matched": matched})
+            if len(rows) >= max(1, int(limit or 30)):
+                break
     return rows
 
 
@@ -130,6 +176,11 @@ def _call(root: Path, name: str, args: dict) -> dict:
         elif name == "search_meetings":
             out = json.dumps(search_meetings(root, args.get("text", ""), args.get("limit", 10), args.get("since", "")),
                              ensure_ascii=False, indent=1)
+        elif name == "calls_with_person":
+            rows = calls_with_person(root, args.get("name", ""), args.get("since", ""), args.get("limit", 30))
+            out = json.dumps(rows, ensure_ascii=False, indent=1) if rows else (
+                "No call has this person as a named speaker, a calendar guest or in its title. Voices are named "
+                "only when the user names them or Ecoscribe recognises them; try search_meetings with the name.")
         else:
             return {"content": [{"type": "text", "text": f"unknown tool {name}"}], "isError": True}
     except (OSError, ValueError) as e:

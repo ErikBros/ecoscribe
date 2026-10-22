@@ -49,7 +49,7 @@ def test_handshake_and_tool_list(tmp_path):
     assert len(r) == 4  # the notification gets no answer
     assert r[0]["result"]["protocolVersion"] == "2025-06-18" and r[0]["result"]["serverInfo"]["name"] == "ecoscribe"
     names = {t["name"] for t in r[1]["result"]["tools"]}
-    assert names == {"list_meetings", "read_meeting", "search_meetings"}
+    assert names == {"list_meetings", "read_meeting", "search_meetings", "calls_with_person"}
     assert all(t["annotations"]["readOnlyHint"] for t in r[1]["result"]["tools"])
     assert r[2]["result"] == {}
     assert r[3]["error"]["code"] == -32601
@@ -182,3 +182,32 @@ def test_mac_claude_config(tmp_path):
     assert data["mcpServers"]["ecoscribe"] == {"command": "/Applications/Dictado.app/Contents/MacOS/Dictado",
                                              "args": ["--mcp"]}
     assert claude_link.is_connected(files)
+
+
+def test_calls_with_person_by_speaker_guest_and_title(tmp_path):
+    """dictado-igs: a named voice, a calendar guest or the title finds the call; unnamed voices never do."""
+    make(tmp_path, "Retro", 5, speaker_names={"Speaker 1": "Ána María"})
+    make(tmp_path, "Planering", 6, calendar={"title": "Planering", "attendees": ["Tom Berg", "Ana Lund"],
+                                             "emails": ["tom@example.com", "ana.lund@example.com"]})
+    make(tmp_path, "Fika med Ana", 7)
+    make(tmp_path, "Mariana sync", 8)  # "ana" starts no word of it
+    make(tmp_path, "Unnamed", 9)  # Others / Speaker N only
+    make(tmp_path, "prueba Ana", 10)  # Ecoscribe's own tests stay out
+    rows = json.loads(call(tmp_path, "calls_with_person", name="ana")["content"][0]["text"])
+    assert [r["title"] for r in rows] == ["Fika med Ana", "Planering", "Retro"]
+    assert rows[0]["matched"] == {"title": ["Fika med Ana"]}
+    assert rows[1]["matched"] == {"guest": ["Ana Lund", "ana.lund@example.com"]}
+    assert rows[1]["guests"] == ["Tom Berg", "Ana Lund"]
+    assert rows[2]["matched"] == {"speaker": ["Ána María"]} and rows[2]["speakers"] == {"Speaker 1": "Ána María"}
+    two = json.loads(call(tmp_path, "calls_with_person", name="ANA mar")["content"][0]["text"])
+    assert [r["title"] for r in two] == ["Retro"]  # every word starts a word of the name
+    assert [r["title"] for r in json.loads(call(tmp_path, "calls_with_person", name="ana", since="2026-10-07")
+                                           ["content"][0]["text"])] == ["Fika med Ana"]
+    assert len(json.loads(call(tmp_path, "calls_with_person", name="ana", limit=1)["content"][0]["text"])) == 1
+
+
+def test_calls_with_person_nothing_found_points_at_search(tmp_path):
+    make(tmp_path, "Retro", 5)
+    r = call(tmp_path, "calls_with_person", name="Tom")
+    assert not r.get("isError") and "search_meetings" in r["content"][0]["text"]
+    assert call(tmp_path, "calls_with_person", name="  ")["isError"] is True
