@@ -37,6 +37,7 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Meeting name from the Google Meet tab when the calendar has no event (no link, or the secret address is turned off) | done | check on Mac (dictado-4ar: window titles via Accessibility) |
 | Your own command after a transcript is done ([transcribe] after_transcribe in config.toml; gets the session folder, runs detached) | done | check on Mac (shared code; detached with start_new_session) |
 | Personal calls: Signal / WhatsApp / Telegram / Discord, a title starting "p-", or a language listed in [personal]; automatic steps over meetings touch only these (dictado-qlj) | done | done (shared code) |
+| Call summaries: after a personal call, summary.md next to it (decisions, to-dos, open questions by kind of call), every item with its time and quote, checked against the transcript; the Claude app reads it first ([summaries] enabled, off by default; `--summarize DIR` by hand) (dictado-crf, dictado-xu2) | done | check on Mac (dictado-1xg) |
 | File transcription (drag and drop) | done | done (installed app: Greek file on the Apple GPU, 2.4% WER) |
 | First-run setup: languages, speech models (both recommended, with download progress), mic test, dictation key, a first dictation, summary; Settings > Run setup again | done | done (checked with a fresh data folder: both models downloaded with a moving bar, the first dictation pasted into the box) |
 | Crash reports, freeze traces, watchdog restart | done | done |
@@ -81,3 +82,4 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Setup: permissions step (first run) | not needed: Windows asks for no permission to listen, type or watch the keyboard | done (Microphone, Accessibility, Input Monitoring: Allow shows macOS's own prompt, then Open settings; ticks live; once both key permissions are on, the app restarts itself so the key works at once) |
 | Setup: speech model download with progress | done (bytes from the download, both models, Continue once the needed one is there) | done (mlx weights, bytes off the network so xet downloads move too, never backwards: dictado-kuu) |
 | Installer | done (.exe, Inno Setup) | done (Ecoscribe.app + .dmg, com.erikbros.ecoscribe, self-signed: this Mac only; a public build needs a Developer ID) |
+| Claude Code from the app (summaries) | done (wsl.exe, a login shell: Claude Code lives in WSL) | ticket dictado-1xg (a zsh login shell; not yet tried on the Mac) |
