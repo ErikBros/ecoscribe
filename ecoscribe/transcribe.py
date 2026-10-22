@@ -27,6 +27,7 @@ from .choose import pick_language
 from .config import TranscribeCfg
 from .engine import _is_gpu_error
 from .routing import mixed_langs, model_for
+from .text import only_credits
 
 log = logging.getLogger(__name__)
 SR = 16000
@@ -136,10 +137,31 @@ def mixed_segments(model, audio: np.ndarray, langs: list[str], cfg: TranscribeCf
     for a, b in pieces(speech(audio)):
         chunk = audio[int(a * SR):int(b * SR)]
         lang = prev = pick_mixed(model, chunk, langs, prev)
-        gen, _ = model.transcribe(chunk, language=lang, beam_size=cfg.beam_size, vad_filter=True,
-                                  condition_on_previous_text=False, initial_prompt=prompt)
-        for s in gen:
+        segs = _piece(model, chunk, lang, cfg, prompt)
+        if prompt and only_credits(" ".join(s.text for s in segs)):  # dictado-u34
+            log.info("piece %.1f-%.1f s came out as only a subtitle credit: again without the word list", a, b)
+            segs = _piece(model, chunk, lang, cfg, None)
+        for s in segs:
             yield SimpleNamespace(start=s.start + a, end=s.end + a, text=s.text, lang=lang)
+
+
+def _piece(model, chunk: np.ndarray, lang: str, cfg: TranscribeCfg, prompt: str | None) -> list:
+    gen, _ = model.transcribe(chunk, language=lang, beam_size=cfg.beam_size, vad_filter=True,
+                              condition_on_previous_text=False, initial_prompt=prompt)
+    return list(gen)
+
+
+def credit_retry(model, audio: np.ndarray, segments, lang: str, cfg: TranscribeCfg, prompt: str | None,
+                 min_s: float = 1.0):
+    """One-language sessions: a segment that is only a subtitle credit over real time (min_s or more) is
+    that stretch done again without the word list (dictado-u34). Times stay relative to `audio`."""
+    for s in segments:
+        if not (prompt and s.end - s.start >= min_s and only_credits(s.text)):
+            yield s
+            continue
+        log.info("%.1f-%.1f s came out as only a subtitle credit: again without the word list", s.start, s.end)
+        for r in _piece(model, audio[int(s.start * SR):int(s.end * SR)], lang, cfg, None):
+            yield SimpleNamespace(start=r.start + s.start, end=r.end + s.start, text=r.text)
 
 
 def steps(cfg: TranscribeCfg) -> list[tuple[str, str]]:
@@ -250,6 +272,7 @@ def run(session_dir: Path, cfg: TranscribeCfg, factory=_default_factory, resolve
                 else:
                     gen, _info = model.transcribe(rest, language=lang, beam_size=cfg.beam_size, vad_filter=True,
                                                   condition_on_previous_text=False, initial_prompt=prompt)
+                    gen = credit_retry(model, rest, gen, lang, cfg, prompt)
                 for s in gen:
                     text = s.text.strip()
                     if text:

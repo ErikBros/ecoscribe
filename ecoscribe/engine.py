@@ -16,7 +16,7 @@ import numpy as np
 
 from .choose import pick_language
 from .config import TextCfg, WhisperCfg
-from .text import clean, is_hallucination, strip_credits, vocab_prompt
+from .text import clean, is_hallucination, only_credits, strip_credits, vocab_prompt
 
 log = logging.getLogger(__name__)
 SR = 16000
@@ -194,11 +194,7 @@ class Engine:
         texts, speech_s, order = [], 0.0, []
         for a, b, lang in runs:
             chunk = audio[max(0, int((a - 0.1) * SR)):int((b + 0.1) * SR)]
-            segments, info = self.model.transcribe(
-                chunk, language=lang, beam_size=beam_size or self.cfg.beam_size, vad_filter=True,
-                vad_parameters={"min_silence_duration_ms": 500}, condition_on_previous_text=False,
-                initial_prompt=prompt, **_timestamps(words_out))
-            segments = list(segments)
+            segments, info = self._transcribe(chunk, lang, beam_size, prompt, words_out)
             _collect(segments, words_out)
             raw = strip_credits("".join(s.text for s in segments))
             run_s = float(getattr(info, "duration_after_vad", info.duration))
@@ -212,6 +208,20 @@ class Engine:
         if not texts:
             return "", runs[0][2], speech_s
         return clean(" ".join(texts), self.text_cfg.strip_fillers, self.text_cfg.append_space), "+".join(order), speech_s
+
+    def _transcribe(self, audio: np.ndarray, lang: str, beam_size, prompt, words_out):
+        """model.transcribe as a list; text that is only a subtitle credit is done again without the
+        word list (dictado-u34): the prompt can tip Whisper into inventing one over real speech."""
+        kw = dict(language=lang, beam_size=beam_size or self.cfg.beam_size, vad_filter=True,
+                  vad_parameters={"min_silence_duration_ms": 500}, condition_on_previous_text=False,
+                  **_timestamps(words_out))
+        segments, info = self.model.transcribe(audio, initial_prompt=prompt, **kw)
+        segments = list(segments)
+        if prompt and only_credits("".join(s.text for s in segments)):
+            log.info("only a subtitle credit with the word list: again without it")
+            segments, info = self.model.transcribe(audio, initial_prompt=None, **kw)
+            segments = list(segments)
+        return segments, info
 
     def _make(self, name, device, compute_type):
         path = str(self.resolve(name))  # local plain-file copy; downloads only if never fetched
@@ -296,11 +306,8 @@ class Engine:
                 if _is_gpu_error(e):
                     raise
                 lang = self.cfg.languages[0]  # no speech for detection to look at
-        segments, info = self.model.transcribe(
-            audio, language=lang, beam_size=beam_size or self.cfg.beam_size, vad_filter=True,
-            vad_parameters={"min_silence_duration_ms": 500}, condition_on_previous_text=False,
-            initial_prompt=vocab_prompt([*self.text_cfg.vocabulary, *(words or [])]), **_timestamps(words_out))
-        segments = list(segments)
+        segments, info = self._transcribe(audio, lang, beam_size,
+                                          vocab_prompt([*self.text_cfg.vocabulary, *(words or [])]), words_out)
         _collect(segments, words_out)
         raw = strip_credits("".join(s.text for s in segments))
         speech_s = float(getattr(info, "duration_after_vad", info.duration))
