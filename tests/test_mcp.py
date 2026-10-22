@@ -211,3 +211,35 @@ def test_calls_with_person_nothing_found_points_at_search(tmp_path):
     r = call(tmp_path, "calls_with_person", name="Tom")
     assert not r.get("isError") and "search_meetings" in r["content"][0]["text"]
     assert call(tmp_path, "calls_with_person", name="  ")["isError"] is True
+def _get(root, **params):
+    return rpc(root, {"jsonrpc": "2.0", "id": 1, "method": "prompts/get", "params": params})[0]
+
+
+def test_debrief_my_call_prompt(tmp_path):
+    """dictado-2mu: the Claude app's 'Debrief my call': to-dos as proposed tickets made only after the user's OK,
+    a follow-up to paste, no mailbox or calendar; the call itself comes with it, its checked summary first."""
+    r = rpc(tmp_path, {"jsonrpc": "2.0", "id": 0, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}},
+            {"jsonrpc": "2.0", "id": 1, "method": "prompts/list"})
+    assert "prompts" in r[0]["result"]["capabilities"]
+    (p,) = r[1]["result"]["prompts"]
+    assert p["name"] == "debrief_call" and p["title"] == "Debrief my call" and not p["arguments"][0]["required"]
+    old = make(tmp_path, "Planering", 3)
+    new = make(tmp_path, "Retro", 5, speaker_names={"Speaker 1": "Ana"})
+    (new / "summary.md").write_text("## To-dos\n- fix the budget", encoding="utf-8")
+    make(tmp_path, "Still going", 6, status="recording")  # not finished: never the default
+    make(tmp_path, "prueba e2e", 7)
+    res = _get(tmp_path, name="debrief_call")["result"]
+    text = res["messages"][0]["content"]["text"]
+    assert res["messages"][0]["role"] == "user" and new.name in res["description"]
+    assert "one ticket per to-do" in text and "Create nothing yet" in text and "ready to paste" in text
+    assert "Never open my mailbox or calendar" in text
+    assert text.index("Create nothing yet") < text.index("## To-dos") < text.index("releasen")
+    other = _get(tmp_path, name="debrief_call", arguments={"id": old.name})["result"]
+    assert "Planering" in other["messages"][0]["content"]["text"]
+
+
+def test_debrief_errors(tmp_path):
+    assert _get(tmp_path, name="debrief_call")["error"]["code"] == -32602  # no call yet
+    make(tmp_path, "Retro", 5)
+    assert _get(tmp_path, name="debrief_call", arguments={"id": "nope"})["error"]["code"] == -32602
+    assert _get(tmp_path, name="other")["error"]["code"] == -32602
