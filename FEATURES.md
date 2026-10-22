@@ -70,6 +70,7 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Call detection (who uses the mic, call windows) | done | done (real-call check: dictado-nhn) |
 | Show a download in its folder | done (dictado-yq9: Explorer with the file selected; the toast's Open folder; Settings > Meetings > Downloads go to) | done (dictado-yq9: open -R, Finder with the file selected) |
 | Tray / menu bar, pill and prompt box | done | done (AppKit) |
+| Smooth pill: see-through corners, a soft shadow, the app's font | done (dictado-acm: drawn as one picture by pillart, shown with UpdateLayeredWindow) | ticket dictado-vx1 (AppKit already smooth; shadow and font to check) |
 | Live text on the pill while dictating | done (a quick pass every 2 s; the careful one is still what gets pasted) | done (Overlay.live: the pill grows to 440x66, the newest words on one line cut on the left; 15 s preview on the Apple GPU 0.7 s with turbo, 1.9 s with large-v3) |
 | Start at login | done (Run key; the old "Dictado" value moves to "Ecoscribe") | done (LaunchAgent com.erikbros.ecoscribe; the old com.erikbros.dictado one moves over) |
 | Single instance | done | done |

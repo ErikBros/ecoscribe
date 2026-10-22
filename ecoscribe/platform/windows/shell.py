@@ -21,6 +21,8 @@ from pathlib import Path
 from ... import meetui
 from ...notice import notice
 from ... import palette as P
+from . import pillart as art
+from .pillart import CH, CW, LH, LW, MH, MW, RH, RW, WAVE_N, WAVE_W  # noqa: F401  the pill's sizes, read here by tests
 
 log = logging.getLogger(__name__)
 u32 = ctypes.windll.user32
@@ -40,14 +42,60 @@ WS_EX_LAYERED, WS_EX_TRANSPARENT = 0x80000, 0x20
 SW_HIDE, SW_SHOWNOACTIVATE = 0, 4
 HWND_TOPMOST = w.HWND(-1)
 SWP_NOSIZE, SWP_NOACTIVATE = 0x1, 0x10
-W, H = 210, 44
-RW, RH = 236, 40  # the dictating pill: dot, waveform, timer (dictado-3tl); pill A: every capsule is 40 tall (dictado-v5g)
-WAVE_N = 24  # waveform bars: about the last second of the voice (one per 50 ms tick)
-WAVE_W = 130  # the waveform's width, the same with or without live text
-MW, MH = 380, 56  # the meeting pill opened by the mouse: label + latest live line
-CW, CH = 92, 30  # the meeting pill as it sits: a small chip, recording dot + timer (dictado-z4j)
-LW, LH = 440, 66  # the dictating pill with one line of live text under it (dictado-live)
-KEY = "#010203"  # transparent color key, gives the pill round ends
+W, H = 210, 44  # the window before its first picture
+KEY = "#010203"  # transparent color key, gives the prompt box round corners
+_u = ctypes.WinDLL("user32", use_last_error=True)  # own handles: argtypes here don't leak to other modules
+_gdi = ctypes.WinDLL("gdi32")
+
+
+class _BLEND(ctypes.Structure):
+    _fields_ = [("BlendOp", ctypes.c_ubyte), ("BlendFlags", ctypes.c_ubyte), ("SourceConstantAlpha", ctypes.c_ubyte),
+                ("AlphaFormat", ctypes.c_ubyte)]
+
+
+class _BIH(ctypes.Structure):
+    _fields_ = [("biSize", w.DWORD), ("biWidth", ctypes.c_long), ("biHeight", ctypes.c_long), ("biPlanes", w.WORD),
+                ("biBitCount", w.WORD), ("biCompression", w.DWORD), ("biSizeImage", w.DWORD), ("biXPelsPerMeter", ctypes.c_long),
+                ("biYPelsPerMeter", ctypes.c_long), ("biClrUsed", w.DWORD), ("biClrImportant", w.DWORD)]
+
+
+_u.GetDC.argtypes, _u.GetDC.restype = (w.HWND,), w.HDC
+_u.ReleaseDC.argtypes = (w.HWND, w.HDC)
+_u.UpdateLayeredWindow.argtypes = (w.HWND, w.HDC, ctypes.POINTER(w.POINT), ctypes.POINTER(w.SIZE), w.HDC,
+                                   ctypes.POINTER(w.POINT), w.COLORREF, ctypes.POINTER(_BLEND), w.DWORD)
+_gdi.CreateCompatibleDC.argtypes, _gdi.CreateCompatibleDC.restype = (w.HDC,), w.HDC
+_gdi.CreateDIBSection.argtypes = (w.HDC, ctypes.POINTER(_BIH), w.UINT, ctypes.POINTER(ctypes.c_void_p), w.HANDLE, w.DWORD)
+_gdi.CreateDIBSection.restype = w.HBITMAP
+_gdi.SelectObject.argtypes, _gdi.SelectObject.restype = (w.HDC, w.HGDIOBJ), w.HGDIOBJ
+_gdi.DeleteObject.argtypes = (w.HGDIOBJ,)
+_gdi.DeleteDC.argtypes = (w.HDC,)
+ULW_ALPHA, AC_SRC_ALPHA = 2, 1
+_EMPTY = art.Image.new("RGBA", (1, 1), (0, 0, 0, 0))
+
+
+def update_layered(hwnd: int, img, x: int, y: int) -> bool:
+    """Show `img` (RGBA) as the whole window at x, y: per-pixel alpha, no colour key (dictado-acm)."""
+    w_, h_ = img.size
+    bits = img.convert("RGBa").tobytes("raw", "BGRa")  # what a layered window wants: premultiplied BGRA
+    screen = _u.GetDC(None)
+    mem = _gdi.CreateCompatibleDC(screen)
+    ptr = ctypes.c_void_p()
+    bih = _BIH(ctypes.sizeof(_BIH), w_, -h_, 1, 32, 0, 0, 0, 0, 0, 0)  # top-down rows
+    bmp = _gdi.CreateDIBSection(screen, ctypes.byref(bih), 0, ctypes.byref(ptr), None, 0)
+    try:
+        if not bmp or not ptr.value:
+            return False
+        ctypes.memmove(ptr, bits, len(bits))
+        old = _gdi.SelectObject(mem, bmp)
+        ok = _u.UpdateLayeredWindow(hwnd, screen, ctypes.byref(w.POINT(x, y)), ctypes.byref(w.SIZE(w_, h_)), mem,
+                                    ctypes.byref(w.POINT(0, 0)), 0, ctypes.byref(_BLEND(0, 0, 255, AC_SRC_ALPHA)), ULW_ALPHA)
+        _gdi.SelectObject(mem, old)
+        return bool(ok)
+    finally:
+        if bmp:
+            _gdi.DeleteObject(bmp)
+        _gdi.DeleteDC(mem)
+        _u.ReleaseDC(None, screen)
 
 
 class MONITORINFO(ctypes.Structure):
@@ -55,38 +103,60 @@ class MONITORINFO(ctypes.Structure):
 
 
 class Overlay:
+    """The pill. Each state is a picture from pillart (smooth, see-through, a soft shadow, dictado-acm)
+    handed to the layered window whole; the tk window only owns the handle and never paints."""
+
     def __init__(self, root: tk.Tk, level_fn=lambda: 0.0, hint: str = "Right Ctrl + Esc to cancel"):
         self.level_fn = level_fn
         self.hint = hint
         self.top = tk.Toplevel(root)
         self.top.overrideredirect(True)
         self.top.attributes("-topmost", True)
-        self.top.attributes("-alpha", 0.93)
-        self.top.attributes("-transparentcolor", KEY)
         self.top.geometry(f"{W}x{H}+0+0")
-        self.c = tk.Canvas(self.top, width=W, height=H, bg=KEY, highlightthickness=0, bd=0)
-        self.c.pack()
         self.top.update_idletasks()
         self.hwnd = int(self.top.wm_frame(), 16)
         ex = u32.GetWindowLongW(self.hwnd, GWL_EXSTYLE)
         u32.SetWindowLongW(self.hwnd, GWL_EXSTYLE,
                            ex | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TRANSPARENT)
+        # a first (empty) picture before it is ever hidden: a layered window hidden before its first
+        # UpdateLayeredWindow refuses every later one (error 87; measured 2026-10-22)
+        update_layered(self.hwnd, _EMPTY, 0, 0)
         u32.ShowWindow(self.hwnd, SW_HIDE)
         self.mode = "hidden"
         self._t0 = 0.0
         self._flash_until = 0.0
         self._flash_msg = ""
-        self.w, self.h = W, H
+        self.w, self.h = W, H  # the pill's own size (the window is pillart.M larger all round, for the shadow)
+        self._img = None
+        self._anchor: tuple[int, int] | None = None  # the pill's bottom centre on screen
+        self._ulw_ok = True
         self.meeting: dict | None = None  # meetui.meeting_view(); shown whenever dictation isn't
         self._drawn = None  # what the meeting layer last drew (no redraw, no flicker)
         self.live_text = ""  # what the live transcript has heard so far (this recording)
         self._levels: list[float] = []  # the waveform: voice level per tick, newest last
-        import tkinter.font as tkf
-        self._live_font = tkf.Font(family="Segoe UI", size=10)
         self.open = False  # the meeting chip is opened by the mouse over it (dictado-z4j)
 
     def ex_style(self) -> int:
         return u32.GetWindowLongW(self.hwnd, GWL_EXSTYLE)
+
+    def _present(self, img) -> None:
+        """A new picture of the pill: same bottom centre, so it grows up and both ways."""
+        self._img = img
+        self.w, self.h = img.width - 2 * art.M, img.height - 2 * art.M
+        if self._anchor:
+            self._blit()
+
+    def _origin(self) -> tuple[int, int]:
+        cx, bottom = self._anchor or (600 + W // 2, 900 + H)
+        return cx - self.w // 2 - art.M, bottom - self.h - art.M
+
+    def _blit(self) -> None:
+        if self._img is None:
+            return
+        x, y = self._origin()
+        if not update_layered(self.hwnd, self._img, x, y) and self._ulw_ok:
+            self._ulw_ok = False  # say it once, not 20 times a second
+            log.warning("the pill couldn't be drawn (UpdateLayeredWindow failed, error %s)", ctypes.get_last_error())
 
     def _place_and_show(self) -> None:
         mi = MONITORINFO()
@@ -94,150 +164,40 @@ class Overlay:
         mon = u32.MonitorFromWindow(u32.GetForegroundWindow(), 2)
         if mon and u32.GetMonitorInfoW(mon, ctypes.byref(mi)):
             r = mi.rcWork
-            x, y = (r.left + r.right - self.w) // 2, r.bottom - self.h - 80
+            self._anchor = ((r.left + r.right) // 2, r.bottom - 80)
         else:
-            x, y = 600, 900
+            self._anchor = (600 + W // 2, 900 + H)
+        self._blit()
+        x, y = self._origin()
         u32.SetWindowPos(self.hwnd, HWND_TOPMOST, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE)
         u32.ShowWindow(self.hwnd, SW_SHOWNOACTIVATE)
 
-    def _size(self, w_: int, h_: int) -> None:
-        if (w_, h_) != (self.w, self.h):
-            self.w, self.h = w_, h_
-            self.top.geometry(f"{w_}x{h_}")
-            self.c.config(width=w_, height=h_)
-
-    def _capsule(self, w_: int, h_: int = RH, r: int = RH // 2) -> None:
-        """Pill A (dictado-v5g): every state is the same dark capsule; only what's in it changes."""
-        self._size(w_, h_)
-        self._drawn = None
-        c = self.c
-        c.delete("all")
-        bg = P.INK
-        c.create_oval(0, 0, 2 * r, 2 * r, fill=bg, outline=bg)
-        c.create_oval(w_ - 2 * r, 0, w_, 2 * r, fill=bg, outline=bg)
-        c.create_oval(0, h_ - 2 * r, 2 * r, h_, fill=bg, outline=bg)
-        c.create_oval(w_ - 2 * r, h_ - 2 * r, w_, h_, fill=bg, outline=bg)
-        c.create_rectangle(r, 0, w_ - r, h_, fill=bg, outline=bg)
-        c.create_rectangle(0, r, w_, h_ - r, fill=bg, outline=bg)
-
     def _notice(self, msg: str) -> None:
-        """A flash as pill A draws it: an icon (a struck mic, a language badge, a warning),
-        the words, the mic's name softly after them."""
-        n = notice(msg)
-        f, fd, fb = self._fonts()
-        mid = RH // 2
-        badge_w = fb.measure(n.badge) + 16 if n.icon == "lang" else 0
-        icon_w = {"nomic": 16, "warn": 16, "lang": badge_w}.get(n.icon, 0)
-        x = 8 if n.icon == "lang" else 16
-        w_ = x + icon_w + (10 if icon_w else 0) + f.measure(n.text) + (10 + fd.measure(n.detail) if n.detail else 0) + 18
-        self._capsule(max(w_, 120))
-        c = self.c
-        if n.icon == "lang":
-            _round_rect(c, x, mid - 12, x + badge_w, mid + 12, 12, fill=P.AEGEAN)
-            c.create_text(x + badge_w / 2, mid, text=n.badge, fill=P.PAPER, font=fb)
-        elif n.icon == "nomic":
-            _mic_struck(c, x + 8, mid, P.CLAY_BRIGHT)
-        elif n.icon == "warn":
-            c.create_oval(x, mid - 8, x + 16, mid + 8, outline=P.CLAY_BRIGHT, width=2)
-            c.create_text(x + 8, mid, text="!", fill=P.CLAY_BRIGHT, font=fb)
-        x += icon_w + (10 if icon_w else 0)
-        if not n.icon:
-            x = (self.w - f.measure(n.text)) // 2
-        c.create_text(x, mid, text=n.text, fill=P.PAPER, font=f, anchor="w")
-        if n.detail:
-            c.create_text(x + f.measure(n.text) + 10, mid, text=n.detail, fill=P.AEGEAN_MUTED, font=fd, anchor="w")
-
-    def _fonts(self):
-        if not hasattr(self, "_f"):
-            self._f = (tkfont.Font(family="Segoe UI", size=10, weight="bold"), tkfont.Font(family="Segoe UI", size=9),
-                       tkfont.Font(family="Segoe UI", size=8, weight="bold"))
-        return self._f
+        """A flash: an icon (a struck mic, a language badge, a warning), the words, the mic's name."""
+        self._drawn = None
+        self._present(art.notice(notice(msg)))
 
     def _dictating_pill(self, secs: int, level: float) -> None:
-        """A slim ink pill (dictado-3tl, the user picked it): the recording dot, a waveform of the
-        last second or so of the voice, the timer. How to cancel shows in the waveform's place
-        for the first 2 s. With live text, a second line under it: the newest words."""
+        """The recording dot, a waveform of the last second or so of the voice, the timer (dictado-3tl).
+        How to cancel shows in the waveform's place for the first 2 s. With live text, a second line."""
         self._levels.append(level)
-        del self._levels[:-WAVE_N]
-        live = self.live_text
-        w_, h_ = (LW, LH) if live else (RW, RH)
-        grew = (w_, h_) != (self.w, self.h)
-        self._capsule(w_, h_, RH // 2)
-        if grew:
-            self._place_and_show()  # stay centered above the taskbar at the new size
-        c = self.c
-        mid = RH // 2
-        on = int(time.monotonic() * 2) % 2 == 0 or level > 0.05  # the dot breathes while it's quiet
-        if on:  # a soft halo while it's lit (dictado-6oe.9)
-            c.create_oval(12, mid - 9, 30, mid + 9, fill=P.TILE_HALO, outline="")
-        c.create_oval(16, mid - 5, 26, mid + 5, fill=P.CLAY_BRIGHT if on else P.TILE_DIM, outline="")
-        c.create_text(w_ - 16, mid, text=f"{secs // 60}:{secs % 60:02d}", fill=P.PAPER,
-                      font=("Segoe UI", 10, "bold"), anchor="e")
-        x0 = 38
-        x1 = x0 + WAVE_W
-        if secs < 2:  # how to cancel, drawn as the keys themselves (dictado-6oe.9)
-            keys = self.hint.split(" to ")[0].split(" + ")
-            x = _keycaps(c, x0, mid, keys)
-            c.create_text(x + 6, mid, text="cancels", fill=P.AEGEAN_PALE, font=("Segoe UI", 9), anchor="w")
-        else:  # the waveform: newest on the right, each bar from the middle line
-            step = (x1 - x0) / WAVE_N
-            pad = [0.0] * (WAVE_N - len(self._levels)) + self._levels
-            for i, lv in enumerate(pad):
-                hh = 2 + (lv ** 1.5) * (RH - 18)
-                x = x0 + i * step + step / 2
-                c.create_line(x, mid - hh / 2, x, mid + hh / 2, fill=(P.AEGEAN_PALE if lv > 0.25 else P.AEGEAN_MID) if lv > 0.04 else P.PILL_OFF,
-                              width=2, capstyle="round")
-        if live:
-            f = self._live_font
-            text, room = " ".join(live.split()), w_ - 32
-            if f.measure(text) > room:  # one line: the newest words, cut on the left
-                while text and f.measure("…" + text) > room:
-                    text = text.split(" ", 1)[1] if " " in text else text[1:]
-                text = "…" + text
-            c.create_text(16, RH + 4, text=text, fill=P.PAPER, font=f, anchor="w")
+        del self._levels[:-art.WAVE_N]
+        self._drawn = None
+        keys = self.hint.split(" to ")[0].split(" + ")
+        self._present(art.dictating(secs, self._levels, keys, self.live_text))
 
     def _hover(self) -> bool:
-        pt, rc = w.POINT(), w.RECT()
-        if not (u32.GetCursorPos(ctypes.byref(pt)) and u32.GetWindowRect(self.hwnd, ctypes.byref(rc))):
+        pt = w.POINT()
+        if not u32.GetCursorPos(ctypes.byref(pt)) or not self._anchor:
             return False
-        return meetui.hovering((pt.x, pt.y), (rc.left, rc.top, rc.right, rc.bottom))
-
-    def _meeting_chip(self, view: dict) -> None:
-        """The meeting as it sits: a small dark chip, recording dot + timer. Click-through."""
-        self._size(CW, CH)
-        c = self.c
-        c.delete("all")
-        r, bg = CH // 2, P.INK
-        c.create_oval(0, 0, CH, CH, fill=bg, outline=bg)
-        c.create_oval(CW - CH, 0, CW, CH, fill=bg, outline=bg)
-        c.create_rectangle(r, 0, CW - r, CH, fill=bg, outline=bg)
-        dot = P.AEGEAN_SOFT if view["busy"] else P.TILE
-        c.create_oval(12, r - 5, 22, r + 5, fill=dot, outline=dot)
-        c.create_text(30, r, text=view.get("short") or view["label"], fill=P.PAPER, font=("Segoe UI", 10), anchor="w")
+        x, y = self._origin()  # the pill itself, not its shadow
+        return meetui.hovering((pt.x, pt.y), (x + art.M, y + art.M, x + art.M + self.w, y + art.M + self.h))
 
     def _meeting_pill(self, view: dict) -> None:
         key = (view["label"], view["line"], view["busy"], self.open)
         if key == self._drawn:
             return
-        if not self.open:
-            self._meeting_chip(view)
-            self._place_and_show()
-            self._drawn = key
-            return
-        self._size(MW, MH)
-        c = self.c
-        c.delete("all")
-        r, bg = MH // 2, P.INK
-        c.create_oval(0, 0, MH, MH, fill=bg, outline=bg)
-        c.create_oval(MW - MH, 0, MW, MH, fill=bg, outline=bg)
-        c.create_rectangle(r, 0, MW - r, MH, fill=bg, outline=bg)
-        dot = P.AEGEAN_SOFT if view["busy"] else P.TILE
-        c.create_oval(18, r - 6, 30, r + 6, fill=dot, outline=dot)
-        if view["line"]:
-            c.create_text(42, 18, text=view["label"], fill=P.PAPER, font=("Segoe UI", 10, "bold"), anchor="w")
-            c.create_text(42, 38, text=view["line"], fill=P.LINE, font=("Segoe UI", 10), anchor="w")
-        else:
-            c.create_text(42, r, text=view["label"], fill=P.PAPER, font=("Segoe UI", 11), anchor="w")
+        self._present(art.meeting_open(view) if self.open else art.meeting_chip(view))
         self._place_and_show()
         self._drawn = key
 
@@ -262,8 +222,8 @@ class Overlay:
         self.mode, self._t0 = "recording", t0
         self.live_text = ""
         self._levels = []
+        self._dictating_pill(0, 0.0)
         self._place_and_show()
-        self.tick()
 
     def busy(self) -> None:
         """Transcribing: a turning arc and what it's doing (pill A, dictado-v5g)."""
@@ -273,13 +233,8 @@ class Overlay:
         self._place_and_show()
 
     def _busy_frame(self) -> None:
-        f = self._fonts()[0]
-        self._capsule(16 + 16 + 10 + f.measure("Writing it down") + 18)
-        c, mid = self.c, RH // 2
-        x0, start = 16, (time.monotonic() * 360) % 360  # one turn a second
-        c.create_oval(x0, mid - 7, x0 + 14, mid + 7, outline=P.PILL_OFF, width=2)
-        c.create_arc(x0, mid - 7, x0 + 14, mid + 7, start=-start, extent=90, style="arc", outline=P.AEGEAN_PALE, width=2)
-        c.create_text(x0 + 16 + 10, mid, text="Writing it down", fill=P.PAPER, font=f, anchor="w")
+        self._drawn = None
+        self._present(art.busy())
 
     def idle(self) -> None:
         self.mode = "hidden"
@@ -334,29 +289,6 @@ def _prompt_icon(c: tk.Canvas, x: float, y: float, kind: str) -> None:
         c.create_rectangle(cx - 7, cy - 9, cx + 7, cy + 9, outline=g, width=2)
         for dy in (-3, 1, 5):
             c.create_line(cx - 3, cy + dy, cx + 4, cy + dy, fill=g, width=2)
-
-
-def _keycaps(c: tk.Canvas, x: float, mid: float, keys) -> float:
-    """Keys as small outlined caps on ink: [Right Ctrl] + [Esc]. Returns where they end."""
-    import tkinter.font as tkf
-    f = tkf.Font(family="Segoe UI", size=8, weight="bold")
-    for i, k in enumerate(keys):
-        if i:
-            c.create_text(x + 4, mid, text="+", fill=P.LINE, font=("Segoe UI", 8), anchor="w")
-            x += 14
-        w = f.measure(k) + 12
-        _round_rect(c, x, mid - 9, x + w, mid + 9, 5, fill="", outline=P.KEYCAP_LINE, width=1)
-        c.create_text(x + w / 2, mid, text=k, fill=P.PAPER, font=f)
-        x += w
-    return x
-
-
-def _mic_struck(c: tk.Canvas, cx: float, cy: float, col: str) -> None:
-    """A mic struck through, 16 px: nothing was heard (pill A, dictado-v5g)."""
-    _round_rect(c, cx - 3, cy - 7, cx + 3, cy + 2, 3, fill="", outline=col, width=1.6)
-    c.create_arc(cx - 5, cy - 5, cx + 5, cy + 5, start=180, extent=180, style="arc", outline=col, width=1.6)
-    c.create_line(cx, cy + 5, cx, cy + 7, fill=col, width=1.6)
-    c.create_line(cx - 6, cy - 6, cx + 6, cy + 6, fill=col, width=1.6, capstyle="round")
 
 
 def _round_rect(c: tk.Canvas, x0, y0, x1, y1, r, **kw):
