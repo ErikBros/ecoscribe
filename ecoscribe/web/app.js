@@ -86,6 +86,7 @@ function demoApi() {
     { ts: iso(14), text: "Sounds good, let's do Thursday at six. I'll bring the new shoes. ", target: "slack.exe", pasted: true, id: "d2", audio: true },
     { ts: iso(41), text: "Remind me to book the climbing gym for the weekend. ", target: "chrome.exe", pasted: false },
     { ts: iso(60 * 26), text: "The quick brown fox jumps over the lazy dog, then runs back to the barn. ", target: "notepad.exe", pasted: true },
+    { ts: iso(60 * 27), text: "Send the draft to Quinta Vell before lunch, she has the numbers. ", target: "slack.exe", pasted: true, id: "d1b" },
   ];
   let t = 0;
   const S = (name, title, mins, status, extra = {}) => ({ name, title, created: iso(mins), status, lang: "sv", lang_name: "Swedish",
@@ -185,6 +186,13 @@ function demoApi() {
       window.__deletedDictation = id || ts;
       return { ok: true, gone: i >= 0 };
     },
+    edit_dictation: async (id, ts, text) => {  // dictado-1ph: the demo learns the one name it knows
+      const r = history.find((x) => (id ? x.id === id : x.ts === ts));
+      if (!r) return { ok: false, error: "That dictation isn't in the history any more." };
+      const before = r.text; r.text = text; window.__edited = text;
+      return { ok: true, text, learn: /Quintavelle/.test(text) && !/Quintavelle/.test(before) ? [{ kind: "word", write: "Quintavelle" }] : [] };
+    },
+    learn_word: async (kind, write, heard) => { window.__learned = [kind, write, heard || ""]; return { ok: true }; },
     add_word: async (w) => { settings.values.vocabulary += "\n" + w; window.__added = w; return { ok: true }; },
     insights_for_claude: async () => ({ ok: true, chars: 5120 }),
     clear_history: async () => { history.length = 0; return { ok: true }; },
@@ -1115,7 +1123,7 @@ async function renderHistory() {
     if (row.kind === "meet") { group.append(meetingHistoryItem(row.x)); continue; }
     const r = row.x;
     const li = document.createElement("li");
-    li.className = "h-item";
+    li.className = "h-item"; if (r.id) li.dataset.id = r.id;
     const t = document.createElement("span"); t.className = "h-time"; t.textContent = timeOf(r.ts);
     const p = document.createElement("p");
     p.className = "h-text"; p.textContent = r.text.trim();
@@ -1133,6 +1141,10 @@ async function renderHistory() {
     btn.className = "btn btn-ghost btn-sm h-copy"; btn.textContent = "Copy";
     btn.onclick = () => copy(r.text, btn);
     btns.append(btn);
+    const ed = document.createElement("button");  // dictado-1ph
+    ed.className = "btn btn-ghost btn-sm h-copy h-edit-btn"; ed.textContent = "Edit"; ed.title = "Fix the text; a name you fix can be learned";
+    ed.onclick = () => editDictation(r, li, p, btns);
+    btns.append(ed);
     const del = document.createElement("button");  // dictado-vfo
     del.className = "btn btn-ghost btn-sm h-copy h-del"; del.textContent = "Delete"; del.title = "Delete this dictation";
     del.onclick = () => deleteDictation(r, li);
@@ -1147,6 +1159,74 @@ async function renderHistory() {
   $("#history-count").textContent = count;
   $("#history-sub").textContent = count ? count + " · kept on this computer" : "";
   $("#history-clear").hidden = !h.stats.total;
+  const demo = $('#history .h-item[data-id="d1b"]');  // screenshots of the edit and the offer
+  if (demo && params.get("hedit") === "1") demo.querySelector(".h-edit-btn").click();
+  if (demo && params.get("learn") === "1") {
+    showLearn(demo, [{ kind: "word", write: "Quintavelle" }, { kind: "replace", heard: "eco scribe", write: "Ecoscribe" }]);
+    demo.scrollIntoView?.({ block: "center" });
+  }
+}
+
+/* History > Edit (dictado-1ph): fix the text in place; a misheard name you fix is offered for next
+   time (Your words, or a Replace rule when it's already there). Nothing is learned without Keep. */
+function editDictation(r, li, p, btns) {
+  if (li.querySelector(".h-edit")) return;
+  const box = document.createElement("textarea");
+  box.className = "h-edit"; box.value = r.text.trim(); box.setAttribute("aria-label", "Dictation text");
+  box.rows = Math.min(8, Math.max(2, Math.ceil(box.value.length / 70)));
+  const bar = document.createElement("div"); bar.className = "h-edit-bar";
+  const hint = document.createElement("span"); hint.className = "muted small"; hint.textContent = "Fix a misheard name and Ecoscribe offers to learn it.";
+  const cancel = document.createElement("button"); cancel.type = "button"; cancel.className = "btn btn-ghost btn-sm"; cancel.textContent = "Cancel";
+  const save = document.createElement("button"); save.type = "button"; save.className = "btn btn-primary btn-sm"; save.textContent = "Save";
+  bar.append(hint, cancel, save);
+  const close = () => { box.remove(); bar.remove(); p.hidden = false; btns.hidden = false; };
+  cancel.onclick = close;
+  box.onkeydown = (e) => {
+    if (e.key === "Escape") close();
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) save.click();
+  };
+  save.onclick = async () => {
+    const text = box.value.trim();
+    if (!text || text === r.text.trim()) { close(); return; }
+    save.disabled = true;
+    const res = await api.edit_dictation(r.id || "", r.id ? "" : r.ts, text);
+    save.disabled = false;
+    if (!res.ok) { toast(res.error || "Couldn't save it."); return; }
+    r.text = res.text; p.textContent = res.text; close();
+    if ((res.learn || []).length) showLearn(li, res.learn); else toast("Saved.");
+  };
+  p.hidden = true; btns.hidden = true;
+  p.after(box, bar);
+  box.focus();
+}
+function showLearn(li, items) {
+  li.querySelector(".h-learn")?.remove();
+  const box = document.createElement("div"); box.className = "h-learn";
+  const gone = (row) => { row.remove(); if (!box.children.length) box.remove(); };
+  for (const s of items) {
+    const row = document.createElement("div"); row.className = "h-learn-row";
+    const msg = document.createElement("span"); msg.className = "h-learn-msg";
+    const name = document.createElement("strong"); name.textContent = s.write;
+    if (s.kind === "replace") msg.append(`Write "${s.heard}" as `, name, " from now on?");
+    else msg.append("Add ", name, " to Your words? Then it's written this way next time.");
+    const keep = document.createElement("button"); keep.type = "button"; keep.className = "btn btn-primary btn-sm"; keep.textContent = "Keep";
+    const no = document.createElement("button"); no.type = "button"; no.className = "btn btn-ghost btn-sm"; no.textContent = "Dismiss";
+    keep.onclick = async () => {
+      keep.disabled = true;
+      const out = await api.learn_word(s.kind, s.write, s.heard || "");
+      if (!out.ok) { keep.disabled = false; toast(out.error || "Couldn't learn it."); return; }
+      row.textContent = "";
+      const done = document.createElement("span"); done.className = "h-learn-done";
+      const n = document.createElement("strong"); n.textContent = s.write;
+      done.append("Learned: ", n);
+      row.append(done);
+      setTimeout(() => gone(row), 4000);
+    };
+    no.onclick = () => gone(row);
+    row.append(msg, keep, no);
+    box.append(row);
+  }
+  li.append(box);
 }
 
 /* History > Delete (dictado-vfo): the row goes at once; the line and its audio after a few seconds to Undo. */

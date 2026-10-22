@@ -580,6 +580,14 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border: 1px solid var(--
 .h-group-list .h-text { grid-column: 2; font-size: 15px; }
 .h-group-list .h-meta { grid-column: 2; flex-wrap: wrap; gap: 6px; }
 .h-group-list .h-btns { grid-column: 3; }
+.h-edit { grid-column: 2 / -1; width: 100%; box-sizing: border-box; padding: 8px 12px; border: 1px solid var(--aegean); border-radius: 10px; background: var(--card); color: var(--ink); font: 15px/1.6 var(--font); resize: vertical; }  /* dictado-1ph */
+.h-edit:focus { outline: none; box-shadow: 0 0 0 3px var(--aegean-soft); }
+.h-edit-bar { grid-column: 2 / -1; display: flex; align-items: center; gap: 8px; }
+.h-edit-bar .muted { margin-right: auto; }
+.h-learn { grid-column: 2 / -1; display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.h-learn-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px; border-radius: 10px; background: var(--aegean-soft); font-size: 14px; }
+.h-learn-msg { margin-right: auto; }
+.h-learn-done { padding: 4px 0; color: var(--ink-soft); }
 .h-tag { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 999px; background: #eeece6; color: var(--ink-soft); font-size: 12px; font-weight: 700; }
 .h-tag-line { background: transparent; border: 1px solid #d5d1c8; }
 .h-tag-dark { background: var(--ink); color: #fff; }

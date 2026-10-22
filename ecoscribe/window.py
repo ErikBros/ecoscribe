@@ -464,6 +464,38 @@ class Api:
             return {"ok": True, "gone": histfile.delete(self._data_dir / "history.jsonl", rid or None, ts or None)}
         return out
 
+    def edit_dictation(self, rid: str = "", ts: str = "", text: str = "") -> dict:
+        """History > Edit (dictado-1ph): saves the new text (the background app owns history.jsonl, like
+        Delete) and says what the change could teach: a name for Your words, or a Replace rule."""
+        from . import commands, histfile, learn
+        text = str(text or "").strip()
+        if not text:
+            return {"ok": False, "error": "The text is empty: use Delete to remove the dictation."}
+        old = next((r for r in self._history_rows()
+                    if (rid and r.get("id") == rid) or (not rid and not r.get("id") and r.get("ts") == ts)), None)
+        if old is None:
+            return {"ok": False, "error": "That dictation isn't in the history any more."}
+        out = self._send("edit_dictation", {"id": rid, "ts": ts, "text": text})
+        if not out.get("ok") and out.get("error") in (commands.NOT_RUNNING, "Dictation isn't running"):
+            out = {"ok": histfile.edit(self._data_dir / "history.jsonl", rid or None, ts or None, text)}
+        if not out.get("ok"):
+            return {"ok": False, "error": out.get("error") or "Couldn't save it."}
+        c = self._load()
+        return {"ok": True, "text": text, "learn": learn.suggest(old.get("text", ""), text, c.text.vocabulary, c.text.replacements)}
+
+    def learn_word(self, kind: str, write: str, heard: str = "") -> dict:
+        """History > Edit > Keep (dictado-1ph): a name into Your words, or a Replace rule from what was heard."""
+        if kind == "word":
+            return self.add_word(write)
+        heard, write = " ".join(str(heard or "").lower().split())[:60], " ".join(str(write or "").split())[:200]  # like Settings
+        if kind != "replace" or not heard or not write:
+            return {"ok": False, "error": "nothing to learn"}
+        c = self._load()
+        c.text.replacements[heard] = write
+        tomlw.save(c, self._config_path)
+        self._signal()
+        return {"ok": True}
+
     def clear_history(self) -> dict:
         p = self._data_dir / "history.jsonl"
         if p.exists():
