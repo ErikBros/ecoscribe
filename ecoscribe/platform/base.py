@@ -77,6 +77,10 @@ CAPABILITIES: dict[str, dict] = {
         "windows": "ecoscribe.platform.windows.shell:Tray,Overlay,PromptWindow",
         "macos": "ecoscribe.platform.macos.shell:Tray,Overlay,PromptWindow",
     },
+    "Smooth pill: see-through corners, a soft shadow, the app's font": {
+        "windows": "ecoscribe.platform.windows.pillart:dictating,busy,notice,meeting_chip,meeting_open",  # dictado-acm
+        "macos": ("ticket", "dictado-vx1"),  # AppKit already draws it smooth; shadow and font to check
+    },
     "Live text on the pill while dictating": {
         "windows": "ecoscribe.platform.windows.shell:Overlay",  # Overlay.live: two lines under the timer
         "macos": "ecoscribe.platform.macos.shell:Overlay",  # Overlay.live: a 460x84 box, the newest two lines under the timer

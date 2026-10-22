@@ -168,6 +168,41 @@ def test_tk_meeting_pill_and_prompt_box():
         root.destroy()
 
 
+@pytest.mark.win
+def test_the_pill_is_one_layered_picture_that_never_takes_focus():
+    """dictado-acm: the pill is drawn by UpdateLayeredWindow (per-pixel alpha), at the picture's size,
+    click-through and no-activate. Off-screen, so nothing shows; no OS input is injected."""
+    import ctypes
+    import tkinter as tk
+    from ctypes import wintypes
+    from ecoscribe.platform.windows import pillart
+    from ecoscribe.platform.windows import shell as ui
+    u32 = ctypes.WinDLL("user32")
+    u32.GetWindowRect.argtypes = (wintypes.HWND, ctypes.POINTER(wintypes.RECT))
+    root = tk.Tk()
+    root.withdraw()
+    try:
+        before = u32.GetForegroundWindow()
+        ov = ui.Overlay(root)
+        ov._anchor = (-4000, -4000)  # well off every screen
+        ov._notice("Scratched")
+        u32.ShowWindow(ov.hwnd, ui.SW_SHOWNOACTIVATE)
+        root.update()
+        rc = wintypes.RECT()
+        u32.GetWindowRect(ov.hwnd, ctypes.byref(rc))
+        assert ov._ulw_ok and (rc.right - rc.left, rc.bottom - rc.top) == (ov.w + 2 * pillart.M, ov.h + 2 * pillart.M)
+        ex = ov.ex_style()
+        assert ex & ui.WS_EX_LAYERED and ex & ui.WS_EX_TRANSPARENT and ex & ui.WS_EX_NOACTIVATE
+        ov._levels = [0.4] * 10
+        ov._dictating_pill(5, 0.5)
+        root.update()
+        u32.GetWindowRect(ov.hwnd, ctypes.byref(rc))
+        assert (rc.right - rc.left) == ui.RW + 2 * pillart.M and rc.bottom == -4000 + pillart.M  # grows from its bottom centre
+        assert u32.GetForegroundWindow() == before
+    finally:
+        root.destroy()
+
+
 def test_a_note_never_hides_a_question():
     start = meetui.Prompt("start", "msteams", "sv", 0.0)
     end = meetui.Prompt("end?", None, None, 0.0)
