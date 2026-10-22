@@ -36,6 +36,24 @@ def test_undo_takes_back_the_paste_in_that_window(target):
     assert target.wait_text(lambda t: t == "") == ""
 
 
+def test_the_selection_is_copied_and_the_edit_replaces_it(target):
+    dl.deliver("Teh shop ", restore_delay_s=0.2)
+    assert target.wait_text(lambda t: t == "Teh shop ") == "Teh shop "
+    time.sleep(0.5)
+    dl.set_clipboard_text("SENTINEL", private=False)
+    send_keys([(0x10, True), (0x24, True), (0x24, False), (0x10, False)])  # Shift+Home: select the line
+    time.sleep(0.2)
+    got = dl.copy_selection()
+    assert got == "Teh shop ", repr(got)
+    assert dl.get_clipboard_text() == "SENTINEL"  # the user's clipboard is back
+    assert dl.deliver("The shop", restore_delay_s=0.2).pasted
+    assert target.wait_text(lambda t: t == "The shop") == "The shop"
+
+
+def test_nothing_selected_copies_nothing(target):
+    assert dl.copy_selection(timeout_s=0.3) is None
+
+
 def test_unicode_roundtrip(target):
     s = "Mañana, Ελλάδα, naïve, 😀 "
     dl.deliver(s, restore_delay_s=0.2)

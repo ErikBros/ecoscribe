@@ -82,6 +82,11 @@ class TextCfg:
     self_corrections: bool = False
     correction_model: str = "haiku"
     correction_timeout_s: float = 5.0  # Haiku through Claude Code answered in 2.4-3.2 s; slower = the text as heard
+    # dictado-ua2 (command_mode.py): dictation key + E with text selected, say what to change; the selection
+    # goes to Claude, so off by default
+    command_mode: bool = False
+    command_model: str = "haiku"
+    command_timeout_s: float = 20.0  # an edit the user asked for can wait longer than a dictation
 
 
 @dataclass

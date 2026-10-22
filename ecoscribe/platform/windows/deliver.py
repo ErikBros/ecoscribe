@@ -29,7 +29,7 @@ def focus_kind() -> str:
 
 log = logging.getLogger(__name__)
 MODIFIERS = (0x10, 0x11, 0x12, 0x5B, 0x5C)  # shift, ctrl, alt, lwin, rwin
-VK_LCONTROL, VK_V, VK_Z = 0xA2, 0x56, 0x5A
+VK_LCONTROL, VK_C, VK_V, VK_Z = 0xA2, 0x43, 0x56, 0x5A
 PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 
 kernel32.OpenProcess.argtypes = (w.DWORD, w.BOOL, w.DWORD)
@@ -200,6 +200,35 @@ def deliver(text: str, restore_delay_s: float = 0.8) -> DeliveryResult:
     if not had_non_text:
         threading.Timer(restore_delay_s, _restore, args=(prior, seq)).start()
     return DeliveryResult(True, exe, "ok", waited, window=foreground_window())
+
+
+def copy_selection(timeout_s: float = 0.5) -> str | None:
+    """The text selected in the window with focus, by Ctrl+C; the clipboard text is put back after.
+    None when Ctrl+C copied nothing (no selection) or the clipboard was busy (command mode, dictado-ua2)."""
+    _wait_modifiers_released()
+    if _modifiers_down():
+        return None
+    try:
+        prior, had_non_text = _read()
+    except ClipboardBusy:
+        return None
+    seq = win32clipboard.GetClipboardSequenceNumber()
+    if send_keys([(VK_LCONTROL, True), (VK_C, True), (VK_C, False), (VK_LCONTROL, False)]) != 4:
+        return None
+    end = time.monotonic() + timeout_s
+    while time.monotonic() < end and win32clipboard.GetClipboardSequenceNumber() == seq:
+        time.sleep(0.01)
+    if win32clipboard.GetClipboardSequenceNumber() == seq:
+        return None
+    _wait_clipboard_quiet()
+    try:
+        text = get_clipboard_text()
+        if not had_non_text:
+            set_clipboard_text(prior, private=False)
+    except ClipboardBusy:
+        log.warning("clipboard busy after copying the selection")
+        return None
+    return text or None
 
 
 def foreground_window() -> int:

@@ -366,7 +366,8 @@ def main(argv=None) -> int:
     from . import deliver as _deliver
     app = App(cfg, recorder, engine, deliver, ui, gate=gate, history_path=data / ("history-test.jsonl" if args.test else "history.jsonl"),
               spool=Spool(data / ("spool-test" if args.test else "spool")),
-              undo=getattr(_deliver, "undo_paste", None), window_now=getattr(_deliver, "foreground_window", None))
+              undo=getattr(_deliver, "undo_paste", None), window_now=getattr(_deliver, "foreground_window", None),
+              copy_selection=getattr(_deliver, "copy_selection", None))
     app.ready = False
     app.start()
 
