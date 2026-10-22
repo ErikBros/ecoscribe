@@ -21,13 +21,16 @@ RO = {"readOnlyHint": True, "openWorldHint": False}
 TOOLS = [
     {"name": "list_meetings", "annotations": RO,
      "description": "List your recorded meetings, calls and transcribed files from Ecoscribe, newest first: "
-                    "id, title, date, app (signal, msteams, slack...), duration, language, status, speaker names.",
+                    "id, title, date, app (signal, msteams, slack...), duration, language, status, speaker names, "
+                    "whether a checked summary exists.",
      "inputSchema": {"type": "object", "properties": {
          "query": {"type": "string", "description": "Only titles containing this text"},
          "since": {"type": "string", "description": "Only sessions on or after this date, YYYY-MM-DD"},
          "limit": {"type": "integer", "description": "At most this many (default 30)"}}}},
     {"name": "read_meeting", "annotations": RO,
-     "description": "The full transcript of one session (id from list_meetings): a header (date, app, duration, "
+     "description": "The full transcript of one session (id from list_meetings): its summary first when one was made "
+                    "(each item with its time and quote; items marked 'not found in the call' failed the check), "
+                    "a header (date, app, duration, "
                     "language), the user's own notes if any were typed, then who said what with [hh:mm:ss] timestamps. "
                     "'Me' is the user (the mic); 'Others' or 'Speaker N' (or a name the user gave) the other side.",
      "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}},
@@ -64,7 +67,8 @@ def _segments(d: Path) -> list[dict]:
 def _row(m: dict) -> dict:
     return {"id": Path(m["dir"]).name, "title": m.get("title", ""), "date": export._date(m), "app": export._app(m),
             "duration": export._duration(m.get("duration_s") or m.get("recorded_s")), "language": export._lang(m),
-            "status": m.get("status"), "speakers": m.get("speaker_names") or {}}
+            "status": m.get("status"), "speakers": m.get("speaker_names") or {},
+            "summary": (Path(m["dir"]) / "summary.md").is_file()}
 
 
 def list_meetings(root: Path, query: str = "", since: str = "", limit: int = 30) -> list[dict]:
@@ -91,7 +95,11 @@ def _session(root: Path, sid: str) -> Path:
 def read_meeting(root: Path, sid: str) -> str:
     d = _session(root, sid)
     meta = sessions.read_meta(d)
-    return export.for_claude(meta, _segments(d), export.read_notes(d))
+    text = export.for_claude(meta, _segments(d), export.read_notes(d))
+    try:  # dictado-crf: its checked summary first, when one was made
+        return (d / "summary.md").read_text(encoding="utf-8").strip() + "\n\n---\n\n" + text
+    except OSError:
+        return text
 
 
 def search_meetings(root: Path, text: str, limit: int = 40) -> list[dict]:

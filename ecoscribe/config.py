@@ -150,6 +150,21 @@ class PersonalCfg:
 
 
 @dataclass
+class ClaudeCfg:
+    """claude_cli.py: the user's own Claude Code login, for summaries (and later self-corrections, command mode)."""
+    command: list = field(default_factory=list)  # empty: wsl.exe + login shell on Windows, a login shell on macOS
+
+
+@dataclass
+class SummariesCfg:
+    """dictado-crf: a short summary next to every personal call (personal.py), each item checked against the call."""
+    enabled: bool = False  # off by default: needs Claude Code logged in, and the call text goes to Claude
+    model: str = "sonnet"  # accuracy over speed for summaries
+    timeout_s: float = 300
+    max_age_days: int = 14  # older calls are only summarized by hand (--summarize DIR)
+
+
+@dataclass
 class Config:
     hotkey: HotkeyCfg = field(default_factory=HotkeyCfg)
     audio: AudioCfg = field(default_factory=AudioCfg)
@@ -160,6 +175,8 @@ class Config:
     transcribe: TranscribeCfg = field(default_factory=TranscribeCfg)
     meetings: MeetingsCfg = field(default_factory=MeetingsCfg)
     personal: PersonalCfg = field(default_factory=PersonalCfg)
+    claude: ClaudeCfg = field(default_factory=ClaudeCfg)
+    summaries: SummariesCfg = field(default_factory=SummariesCfg)
 
 
 def load(path: Path | None) -> Config:

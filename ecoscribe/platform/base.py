@@ -105,6 +105,10 @@ CAPABILITIES: dict[str, dict] = {
         "windows": "ecoscribe.platform.windows.speakers:addon_exe",  # the old Dictado Speakers still found
         "macos": "ecoscribe.platform.macos.speakers:addon_exe",  # Ecoscribe Speakers.app (the old Dictado Speakers.app still found), pyannote on MPS
     },
+    "Claude Code from the app (summaries)": {
+        "windows": "ecoscribe.claude_cli:default_command",  # wsl.exe + bash login shell
+        "macos": ("ticket", "dictado-1xg"),  # zsh login shell, not yet tried on the Mac
+    },
     "Claude app connection (MCP)": {
         "windows": "ecoscribe.platform.windows.claude_link:config_files",
         "macos": "ecoscribe.platform.macos.claude_link:config_files",  # connect() is shared

@@ -29,6 +29,7 @@ def parse(argv):
     ap.add_argument("--transcribe", metavar="DIR", help="transcribe one session folder, then exit")
     ap.add_argument("--meeting", metavar="DIR", help="record + live-transcribe a meeting into DIR until stopped")
     ap.add_argument("--speakers", metavar="DIR", help="tell the remote speakers apart in a finished session (needs the add-on)")
+    ap.add_argument("--summarize", metavar="DIR", help="write summary.md for one session with Claude Code, then exit")
     ap.add_argument("--engine-worker", action="store_true", help=argparse.SUPPRESS)
     ap.add_argument("--mcp", action="store_true", help="read-only MCP server over stdio, for the Claude app")
     ap.add_argument("--supervise", action="store_true", help=argparse.SUPPRESS)  # the watchdog (t0u.37)
@@ -187,11 +188,16 @@ def _start_meetings(cfg, data, ui, root, log, app=None):
     from . import commands
     commands.Watcher(data, commands.handler_for(ctl, watch, MANUAL, app=app)).start()  # the window's buttons
     tracker = meetui.Tracker()
+    from .summary import Sweeper
+    sweeper = Sweeper(cfg, ctl.root, ipc.spawn)
 
     def poll():
         try:
             ctl.poll()
             st = ctl.state()
+            busy = {x["dir"] for x in (st["meeting"], st["job"], st["next_meeting"]) if x} | set(st["queue"])
+            for d in sweeper.tick(busy):
+                log.info("summary ready %s", Path(d).name)
             line = meetui.last_live_line(st["meeting"]["dir"]) if st["meeting"] else None
             ui.set_meeting(st, meetui.meeting_view(st, time.time(), line))
             for kind, d in tracker.update(st):
@@ -233,6 +239,9 @@ def main(argv=None) -> int:
     if args.speakers:
         from .diarize import main as speakers_main
         winutil.hard_exit(speakers_main(args.speakers))
+    if args.summarize:  # worker process (dictado-crf): one Claude call, no UI
+        from .summary import main as summary_main
+        winutil.hard_exit(summary_main(args.summarize, args.config))
     if args.selftest:
         winutil.hard_exit(selftest(args.selftest, args.out))
     if args.ui:
