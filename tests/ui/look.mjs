@@ -80,12 +80,7 @@ const STATE = {
 // 5. one colour set: colours written outside :root may only go down (a ratchet towards one token file, dictado-u9h)
 const STRAY_COLOURS_MAX = 85;
 // found on 2026-10-22, each a look change waiting for Erik's OK (dictado-9jf); delete a line once it's fixed
-const KNOWN = [
-  "inicio: status-once: status shown 3 times",
-  "detenido: no-dash-placeholder:",
-  "detenido: copy-matches-state:",
-  "cargando: copy-matches-state:",
-];
+const KNOWN = [];
 
 const found = [];
 for (const [name, q] of Object.entries(PAGES)) {

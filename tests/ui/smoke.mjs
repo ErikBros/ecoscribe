@@ -186,7 +186,8 @@ async function load(query) {
 { // stopped
   const { doc } = await load("page=inicio&state=stopped");
   check(doc.querySelector("#hero-actions button")?.textContent === "Start Ecoscribe", "stopped offers start button");
-  check(doc.querySelector("#fact-engine").textContent === "—", "stopped shows no stale facts");
+  check(doc.querySelector(".side-facts").hidden && !doc.querySelector("#side-off").hidden,
+    "stopped shows no stale facts, and says why");
 }
 { // historial + search
   const { window, doc } = await load("page=historial");
