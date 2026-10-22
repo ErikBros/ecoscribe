@@ -107,10 +107,10 @@ function demoApi() {
   ];
   const SEGS_MULTI = [
     { t0: 3.1, t1: 8.0, text: "Thanks for joining, everyone. Shall we start with the timeline?", speaker: "Me" },
-    { t0: 8.6, t1: 15.2, text: "Yes. The data team needs two more weeks for the export.", speaker: "Speaker 1" },
+    { t0: 8.6, t1: 15.2, text: "Yes. The data team needs two more weeks and one more poll request for the export.", speaker: "Speaker 1" },
     { t0: 15.8, t1: 21.0, text: "Two weeks works for us if the format stays the same.", speaker: "Speaker 2" },
     { t0: 21.4, t1: 26.9, text: "I can confirm that on Friday after I talk to legal.", speaker: "Speaker 3" },
-    { t0: 27.3, t1: 31.0, text: "Great, then we lock the plan today.", speaker: "Me" },
+    { t0: 27.3, t1: 31.0, text: "Great, I'll open the poll request and we lock the plan today.", speaker: "Me" },
   ];
   const SUMMARY = { kind: "job", checked: 2, total: 3,  // dictado-nl5: what summary.json holds, invented
     summary: "Retro om den långsamma deployen i torsdags: orsaken var cachen efter migreringen.",
@@ -121,11 +121,27 @@ function demoApi() {
   let liveN = 2;
   const notes = { "2026-10-05_1400_retro": "- Is the export date firm?\n- Ask legal about the format" };
   const find = (n) => sess.find((s) => s.name === n);
+  const segsNow = {}, segsBefore = {};  // dictado-9lo: the demo transcripts, which the Replace list changes
+  const segsFor = (n) => segsNow[n] || (segsNow[n] = (n.endsWith("kund") ? SEGS_MULTI : SEGS).map((x) => ({ ...x })));
+  const replaceIn = (n) => {  // like text.replace_counted: whole words, any case, longest first, real changes counted
+    const rep = Object.fromEntries(settings.values.replacements.map((p) => [p.heard.toLowerCase().split(/\s+/).join(" "), p.write]));
+    const keys = Object.keys(rep).sort((a, b) => b.length - a.length), counts = {};
+    if (!keys.length) return { segs: segsFor(n), counts };
+    const alt = keys.map((k) => k.split(" ").map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+")).join("|");
+    const rx = new RegExp(`(?<![\\p{L}\\p{N}_])(${alt})(?![\\p{L}\\p{N}_])`, "giu");
+    const segs = segsFor(n).map((x) => ({ ...x, text: x.text.replace(rx, (m) => {
+      const k = m.toLowerCase().split(/\s+/).join(" ");
+      if (m !== rep[k]) counts[k] = (counts[k] || 0) + 1;
+      return rep[k];
+    }) }));
+    return { segs, counts, rep };
+  };
+  const total = (counts) => Object.values(counts).reduce((a, b) => a + b, 0);
   const mstate = () => ({ meeting: rec && find("2026-10-05_1400_retro")?.status === "recording"
     ? { name: "2026-10-05_1400_retro", app: "ms-teams", lang: "sv", started: iso(12), status: "recording" } : null, job: null, queue: [] });
   return {
     list_sessions: async (q) => ({ items: sess.filter((s) => !q || s.title.toLowerCase().includes(q.toLowerCase())), state: mstate() }),
-    get_session: async (n) => ({ session: find(n), segments: find(n)?.status !== "done" ? [] : n.endsWith("kund") ? SEGS_MULTI : SEGS,
+    get_session: async (n) => ({ session: find(n), segments: find(n)?.status !== "done" ? [] : segsFor(n),
       exports: ["transcript.txt"], notes: notes[n] || "", summary: find(n)?.summary === "done" ? SUMMARY : null }),
     voices_info: async () => window.__noVoices ? { count: 0, names: [], on: true } : { count: 2, names: ["Ana", "Tom"], on: true },
     crashes: async () => (params.get("crash") === "1" ? { items: [{ name: "2026-10-06_140325", when: "2026-10-06 140325", exit: MAC ? "unknown" : "0xC0000005 (access violation)" }], gave_up: false } : { items: [], gave_up: false }),
@@ -163,6 +179,23 @@ function demoApi() {
       if (name) s.speaker_names[label] = name; else delete s.speaker_names[label]; window.__renamed = [label, name]; return { ok: true, names: s.speaker_names }; },
     delete_session: async (n) => { sess.splice(sess.indexOf(find(n)), 1); return { ok: true }; },
     open_folder: async () => ({ ok: true }),
+    replace_preview: async (n) => {
+      const { counts, rep } = replaceIn(n);
+      const pairs = Object.entries(counts).map(([heard, k]) => ({ heard, write: rep[heard], n: k })).sort((a, b) => b.n - a.n);
+      return { ok: true, places: total(counts), pairs, empty: !settings.values.replacements.length, undo: !!segsBefore[n] };
+    },
+    apply_replacements: async (n) => {
+      if (!settings.values.replacements.length) return { ok: false, error: "Your Replace list is empty: add pairs in Settings › Languages and words." };
+      const { segs, counts } = replaceIn(n), places = total(counts);
+      if (places) { segsBefore[n] = segsFor(n); segsNow[n] = segs; }
+      window.__replaced = places;
+      return { ok: true, places };
+    },
+    undo_replacements: async (n) => {
+      if (!segsBefore[n]) return { ok: false, error: "There's nothing to undo." };
+      segsNow[n] = segsBefore[n]; delete segsBefore[n]; window.__undone = n;
+      return { ok: true };
+    },
     copy_transcript: async () => ({ ok: true }),
     email_participants: async (name) => { window.__emailed = name; return { ok: true, to: ["ana@example.com", "bo@example.com"], inline: false, chars: 9000 }; },
     get_status: async () => (params.get("state") === "stopped" ? { state: "stopped", alive: false, version: "1.1.0" }
@@ -856,6 +889,7 @@ function renameSpeaker(el) {
 async function openSession(name) {
   r.open = name; r.next = 0; r.status = null; r.segs = 0; r.speakers = null; r.names = {};
   r.notesLoaded = false; clearTimeout(r.notesTimer);
+  r.repAsked = false; paintReplace(null);
   $("#r-notes-text").value = "";
   $("#r-segs").innerHTML = "";
   $("#r-jump").hidden = true;
@@ -999,10 +1033,58 @@ async function renderDetail(name) {
     for (const x of segs) list.append(segLi(x, s.status === "done"));
   }
   renderSummary(s, s.status === "done" ? summ : null);
+  if (s.status === "done" && s.speakers !== "pending" && s.speakers !== "running" && !r.repAsked) { r.repAsked = true; replaceCheck(name); }
   const n = $("#r-segs").childElementCount;
   $("#r-segs-empty").hidden = n > 0;
   $("#r-segs-empty-text").textContent = s.status === "failed" ? `Failed: ${s.error || "unknown error"}`
     : recording ? "Listening: the first text arrives in a few seconds." : working ? "The text appears when it finishes." : "This session has no text.";
+}
+/* the Replace list on a saved transcript (dictado-9lo): offered when it would change something, one Undo after */
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+async function replaceCheck(name) {
+  const out = await api.replace_preview(name).catch(() => ({ ok: false }));
+  if (r.open === name) paintReplace(out.ok && out.places > 0 ? { offer: out } : null);
+}
+function paintReplace(st) {
+  $("#r-replace").hidden = !st;
+  if (!st) return;
+  const o = st.offer;
+  if (o) {
+    $("#r-replace-title").textContent = `${plural(o.places, "place matches", "places match")} your Replace list`;
+    $("#r-replace-detail").textContent = o.pairs.slice(0, 3).map((p) => `${p.heard} → ${p.write}${o.pairs.length > 1 ? ` (${p.n})` : ""}`).join(" · ")
+      + (o.pairs.length > 3 ? ` · and ${o.pairs.length - 3} more` : "");
+  } else {
+    $("#r-replace-title").textContent = `Changed ${plural(st.done, "place", "places")} with your Replace list`;
+    $("#r-replace-detail").textContent = "Also in the downloads. The audio is untouched.";
+  }
+  $("#r-replace-go").hidden = !o; $("#r-replace-undo").hidden = !!o;
+  $("#r-replace-later").textContent = o ? "Not now" : "Hide";
+}
+async function reloadSegs(name) {  // the same lines with their new text, where the reader was
+  const list = $("#r-segs"), top = list.scrollTop;
+  list.innerHTML = "";
+  await renderDetail(name);
+  list.scrollTop = top;
+}
+async function replaceApply() {
+  const name = r.open, b = $("#r-replace-go");
+  b.disabled = true;
+  const out = await api.apply_replacements(name).catch(() => ({ ok: false }));
+  b.disabled = false;
+  if (!out.ok) { toast(out.error || "Couldn't apply the Replace list."); return; }
+  if (r.open !== name) return;
+  if (!out.places) { paintReplace(null); toast("Nothing in this transcript matches your Replace list now."); return; }
+  await reloadSegs(name);
+  paintReplace({ done: out.places });
+}
+async function replaceUndo() {
+  const name = r.open;
+  const out = await api.undo_replacements(name).catch(() => ({ ok: false }));
+  if (!out.ok) { toast(out.error || "Couldn't undo it."); return; }
+  if (r.open !== name) return;
+  await reloadSegs(name);
+  toast("Undone: the transcript is back as it was.");
+  replaceCheck(name);
 }
 function notesIn(text) {  // once per open: polls must never overwrite what the user is typing
   if (r.notesLoaded) return;
@@ -1102,6 +1184,9 @@ function rWire() {
   $("#r-copy-summary").onclick = async () => { await api.copy_transcript(r.open, "summary"); toast("Summary prompt copied: paste it into Claude."); };
   for (const b of $$("[data-fmt]")) b.onclick = () => download(r.open, b.dataset.fmt);
   $("#r-folder").onclick = () => api.open_folder(r.open);
+  $("#r-replace-go").onclick = replaceApply;
+  $("#r-replace-undo").onclick = replaceUndo;
+  $("#r-replace-later").onclick = () => paintReplace(null);
   $("#r-delete").onclick = async () => {
     if (!confirm("Delete this transcript and its audio? This can't be undone.")) return;
     const out = await api.delete_session(r.open);
@@ -2012,6 +2097,7 @@ async function boot() {
     const p = api.take_page ? await api.take_page().catch(() => null) : null;
     if (p) show(p);
   }, 1000);
+  if (params.get("demo") === "1" && params.get("replaced") === "1") setTimeout(() => $("#r-replace-go")?.click(), 500);  // screenshot (dictado-9lo)
   if (params.get("demo") === "1" && params.get("retrymenu") === "1") setTimeout(() => $(".h-retry button")?.click(), 300);  // screenshot
   if (params.get("demo") === "1" && params.get("models") === "scroll") setTimeout(() => $("#m-rows").scrollIntoView(), 300);  // screenshot
   if (params.get("demo") === "1" && params.get("addlangs")) setTimeout(() => { sx.langs.push(...params.get("addlangs").split(",")); paintLangs(); }, 300);  // screenshot

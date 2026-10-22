@@ -141,17 +141,42 @@ def voice_commands(s: str) -> tuple[str, bool]:
     return (s.rstrip() if enter else s), enter
 
 
+def _replace_rx(table):
+    """{heard: write} folded to lower case and single spaces, and one regex for all of them (longest first)."""
+    rep = {" ".join(k.lower().split()): v for k, v in (table or {}).items() if k and k.strip() and v is not None}
+    if not rep:
+        return rep, None
+    alts = "|".join(r"\s+".join(map(re.escape, k.split())) for k in sorted(rep, key=len, reverse=True))
+    return rep, re.compile(rf"(?<!\w)({alts})(?!\w)", re.IGNORECASE)
+
+
 def replacements(s: str, table) -> str:
     """The Replace list (dictado-b7u): each heard phrase, anywhere, as whole words and in any case,
     becomes what the user wrote; the longest phrase wins where two overlap."""
     if not table or not s:
         return s
-    rep = {" ".join(k.lower().split()): v for k, v in table.items() if k and k.strip() and v is not None}
-    if not rep:
+    rep, rx = _replace_rx(table)
+    if rx is None:
         return s
-    alts = "|".join(r"\s+".join(map(re.escape, k.split())) for k in sorted(rep, key=len, reverse=True))
-    rx = re.compile(rf"(?<!\w)({alts})(?!\w)", re.IGNORECASE)
     return rx.sub(lambda m: rep[" ".join(m.group(1).lower().split())], s)
+
+
+def replace_counted(texts, table) -> tuple[list[str], dict[str, int]]:
+    """The Replace list over many texts (a saved transcript, dictado-9lo): the new texts and how many
+    places each heard phrase changed. A match already written that way ("Ecoscribe" for
+    eco scribe -> Ecoscribe in any case) changes nothing and isn't counted."""
+    rep, rx = _replace_rx(table)
+    texts = list(texts)
+    if rx is None:
+        return texts, {}
+    counts: dict[str, int] = {}
+
+    def sub(m):
+        key = " ".join(m.group(1).lower().split())
+        if m.group(1) != rep[key]:
+            counts[key] = counts.get(key, 0) + 1
+        return rep[key]
+    return [rx.sub(sub, t) if t else t for t in texts], counts
 
 
 def snippets(s: str, table) -> str:

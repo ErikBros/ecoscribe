@@ -553,5 +553,27 @@ async function load(query) {
   doc.querySelector('#set-tabs [data-sec="meetings"]').click(); await sleep(50);
   check(vis().length > 0 && vis().every((k) => k === "meetings"), "a tab shows only its section");
 }
+{ // Meetings > apply the Replace list to a saved transcript, and Undo (dictado-9lo)
+  const { window, doc, errors } = await load("page=reuniones/2026-10-04_1600_kund");
+  await sleep(300);
+  const box = doc.querySelector("#r-replace"), title = () => doc.querySelector("#r-replace-title").textContent;
+  const texts = () => [...doc.querySelectorAll("#r-segs .r-text")].map((p) => p.textContent).join(" | ");
+  check(box && !box.hidden && title() === "2 places match your Replace list", "a transcript with matches offers the Replace list, with the count");
+  check(doc.querySelector("#r-replace-detail").textContent === "poll request → pull request", "it names the pair");
+  check(texts().includes("one more poll request") && !doc.querySelector("#r-replace-go").hidden, "nothing changes before Apply");
+  doc.querySelector("#r-replace-go").click(); await sleep(200);
+  check(window.__replaced === 2 && !texts().includes("poll request") && texts().includes("one more pull request"), "Apply changes the lines");
+  check(title() === "Changed 2 places with your Replace list" && !doc.querySelector("#r-replace-undo").hidden
+    && doc.querySelector("#r-replace-go").hidden, "then says what it changed, with Undo");
+  doc.querySelector("#r-replace-undo").click(); await sleep(200);
+  check(texts().includes("one more poll request") && doc.querySelector("#toast").textContent.startsWith("Undone"), "Undo puts the text back");
+  check(!box.hidden && title().startsWith("2 places match"), "and offers it again");
+  doc.querySelector("#r-replace-later").click();
+  check(box.hidden, "Not now hides it");
+  check(errors.length === 0, "no JS errors: " + errors.join("; "));
+  const none = await load("page=reuniones/2026-10-05_0915_planering");
+  await sleep(300);
+  check(none.doc.querySelector("#r-replace").hidden, "nothing matches: no offer");
+}
 console.log(failed ? `\n${failed} FAILED` : "\nall ok");
 process.exit(failed ? 1 : 0);
