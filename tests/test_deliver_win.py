@@ -28,6 +28,14 @@ def test_pastes_and_restores_clipboard(target):
     assert dl.get_clipboard_text() == "SENTINEL"
 
 
+def test_undo_takes_back_the_paste_in_that_window(target):
+    r = dl.deliver("Taken back ", restore_delay_s=0.2)
+    assert r.pasted and r.window == target.hwnd == dl.foreground_window()
+    assert target.wait_text(lambda t: t == "Taken back ") == "Taken back "
+    assert dl.undo_paste()
+    assert target.wait_text(lambda t: t == "") == ""
+
+
 def test_unicode_roundtrip(target):
     s = "Mañana, Ελλάδα, naïve, 😀 "
     dl.deliver(s, restore_delay_s=0.2)

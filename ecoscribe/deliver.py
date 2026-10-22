@@ -8,4 +8,5 @@ if sys.platform == "darwin":  # NSPasteboard + Cmd+V
                                          get_clipboard_text, set_clipboard_text)
 else:  # clipboard + Ctrl+V, kept out of clipboard history
     from .platform.windows.deliver import (ClipboardBusy, DeliveryResult, deliver, foreground_exe,  # noqa: F401
-                                           get_clipboard_text, set_clipboard_text)
+                                           foreground_window, get_clipboard_text, set_clipboard_text,
+                                           undo_paste)

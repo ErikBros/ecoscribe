@@ -29,7 +29,7 @@ def focus_kind() -> str:
 
 log = logging.getLogger(__name__)
 MODIFIERS = (0x10, 0x11, 0x12, 0x5B, 0x5C)  # shift, ctrl, alt, lwin, rwin
-VK_LCONTROL, VK_V = 0xA2, 0x56
+VK_LCONTROL, VK_V, VK_Z = 0xA2, 0x56, 0x5A
 PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 
 kernel32.OpenProcess.argtypes = (w.DWORD, w.BOOL, w.DWORD)
@@ -50,6 +50,7 @@ class DeliveryResult:
     target_exe: str
     reason: str
     waited_ms: int = 0
+    window: int = 0  # the window it was pasted into (dictado-ost: undo only there)
 
 
 class ClipboardBusy(Exception):
@@ -198,7 +199,19 @@ def deliver(text: str, restore_delay_s: float = 0.8) -> DeliveryResult:
         return DeliveryResult(False, exe, "blocked", waited)
     if not had_non_text:
         threading.Timer(restore_delay_s, _restore, args=(prior, seq)).start()
-    return DeliveryResult(True, exe, "ok", waited)
+    return DeliveryResult(True, exe, "ok", waited, window=foreground_window())
+
+
+def foreground_window() -> int:
+    return int(user32.GetForegroundWindow() or 0)
+
+
+def undo_paste() -> bool:
+    """Ctrl+Z in the window with focus: one paste is one undo step in text boxes (dictado-ost)."""
+    _wait_modifiers_released()
+    if _modifiers_down():
+        return False
+    return send_keys([(VK_LCONTROL, True), (VK_Z, True), (VK_Z, False), (VK_LCONTROL, False)]) == 4
 
 
 def _restore(prior: str | None, seq: int) -> None:

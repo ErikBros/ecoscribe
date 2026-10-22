@@ -36,7 +36,8 @@ def _alt(ps) -> str:
     return "|".join(r"[\s,]+".join(map(re.escape, p.split())) for p in sorted(ps, key=len, reverse=True))
 
 
-_SCRATCH = re.compile(r"(?:^|(?<=[.,;:!?]))\s*(?:" + _alt(p for ps in SCRATCH.values() for p in ps) +
+_SCRATCH_ALT = _alt(p for ps in SCRATCH.values() for p in ps)
+_SCRATCH = re.compile(r"(?:^|(?<=[.,;:!?]))\s*(?:" + _SCRATCH_ALT +
                       r")\s*(?:[.,;:!?]+|$)", re.IGNORECASE)
 _TRIGGER = re.compile(r"(?:^|(?<=[\s.,;:!?]))(?:" + _alt(p for ps in TRIGGERS.values() for p in ps) +
                       r")(?=[\s.,;:!?]|$)", re.IGNORECASE)
@@ -56,6 +57,11 @@ def scratch_that(s: str) -> str:
             rest = rest[0].upper() + rest[1:]
         s = f"{keep} {rest}".strip()
     return s + tail if s else ""
+
+
+def scratch_only(s: str) -> bool:
+    """The whole dictation is "scratch that": take back the previous paste (dictado-ost)."""
+    return bool(re.fullmatch(r"\s*(?:" + _SCRATCH_ALT + r")\s*[.,;:!?]*\s*", s, re.IGNORECASE))
 
 
 def wants_model(s: str) -> bool:

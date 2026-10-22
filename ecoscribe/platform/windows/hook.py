@@ -24,6 +24,7 @@ from .win32types import (HOOKPROC, KBDLLHOOKSTRUCT, LLKHF_EXTENDED, LLKHF_INJECT
 
 log = logging.getLogger(__name__)
 VK_LANG = 0x4C  # L: dictation key + L picks the next dictation's language (dictation-languages)
+VK_REPASTE = 0x52  # R: dictation key + R pastes the last dictation again (dictado-ost)
 _DOWN = {WM_KEYDOWN, WM_SYSKEYDOWN}
 _UP = {WM_KEYUP, WM_SYSKEYUP}
 
@@ -46,6 +47,7 @@ class HookThread(threading.Thread):
         self._toggle_down = False  # tracked inside the hook callback itself
         self._eat_esc_up = False
         self._lang_held = False  # L went down with the dictation key held: swallowed until it's up
+        self._repaste_held = False  # same for R
         self.numpad_enter = numpad_enter  # the numpad's Enter is a second dictation key (swallowed)
         self._alias_down = False  # the numpad's Enter is down as the dictation key
         self._q: queue.SimpleQueue = queue.SimpleQueue()
@@ -66,6 +68,17 @@ class HookThread(threading.Thread):
             self._emit(("lang", VK_LANG, time.monotonic()))
         elif not down:
             self._lang_held = False
+        return True
+
+    def repaste_key(self, vk: int, down: bool) -> bool:
+        """Dictation key + R: emit "repaste" once per press and swallow the R (down and up), like L."""
+        if self.combo is not None or vk != VK_REPASTE or not (self._toggle_down or self._repaste_held):
+            return False
+        if down and not self._repaste_held:
+            self._repaste_held = True
+            self._emit(("repaste", VK_REPASTE, time.monotonic()))
+        elif not down:
+            self._repaste_held = False
         return True
 
     def numpad_alias(self, vk: int, flags: int, down: bool) -> tuple[int, bool]:
@@ -113,8 +126,8 @@ class HookThread(threading.Thread):
                     self._emit(("down" if down else "up", vk, time.monotonic()))
                     if alias:
                         return 1
-                    if self.lang_key(vk, down):
-                        return 1  # the app under the cursor never sees this L (no Ctrl+L)
+                    if self.lang_key(vk, down) or self.repaste_key(vk, down):
+                        return 1  # the app under the cursor never sees this L or R (no Ctrl+L, Ctrl+R)
                     if self.would_swallow(vk, down):
                         return 1
         return user32.CallNextHookEx(None, code, wparam, lparam)
@@ -192,7 +205,7 @@ class HookThread(threading.Thread):
                 return
             try:
                 if ev:
-                    action = {"combo": "toggle", "lang": "lang"}.get(ev[0]) or self.keys.feed(*ev)
+                    action = {"combo": "toggle", "lang": "lang", "repaste": "repaste"}.get(ev[0]) or self.keys.feed(*ev)
                     if action:
                         self.on_action(action)
                 action = self.keys.tick(time.monotonic())  # also between auto-repeat downs
