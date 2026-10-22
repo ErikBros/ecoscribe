@@ -1168,7 +1168,7 @@ async function renderHistory() {
 }
 
 /* History > Edit (dictado-1ph): fix the text in place; a misheard name you fix is offered for next
-   time (Your words, or a Replace rule when it's already there). Nothing is learned without Keep. */
+   time (Your words, or a Replace rule when it's already there). Nothing is learned until a chip is clicked. */
 function editDictation(r, li, p, btns) {
   if (li.querySelector(".h-edit")) return;
   const box = document.createElement("textarea");
@@ -1199,33 +1199,25 @@ function editDictation(r, li, p, btns) {
   p.after(box, bar);
   box.focus();
 }
-function showLearn(li, items) {
+function showLearn(li, items) {  // one quiet line of chips under the dictation (look B, picked)
   li.querySelector(".h-learn")?.remove();
-  const box = document.createElement("div"); box.className = "h-learn";
-  const gone = (row) => { row.remove(); if (!box.children.length) box.remove(); };
+  const box = document.createElement("div"); box.className = "h-learn h-learn-chips";
+  const lab = document.createElement("span"); lab.className = "muted small"; lab.textContent = "Learn for next time:";
+  box.append(lab);
   for (const s of items) {
-    const row = document.createElement("div"); row.className = "h-learn-row";
-    const msg = document.createElement("span"); msg.className = "h-learn-msg";
-    const name = document.createElement("strong"); name.textContent = s.write;
-    if (s.kind === "replace") msg.append(`Write "${s.heard}" as `, name, " from now on?");
-    else msg.append("Add ", name, " to Your words? Then it's written this way next time.");
-    const keep = document.createElement("button"); keep.type = "button"; keep.className = "btn btn-primary btn-sm"; keep.textContent = "Keep";
-    const no = document.createElement("button"); no.type = "button"; no.className = "btn btn-ghost btn-sm"; no.textContent = "Dismiss";
-    keep.onclick = async () => {
-      keep.disabled = true;
+    const chip = document.createElement("button"); chip.type = "button"; chip.className = "h-learn-chip";
+    chip.textContent = s.kind === "replace" ? `${s.heard} → ${s.write}` : `+ ${s.write}`;
+    chip.title = s.kind === "replace" ? "Add a Replace rule" : "Add to Your words";
+    chip.onclick = async () => {
       const out = await api.learn_word(s.kind, s.write, s.heard || "");
-      if (!out.ok) { keep.disabled = false; toast(out.error || "Couldn't learn it."); return; }
-      row.textContent = "";
-      const done = document.createElement("span"); done.className = "h-learn-done";
-      const n = document.createElement("strong"); n.textContent = s.write;
-      done.append("Learned: ", n);
-      row.append(done);
-      setTimeout(() => gone(row), 4000);
+      if (!out.ok) { toast(out.error || "Couldn't learn it."); return; }
+      chip.disabled = true; chip.classList.add("done"); chip.textContent = `✓ ${s.write}`;
     };
-    no.onclick = () => gone(row);
-    row.append(msg, keep, no);
-    box.append(row);
+    box.append(chip);
   }
+  const x = document.createElement("button"); x.type = "button"; x.className = "btn btn-ghost btn-sm"; x.textContent = "Not now";
+  x.onclick = () => box.remove();
+  box.append(x);
   li.append(box);
 }
 

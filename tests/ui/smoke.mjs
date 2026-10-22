@@ -488,10 +488,10 @@ async function load(query) {
   box.value = "Send the draft to Quintavelle before lunch, she has the numbers.";
   [...li.querySelectorAll(".h-edit-bar button")].find((b) => b.textContent === "Save").click(); await sleep(100);
   check(window.__edited?.includes("Quintavelle") && li.querySelector(".h-text").textContent.includes("Quintavelle") && !li.querySelector(".h-edit"), "Save keeps the new text");
-  const keep = [...li.querySelectorAll(".h-learn button")].find((b) => b.textContent === "Keep");
-  check(keep && li.querySelector(".h-learn").textContent.includes("Quintavelle"), "the fixed name is offered");
-  keep.click(); await sleep(50);
-  check(JSON.stringify(window.__learned) === JSON.stringify(["word", "Quintavelle", ""]) && li.querySelector(".h-learn").textContent.includes("Learned"), "Keep learns it");
+  const chip = li.querySelector(".h-learn .h-learn-chip");
+  check(chip && chip.textContent === "+ Quintavelle", "the fixed name is offered");
+  chip.click(); await sleep(50);
+  check(JSON.stringify(window.__learned) === JSON.stringify(["word", "Quintavelle", ""]) && chip.classList.contains("done"), "a click learns it");
   li.querySelector(".h-edit-btn").click();
   li.querySelector(".h-edit").dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape" }));
   check(!li.querySelector(".h-edit") && !li.querySelector(".h-text").hidden, "Escape cancels");
