@@ -214,6 +214,15 @@ async function load(query) {
   check(note.hidden && window.__updDismissed === "1.18.0", "× hides it for that version");
   check(errors.length === 0, "no JS errors with the update notice: " + errors.join("; "));
 }
+{ // dictado-7e1: the GPU part downloading / failed shows in the engine fact
+  const { doc } = await load("page=inicio&gpurt=downloading");
+  check(doc.querySelector("#fact-engine").textContent === "CPU · getting GPU 44%"
+    && doc.querySelector("#fact-engine").title === "Downloading the GPU part once: 214 MB of 476 MB", "GPU part download progress");
+  const f = (await load("page=inicio&gpurt=failed")).doc;
+  check(f.querySelector("#fact-engine").textContent === "CPU · GPU download failed" && f.querySelector("#fact-engine").title.includes("no connection"),
+    "GPU part download failed, why in the tooltip");
+  check(doc.querySelector("#fact-engine") && (await load("page=inicio")).doc.querySelector("#fact-engine").textContent === "GPU · fast", "GPU as before");
+}
 { // stopped
   const { doc } = await load("page=inicio&state=stopped");
   check(doc.querySelector("#hero-actions button")?.textContent === "Start Ecoscribe", "stopped offers start button");

@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "asset": "ecoscribe-gpu-runtime-1.zip",
+  "url": "https://github.com/ErikBros/ecoscribe/releases/download/gpu-runtime-1/ecoscribe-gpu-runtime-1.zip",
+  "size": 450987016,
+  "sha256": "c741005e112f074851411e15faca79df06ebd3930ea7763a3228d0521e3e7e3d",
+  "min_driver": 12000,
+  "files": {
+    "nvidia/cublas/bin/cublas64_12.dll": {
+      "size": 102518272,
+      "sha256": "52ce5ba0ec5327d39be6021f0f9362d2ed4d64d7206f9b5afc06398d827b8e82"
+    },
+    "nvidia/cublas/bin/cublasLt64_12.dll": {
+      "size": 668673536,
+      "sha256": "71705a7cf0923f4ab034d0d2620bbfc989ff669ac3d79f868b7a7c597ca559c5"
+    },
+    "nvidia/cuda_runtime/bin/cudart64_12.dll": {
+      "size": 583680,
+      "sha256": "760c38928bbe5759f7b31ed6692599eb7ec83cedd5702e84c2b72028a89837e1"
+    },
+    "nvidia/cudnn/bin/cudnn64_9.dll": {
+      "size": 265840,
+      "sha256": "cfb574a55523cda1a869e5725c07c429cbffcc73c6bbd9f78a0062da7cc004f5"
+    }
+  },
+  "made_by": "tools/build.py --new-runtime; upload the zip once as release gpu-runtime-1"
+}

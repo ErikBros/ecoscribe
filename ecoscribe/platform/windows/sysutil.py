@@ -1,4 +1,4 @@
-"""winutil on Windows: single instance by named mutex, CUDA DLL dirs, DPI, a hard exit without DLL detach."""
+"""winutil on Windows: single instance by named mutex, CUDA DLL dirs (the GPU runtime pack), DPI, a hard exit without DLL detach."""
 from __future__ import annotations
 
 import ctypes
@@ -35,28 +35,49 @@ def release_instance() -> None:
         _mutex = None
 
 
-def add_cuda_dll_dirs() -> list[str]:
-    """Make the pip-installed CUDA 12 DLLs (nvidia/*/bin) loadable by ctranslate2."""
+def cuda_roots() -> list[str]:
+    """Folders with nvidia/<lib>/bin under them, in search order: the GPU runtime pack (dictado-7e1),
+    the app's own folder (installers <= 1.17 bundled the DLLs there), then site-packages (a source run)."""
     roots = []
-    if getattr(sys, "frozen", False):  # PyInstaller: DLLs are bundled next to the exe
+    try:
+        from ...gpu_runtime import dll_root
+        rt = dll_root()
+        if rt is not None:
+            roots.append(str(rt))
+    except Exception:  # never stop the app over it: CUDA then fails and the engine runs on the CPU
+        pass
+    if getattr(sys, "frozen", False):
         roots.append(getattr(sys, "_MEIPASS", str(Path(sys.executable).parent)))
     roots += list(site.getsitepackages())
     try:
         roots.append(site.getusersitepackages())
     except Exception:
         pass
+    return roots
+
+
+_added: set[str] = set()
+
+
+def add_cuda_dll_dirs() -> list[str]:
+    """Make the CUDA 12 DLLs (nvidia/*/bin) loadable by ctranslate2: os.add_dll_directory for Python's
+    loader, PATH for ctranslate2's own LoadLibrary of cublas. Called again once the runtime arrives."""
     added = []
-    for root in roots:
+    for root in cuda_roots():
         nv = Path(root) / "nvidia"
         if not nv.is_dir():
             continue
         for bin_dir in nv.glob("*/bin"):
+            if str(bin_dir) in _added:
+                continue
             try:
                 os.add_dll_directory(str(bin_dir))
             except (OSError, AttributeError):
                 continue
-            os.environ["PATH"] = str(bin_dir) + os.pathsep + os.environ.get("PATH", "")
+            _added.add(str(bin_dir))
             added.append(str(bin_dir))
+    if added:  # in root order, ahead of what was there: the runtime pack wins over any other copy
+        os.environ["PATH"] = os.pathsep.join(added + [os.environ.get("PATH", "")])
     return added
 
 

@@ -3,8 +3,13 @@
     python release_gate.py <Ecoscribe-Setup-X.Y.Z.exe>             check only
     python release_gate.py <Ecoscribe-Setup-X.Y.Z.exe> --install   check, then install and wait for "ready"
 
+The build folder is the installer's folder (dist\\Ecoscribe and the GPU runtime pack are next to it).
 Nothing is installed unless every line says PASS. The last lines always say plainly whether it was
 installed and whether it runs now. Old installers are listed for a delete OK, never deleted here.
+
+GPU runtime pack (dictado-7e1): the app has no CUDA DLLs; the gate checks the pack matches the manifest,
+is published where the app downloads it, and that the built app runs on the GPU with only the pack.
+After the install it waits for the app to have the runtime and runs the installed app's GPU selftest.
 """
 from __future__ import annotations
 
@@ -15,9 +20,12 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.request
 from pathlib import Path
 
 APP = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(APP))
+from ecoscribe import gpu_runtime  # noqa: E402
 LOCAL = Path(os.environ.get("LOCALAPPDATA", Path.home()))
 DATA = LOCAL / "ecoscribe"
 APPDIR = LOCAL / "Programs" / "Ecoscribe"
@@ -51,11 +59,20 @@ def pid_alive(pid) -> bool:
         return False
 
 
-def check_disk(setup: Path, free=None) -> tuple[bool, str]:
+def check_disk(setup: Path, free=None, runtime: int = 0) -> tuple[bool, str]:
+    """runtime: bytes the GPU runtime still needs on this PC (zip + unpacked), 0 when it is there."""
     size = setup.stat().st_size
     free = shutil.disk_usage(LOCAL).free if free is None else free
-    ok = free >= ROOM * size
-    return ok, f"{free / 1e9:.1f} GB free, needs {ROOM * size / 1e9:.1f} GB ({ROOM}x the {size / 1e9:.2f} GB installer)"
+    need = ROOM * size + runtime
+    ok = free >= need
+    extra = f" + {runtime / 1e9:.1f} GB GPU runtime" if runtime else ""
+    return ok, f"{free / 1e9:.1f} GB free, needs {need / 1e9:.1f} GB ({ROOM}x the {size / 1e9:.2f} GB installer{extra})"
+
+
+def runtime_need(m: dict | None, data: Path | None = None) -> int:
+    if not m or gpu_runtime.installed(data or DATA, m):
+        return 0
+    return int(m["size"]) + gpu_runtime.unpacked_bytes(m)
 
 
 def check_no_meeting(path: Path = DATA / "meetings.json", alive=pid_alive) -> tuple[bool, str]:
@@ -88,21 +105,113 @@ def check_tests() -> tuple[bool, str]:
     return r.returncode == 0, f"{tail} ({time.monotonic() - t0:.0f} s)"
 
 
-def check_selftest(dist: Path = OUT / "dist" / "Ecoscribe") -> tuple[bool, str]:
-    """The built app (before it's installed) loads CUDA from its own folder, with a clean PATH, and transcribes."""
-    exe, out = dist / "Ecoscribe.exe", OUT / "selftest-gate.json"
+def selftest(exe: Path, out: Path, runtime: Path | None = None, run=subprocess.run) -> dict:
+    """Run `exe --selftest` with a clean PATH (nothing CUDA from this PC's tools), its JSON result or {}.
+    runtime: the GPU runtime folder to hand it (ECOSCRIBE_GPU_RUNTIME); None: the one it finds itself."""
+    env = {k: v for k, v in os.environ.items() if k.upper() not in ("PATH", gpu_runtime.ENV_DIR)}
+    env["PATH"] = r"C:\Windows\System32;C:\Windows"
+    if runtime is not None:
+        env[gpu_runtime.ENV_DIR] = str(runtime)
+    Path(out).unlink(missing_ok=True)
+    run([str(exe), "--selftest", str(FIX), "--out", str(out)], env=env, timeout=240)
+    try:
+        return json.loads(Path(out).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def judge_selftest(d: dict, runtime: Path | None) -> tuple[bool, str]:
+    """On the GPU, heard the fixture, and cuBLAS came from the runtime pack (not from anywhere else)."""
+    if not d:
+        return False, "selftest wrote no result"
+    ok = bool(d.get("ok")) and d.get("device") == "cuda" and "climbing session" in d.get("text", "")
+    where = d.get("gpu_runtime")
+    if runtime is not None and (not where or Path(where).resolve() != Path(runtime).resolve()):
+        ok = False
+    if "cublas64_12.dll" not in (d.get("nvidia_dlls") or []):
+        ok = False
+    detail = f"device {d.get('device')}, {d.get('ms')} ms, CUDA from {where or 'nowhere'}"
+    return ok, detail + ("" if ok else f", {d.get('error') or d.get('text')}")
+
+
+def check_split(dist: Path | None = None, m: dict | None = None) -> tuple[bool, str]:
+    """The built app carries no CUDA DLL of the pack: that is what keeps the installer small."""
+    import runtime_pack
+    dist = dist or OUT / "dist" / "Ecoscribe"
+    m = m or gpu_runtime.manifest()
+    if not m:
+        return False, "no ecoscribe/gpu_runtime.json"
+    if not dist.is_dir():
+        return False, f"no build at {dist}"
+    stray = runtime_pack.bundled(dist, m)
+    return not stray, "no CUDA DLLs in the app" if not stray else f"in the app: {', '.join(stray)}"
+
+
+def runtime_zip(m: dict) -> Path:
+    return OUT / m["asset"]
+
+
+def check_runtime_pack(m: dict | None = None) -> tuple[bool, str]:
+    """The pack next to the installer is byte for byte the one the app's manifest names."""
+    import runtime_pack
+    m = m or gpu_runtime.manifest()
+    if not m:
+        return False, "no ecoscribe/gpu_runtime.json"
+    zp = runtime_zip(m)
+    if not zp.exists():
+        return False, f"no {zp.name} in {OUT} (tools/build.py --runtime)"
+    if zp.stat().st_size != m["size"] or runtime_pack.sha256(zp) != m["sha256"]:
+        return False, f"{zp.name} differs from the manifest (size or sha256)"
+    return True, f"{zp.name}, {m['size'] / 1e6:.0f} MB, matches version {m['version']}"
+
+
+def published_size(url: str, opener=urllib.request.urlopen) -> int | None:
+    """The size of the file at `url` (one byte asked for, the total read from Content-Range), None if it isn't there."""
+    req = urllib.request.Request(url, headers={"Range": "bytes=0-0", "User-Agent": "Ecoscribe-gate"})
+    try:
+        with opener(req, timeout=30) as r:
+            rng = r.headers.get("Content-Range") or ""
+            if "/" in rng:
+                return int(rng.rsplit("/", 1)[1])
+            n = r.headers.get("Content-Length")
+            return int(n) if n is not None else None
+    except Exception:
+        return None
+
+
+def check_runtime_published(m: dict | None = None, opener=urllib.request.urlopen) -> tuple[bool, str]:
+    """Every PC without the runtime downloads it from the manifest's URL: it must be there before an
+    installer that needs it goes out."""
+    import runtime_pack
+    m = m or gpu_runtime.manifest()
+    if not m:
+        return False, "no ecoscribe/gpu_runtime.json"
+    size = published_size(m["url"], opener)
+    if size == m["size"]:
+        return True, f"release {runtime_pack.tag(m['version'])} has {m['asset']}"
+    what = "missing" if size is None else f"{size} bytes, not {m['size']}"
+    return False, (f"{m['asset']} {what} at {m['url']}: upload it once, see 'GPU runtime release' in "
+                   "tools/build.py")
+
+
+def check_selftest(dist: Path | None = None, m: dict | None = None) -> tuple[bool, str]:
+    """The built app (before it's installed), with a clean PATH and only the GPU runtime pack unpacked
+    next to the build, loads CUDA from the pack and transcribes on the GPU."""
+    dist = dist or OUT / "dist" / "Ecoscribe"
+    exe = dist / "Ecoscribe.exe"
     if not exe.exists():
         return False, f"no build at {exe}"
-    env = {k: v for k, v in os.environ.items() if k.upper() != "PATH"}
-    env["PATH"] = r"C:\Windows\System32;C:\Windows"
-    out.unlink(missing_ok=True)
-    subprocess.run([str(exe), "--selftest", str(FIX), "--out", str(out)], env=env, timeout=240)
-    try:
-        d = json.loads(out.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return False, "selftest wrote no result"
-    ok = d.get("ok") and d.get("device") == "cuda" and "climbing session" in d.get("text", "")
-    return bool(ok), f"device {d.get('device')}, {d.get('ms')} ms" + ("" if ok else f", {d.get('error') or d.get('text')}")
+    m = m or gpu_runtime.manifest()
+    if not m:
+        return False, "no ecoscribe/gpu_runtime.json"
+    data = OUT / "gate-runtime"
+    rt = gpu_runtime.folder(data, m)
+    if gpu_runtime.check(rt, m, full=True) is not None:
+        zp = runtime_zip(m)
+        if not zp.exists():
+            return False, f"no {zp.name} to run the selftest with"
+        rt = gpu_runtime.unpack(zp, data, m)
+    return judge_selftest(selftest(exe, OUT / "selftest-gate.json", runtime=rt), rt)
 
 
 def old_installers(keep: Path) -> list[Path]:
@@ -133,11 +242,47 @@ def install(setup: Path, version: str) -> tuple[bool, dict]:
     return False, s or {"installer exit code": r.returncode}
 
 
+def wait_runtime(m: dict, minutes: float = 20, data: Path | None = None, clock=time.monotonic,
+                 sleep=time.sleep) -> tuple[bool, str]:
+    """After the install: the app fetches the GPU runtime (or takes it from the old install folder).
+    Waits for it, then checks every file's sha256."""
+    data = data or DATA
+    end, st = clock() + minutes * 60, {}
+    while clock() < end:
+        if gpu_runtime.installed(data, m):
+            why = gpu_runtime.check(gpu_runtime.folder(data, m), m, full=True)
+            return why is None, f"runtime {m['version']} in {gpu_runtime.folder(data, m)}" + (f": {why}" if why else "")
+        st = status().get("gpu_runtime") or {}
+        if st.get("state") in ("no_gpu", "old_driver"):
+            return False, f"the app fetches no runtime here: {st['state']}"
+        sleep(5)
+    return False, f"no runtime after {minutes:.0f} min (status: {st or 'none'})"
+
+
+def after_install(m: dict | None) -> list[tuple[str, bool, str]]:
+    """The installed app has the GPU runtime and its own selftest runs on the GPU from it."""
+    if not m:
+        return [("GPU runtime present", False, "no ecoscribe/gpu_runtime.json")]
+    ok, detail = wait_runtime(m)
+    out = [("GPU runtime present", ok, detail)]
+    if ok:
+        rt = gpu_runtime.folder(DATA, m)
+        ok, detail = judge_selftest(selftest(APPDIR / "Ecoscribe.exe", OUT / "selftest-installed.json"), rt)
+        out.append(("installed app GPU selftest", ok, detail))
+    return out
+
+
 def run(setup: Path, do_install: bool) -> int:
-    checks = [("disk room", lambda: check_disk(setup)),
+    global OUT
+    OUT = Path(setup).resolve().parent  # the build folder: dist, the pack and the selftest results live here
+    m = gpu_runtime.manifest()
+    checks = [("disk room", lambda: check_disk(setup, runtime=runtime_need(m))),
               ("no meeting live", check_no_meeting),
               ("version", lambda: check_version(setup)),
               ("unit tests", check_tests),
+              ("app without CUDA DLLs", check_split),
+              ("GPU runtime pack", check_runtime_pack),
+              ("GPU runtime published", check_runtime_published),
               ("built app selftest", check_selftest)]
     failed = []
     for name, fn in checks:
@@ -165,10 +310,17 @@ def run(setup: Path, do_install: bool) -> int:
     if not do_install:
         return 0
     ok, s = install(setup, version)
+    post = after_install(m) if ok else []
+    for name, good, detail in post:
+        print(f"{'PASS' if good else 'FAIL'}  {name}: {detail}", flush=True)
+    gpu_ok = all(good for _, good, _ in post)
     print(f"Installed: {'yes' if ok else 'no'}, {version}, {when}")
     print(f"Running now: {'yes' if s.get('state') == 'ready' else 'no'}")
-    print(f"Checked by: status.json says {s.get('state')} on {s.get('device')}, version {s.get('version')}")
-    return 0 if ok else 1
+    print(f"Checked by: status.json says {s.get('state')} on {s.get('device')}, version {s.get('version')}"
+          + (f"; {post[-1][2]}" if post else ""))
+    if ok and not gpu_ok:
+        print("Left: the GPU check after the install failed (see FAIL above); the app runs, on the CPU until fixed")
+    return 0 if ok and gpu_ok else 1
 
 
 if __name__ == "__main__":

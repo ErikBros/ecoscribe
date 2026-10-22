@@ -237,6 +237,7 @@ class EngineProxy:
         self._lock = threading.RLock()  # one request at a time
         self._spawn_lock = threading.Lock()  # the worker handle; never held for long
         self._last = clock()
+        self._renew = False  # the GPU runtime arrived: a worker started on the CPU makes way (dictado-7e1)
         self._closed = threading.Event()
         if check_s:
             threading.Thread(target=self._watch, args=(check_s,), name="ecoscribe-engine-idle", daemon=True).start()
@@ -386,11 +387,24 @@ class EngineProxy:
         finally:
             self._lock.release()
 
+    def renew(self) -> None:
+        """The GPU runtime is there now (dictado-7e1): retire the current worker as soon as no dictation
+        uses it, so the next one starts on the GPU. Never cuts a transcription short."""
+        self._renew = True
+        self.check_idle()
+
     def check_idle(self) -> None:
         if not self._lock.acquire(blocking=False):
-            return  # a transcription is running: not idle
+            return  # a transcription is running: not idle (a pending renew waits for the next check)
         try:
             with self._spawn_lock:
+                if self._renew:
+                    self._renew = False
+                    if self._w is not None:
+                        log.info("GPU runtime ready: retiring the engine worker, the next one starts on the GPU")
+                        self._w.kill()
+                        self._w = None
+                    return
                 if self._w is not None and self.clock() - self._last >= self.cfg.idle_exit_s:
                     log.info("engine idle %.0f s: stopping the worker to free memory", self.clock() - self._last)
                     self._w.kill()

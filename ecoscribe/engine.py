@@ -110,6 +110,10 @@ class Engine:
                 log.info("the GPU failed before on this PC (%s): small/cpu", self.skip_gpu)
                 self._cpu(self.skip_gpu)
                 return
+            if self.cfg.device == "cuda" and (why := self.runtime_missing()):  # dictado-7e1: CUDA DLLs on their way
+                log.info("%s: small/cpu until it is there", why)
+                self._cpu(why)
+                return
             try:
                 name, compute_type = dictation_model(self.cfg)
                 self.model = self._make(name, self.cfg.device, compute_type)
@@ -125,6 +129,12 @@ class Engine:
                 log.error("whisper on %s failed (%s: %s); falling back to small/cpu", self.cfg.device,
                           type(e).__name__, e)
                 self._cpu(f"{type(e).__name__}: {e}")
+
+    @staticmethod
+    def runtime_missing() -> str | None:
+        """Why CUDA can't load yet on an installed app without the GPU runtime pack (gpu_runtime.py)."""
+        from .gpu_runtime import missing
+        return missing()
 
     def _cpu(self, reason: str) -> None:
         self.fallback_reason = reason

@@ -55,6 +55,11 @@ def remember_bad(data: Path, app_version: str, driver: int | None, reason: str) 
 
 def notice(reason: str | None, driver: int | None = None) -> str:
     """One line for the user about dictating on the CPU."""
+    from .gpu_runtime import MIN_DRIVER, MISSING
+    if reason == MISSING and driver and driver < MIN_DRIVER:
+        reason = "CUDA driver version is insufficient for CUDA runtime version"
+    elif reason == MISSING and driver:  # dictado-7e1: the CUDA libraries are being downloaded, once
+        return "Getting Ecoscribe's GPU part (one download). Dictating on the CPU, slower, until it's there."
     if reason and "driver version is insufficient" in reason.lower():
         have = f" (it supports CUDA {_version(driver)})" if driver else ""
         return (f"Your NVIDIA driver is too old for Ecoscribe{have}: update it from nvidia.com/drivers. "
