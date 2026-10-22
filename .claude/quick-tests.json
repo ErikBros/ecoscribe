@@ -1,0 +1,4 @@
+[
+  {"paths": ["ecoscribe/web/"], "cmd": "bash tools/quick_tests.sh js"},
+  {"paths": ["ecoscribe/", "tools/"], "cmd": "bash tools/quick_tests.sh py"}
+]
