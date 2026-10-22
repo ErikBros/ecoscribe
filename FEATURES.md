@@ -44,6 +44,7 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | File transcription (drag and drop) | done | done (installed app: Greek file on the Apple GPU, 2.4% WER) |
 | First-run setup: languages, speech models (both recommended, with download progress), mic test, dictation key, a first dictation, summary; Settings > Run setup again | done | done (checked with a fresh data folder: both models downloaded with a moving bar, the first dictation pasted into the box) |
 | Crash reports, freeze traces, watchdog restart | done | done |
+| Last snapshot before a frozen app is restarted (every thread's stack, log tail, versions, state; reports kept to the newest 20, 50 MB), and a counts-only health check by version in crashes/health.md (starts, crashes, freezes, restarts; no text) (dictado-dhr) | done | check on Mac (shared code; the last snapshot also sends SIGUSR1 for the native dump) |
 | A newer version is out: once a day the app asks GitHub for the latest release (no account, errors silent), Home shows it with Download (the release page: .exe and .dmg) and ×; Settings > Check for new versions (updates.py) | done (dictado-cjk) | check on Mac (shared code, dictado-cjk) |
 | Dictation recovered after a crash | done | done (real crash mid-dictation: back in History, not pasted) |
 | Home crash card, Settings > Troubleshooting | done | done (real SIGSEGV of the installed app: report, restart, card) |

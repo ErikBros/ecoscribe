@@ -164,11 +164,16 @@ def test_frozen_past_hang_s_is_killed_reported_and_restarted(tmp_path):
     t[0] += 30
     assert sup.step() == "ok" and procs.killed == [] and spawned == []  # watched 30 s: not yet
     t[0] += 31
+    assert sup.step() == "ok" and procs.killed == [] and fw.request().exists()  # first a last snapshot
+    final = fw.check()  # the app's freeze thread answers with every thread's stack
+    assert final == fw.final() and final.exists() and not fw.request().exists()
     assert sup.step() == "ok" and procs.killed == [100]
     [rep] = crash.reports(data)
     assert spawned == [["--restarted", "--after-crash", str(rep)]]
-    assert "Frozen" in (rep / "report.md").read_text(encoding="utf-8")
-    assert (rep / dump.name).exists() and not fw.marker().exists()
+    text = (rep / "report.md").read_text(encoding="utf-8")
+    assert "Frozen" in text and "last snapshot, right before the restart" in text
+    assert (rep / dump.name).exists() and (rep / final.name).exists() and not fw.marker().exists()
+    assert crash.health(data)["1.4.1"]["freezes_restarted"] == 1
 
 
 def test_hang_check_is_off_without_hang_s(tmp_path):
@@ -227,7 +232,46 @@ def test_windows_frozen_app_is_killed_too(tmp_path):
     sup.step()
     t[0] += 61
     sup.step()
+    assert killed == [] and (m.parent / "dump-100").exists()  # asks for a last snapshot first
+    t[0] += 1
+    sup.step()
+    assert killed == []  # still waiting for it
+    t[0] += 3
+    sup.step()  # no snapshot came (the whole app stuck): killed anyway
     assert killed == [100] and spawned and spawned[0][:2] == ["--restarted", "--after-crash"]
+    [rep] = crash.reports(data)
+    assert "No last snapshot came" in (rep / "report.md").read_text(encoding="utf-8")
+    assert not (m.parent / "dump-100").exists()
+
+
+def test_frozen_app_that_answers_during_the_snapshot_is_not_killed(tmp_path):
+    sup, procs, spawned, data, t = mac_setup(tmp_path, hang_s=60)
+    fw = crash.FreezeWatch(data, 100, limit_s=3.0, clock=lambda: t[0])
+    t[0] += 5
+    fw.check()
+    sup.step()
+    t[0] += 61
+    sup.step()
+    assert fw.request().exists()
+    fw.beat()  # the main thread answers again
+    t[0] += 5
+    assert sup.step() == "ok" and procs.killed == [] and spawned == [] and not fw.request().exists()
+
+
+def test_crashes_and_give_ups_are_counted_by_version(tmp_path):
+    sup, procs, spawned, data, t = setup(tmp_path)
+    for i, pid in enumerate((100, 201, 202)):
+        if i:
+            status(data, pid=pid, state="ready")
+            procs.live.add(pid)
+            sup.step()
+        procs.end(pid, 0xC0000005)
+        sup.step()
+        t[0] += 60
+    h = crash.health(data)["1.4.1"]
+    assert h["crashes"] == 3 and h["gave_up"] == 1 and h["freezes_restarted"] == 0
+    md = (crash.crashes_dir(data) / "health.md").read_text(encoding="utf-8")
+    assert "| 1.4.1 | 0 | 3 | 0 | 0 | 1 |" in md
 
 
 def test_winproc_kill_ends_a_real_process():
