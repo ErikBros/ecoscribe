@@ -87,7 +87,8 @@ def test_search_finds_lines_with_time_and_speaker(tmp_path):
     make(tmp_path, "Planering", 3, segs=[{"t0": 0, "t1": 1, "text": "Inget om det.", "speaker": "Me"}])
     text = call(tmp_path, "search_meetings", text="RELEASEN")["content"][0]["text"]
     hits = json.loads(text)
-    assert len(hits) == 1 and hits[0]["title"] == "Retro" and hits[0]["at"] == "00:00:01" and hits[0]["speaker"] == "Ana"
+    assert len(hits) == 1 and hits[0]["title"] == "Retro"
+    assert hits[0]["hits"][0]["at"] == "00:00:01" and hits[0]["hits"][0]["speaker"] == "Ana"
 
 
 def test_runs_as_a_real_process(tmp_path):

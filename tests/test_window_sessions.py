@@ -39,6 +39,14 @@ def test_list_newest_first_and_search(env):
     assert [r["title"] for r in api.list_sessions("plan")["items"]] == ["Planering"]
 
 
+def test_the_search_box_finds_what_was_said_without_accents(env):
+    api, root, *_ = env
+    make(root, "Planering", 1, segs=[{"t0": 0, "t1": 2, "text": "Vi ses i Göteborg på måndag.", "speaker": "Me"}])
+    make(root, "Retro", 2, segs=[{"t0": 0, "t1": 2, "text": "Inget särskilt.", "speaker": "Me"}])
+    assert [r["title"] for r in api.list_sessions("goteborg mandag")["items"]] == ["Planering"]
+    assert [r["title"] for r in api.list_sessions("RETRO")["items"]] == ["Retro"]
+
+
 def test_get_session_and_copy(env):
     api, root, _, copied, _ = env
     d = make(root, "Retro", 2, segs=[{"t0": 0, "t1": 2, "text": "Hej", "speaker": "Others"}])

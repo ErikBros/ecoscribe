@@ -16,7 +16,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import __version__, commands, config, diarize, hotkeys, export, ipc, meetings, paths, sessions, status, tomlw
+from . import __version__, commands, config, diarize, hotkeys, export, ipc, meetings, paths, search, sessions, status, tomlw
 from .languages import ALL as ALL_LANGS, BASE as BASE_LANGS, available, meeting_options, valid_extra, valid_meeting_lang
 from .routing import LANG_NAMES
 
@@ -475,10 +475,23 @@ class Api:
                 "people": list((m.get("calendar") or {}).get("attendees") or []), "app": m.get("app")}  # dictado-6oe.4
 
     def list_sessions(self, query: str = "") -> dict:
-        q = str(query or "").strip().lower()
+        """The search box finds a title or anything said in the call, accents and case ignored (dictado-8h8)."""
+        q = str(query or "").strip()
         me = self._me()
         rows = [self._row(m, me) for m in sessions.list_sessions(self._root())]
-        return {"items": [r for r in rows if not q or q in r["title"].lower()], "state": self.meetings_state()}
+        if q:
+            said = set()
+            try:
+                idx = search.open_index(self._root())
+                try:
+                    said = idx.session_ids(q)
+                finally:
+                    idx.close()
+            except Exception:
+                log.exception("meeting search failed; titles only")
+            fq = search.fold(q)
+            rows = [r for r in rows if fq in search.fold(r["title"]) or r["name"] in said]
+        return {"items": rows, "state": self.meetings_state()}
 
     def get_session(self, name: str) -> dict:
         d = self._session(name)
