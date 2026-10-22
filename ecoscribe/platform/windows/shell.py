@@ -500,10 +500,15 @@ class Tray:
             pystray.MenuItem("Open log", lambda: os.startfile(str(log_path))),
             pystray.MenuItem("Quit", lambda: on_quit()),
         )
-        self.icon = pystray.Icon("ecoscribe", self._images["idle"], "Ecoscribe", menu)
+        from .trayicon import cached
+        self._state = "idle"
+        self.icon = cached(pystray.Icon)("ecoscribe", self._images["idle"], "Ecoscribe", menu)
         threading.Thread(target=self.icon.run, name="ecoscribe-tray", daemon=True).start()
 
     def set_state(self, state: str) -> None:
+        if state == self._state:  # nothing to redraw
+            return
+        self._state = state
         try:
             self.icon.icon = self._images.get(state, self._images["idle"])
         except Exception:
