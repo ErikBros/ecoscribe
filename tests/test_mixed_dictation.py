@@ -60,10 +60,27 @@ def test_a_disagreeing_piece_is_checked_again_the_full_way():
         if not full and abs(float(np.median(chunk)) - LEVEL["el"]) < 0.01:
             return "en"  # the quick way gets the Greek piece wrong...
         return min(LEVEL, key=lambda k: abs(LEVEL[k] - float(np.median(chunk))))  # ...the full way doesn't
-    e._detect = detect
+    e._detect_how = lambda chunk, langs, full=False: (detect(chunk, langs, full), full)
     assert e.language_runs(recording(), ["en", "es", "sv", "el"]) == [(0.0, 10.0, "es"), (10.2, 16.0, "el"),
                                                                         (16.2, 24.0, "es")]
     assert seen.count(True) == 1  # only the piece that disagreed paid for the full check
+
+
+def test_a_piece_already_checked_the_full_way_is_not_asked_again():
+    """dictado-8iu: an unsure quick answer already went the full way; the full check gives the same
+    answer on a repeat, so a disagreeing piece answered that way isn't checked a second time."""
+    e = engine()
+    seen = []
+
+    def detect_how(chunk, langs, full=False):
+        lang = min(LEVEL, key=lambda k: abs(LEVEL[k] - float(np.median(chunk))))
+        greek = lang == "el"
+        seen.append(("full" if full or greek else "quick", lang))
+        return lang, full or greek  # the Greek piece was unsure: _detect_how already went the full way
+    e._detect_how = detect_how
+    assert e.language_runs(recording(), ["en", "es", "sv", "el"]) == [(0.0, 10.0, "es"), (10.2, 16.0, "el"),
+                                                                        (16.2, 24.0, "es")]
+    assert seen.count(("full", "el")) == 1 and len(seen) == 4  # one ask per piece, none repeated
 
 
 def test_no_mixing_when_forced_single_language_short_or_preview():
