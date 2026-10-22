@@ -255,6 +255,13 @@ def test_summary_prompt_says_which_meeting_and_opens_it(tmp_path):  # dictado-nl
     assert [c for _l, c in p.buttons] == ["abrir", "hide"]
 
 
+def test_command_mode_off_says_where_to_turn_it_on():  # dictado-1b7
+    p = meetui.Prompt("cmdoff", None, None, opened_at=0.0)
+    assert p.title == "Command mode is off"
+    assert "Settings" in p.question and "[" not in p.question and "command_mode" not in p.question
+    assert p.buttons == [("Open Settings", "claude"), ("Close", "hide")] and p.expired(1000.0) == "hide"
+
+
 def test_nomic_prompt_names_the_mic():
     p = meetui.Prompt("nomic", "Zone Vibe 100", None, opened_at=0.0)
     assert "Zone Vibe 100" in p.question and [c for _l, c in p.buttons] == ["mic", "hide"]

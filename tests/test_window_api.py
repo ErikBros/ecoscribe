@@ -432,3 +432,13 @@ def test_claude_switches_round_trip_with_their_phrase_list(api):  # dictado-bd6
     assert api.save_settings({"self_corrections": True, "command_mode": True})["ok"]
     c = config.load(api._config_path)
     assert c.text.self_corrections is True and c.text.command_mode is True
+
+
+def test_an_open_window_takes_the_page_it_was_asked_for_once(tmp_path, monkeypatch):  # dictado-1b7
+    from ecoscribe import ipc, paths
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path)
+    api = Api(data_dir=tmp_path)
+    assert api.take_page() is None
+    ipc.ask_page("ajustes/claude")
+    assert api.take_page() == "ajustes/claude"
+    assert api.take_page() is None  # once

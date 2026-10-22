@@ -178,7 +178,8 @@ def _which(d: str | None) -> str:
 
 class Prompt:
     """kind: start (a call began) | end? (long silence) | done | failed (a transcript ended) |
-    summary (its summary is written) | nomic (dictation heard nothing twice)."""
+    summary (its summary is written) | nomic (dictation heard nothing twice) |
+    cmdoff (the command-mode keys were pressed while it is off)."""
 
     def __init__(self, kind: str, app: str | None, lang: str | None, opened_at: float):
         self.kind, self.app, self.lang, self.opened_at = kind, app, lang, opened_at
@@ -191,6 +192,10 @@ class Prompt:
         elif kind == "nomic":  # two dictations in a row heard nothing (dictado-99x); app = the mic's name
             self.title, self.question = "Didn't hear you, twice", f"Nothing came through {app}. Wrong or muted mic?"
             self.buttons = [("Check the mic", "mic"), ("Close", "hide")]
+        elif kind == "cmdoff":  # dictado-1b7: the keys say the user wants it; say where it is
+            self.title = "Command mode is off"
+            self.question = "Turn on \u201cChange selected text by voice\u201d in Settings to use it."
+            self.buttons = [("Open Settings", "claude"), ("Close", "hide")]
         elif kind == "done":
             self.title, self.question = "Transcript ready", _which(app)
             self.buttons = [("Open", "abrir"), ("Close", "hide")]
