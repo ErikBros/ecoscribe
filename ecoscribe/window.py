@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import re
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -79,6 +80,21 @@ else:  # ecoscribe/platform/windows/desktop.py + procs.py
     from .platform.windows.desktop import reveal as _reveal
     from .platform.windows.desktop import startfile as _startfile
     from .platform.windows.procs import alive as _pid_alive
+
+
+def _gpu() -> str:
+    """The NVIDIA card and driver, and the newest CUDA the driver runs (Ecoscribe needs 12): debug info."""
+    from . import gpu
+    if sys.platform != "win32":
+        return "n/a"
+    try:
+        out = subprocess.run(["nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader"],
+                             capture_output=True, text=True, timeout=5,
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        out = ""
+    cuda = gpu.driver_cuda()
+    return f"{out or 'no NVIDIA card found'}; driver runs CUDA {gpu._version(cuda) if cuda else 'none'}"
 
 
 def _platform() -> str:
@@ -876,11 +892,12 @@ class Api:
         reps = crash.reports(d)[:5]
         live = sorted((crash.crashes_dir(d) / "live").glob("freeze-*.log")) if (crash.crashes_dir(d) / "live").exists() else []
         parts = [f"Ecoscribe debug info. Please find what's wrong. Data folder: {d}", "",
-                 f"Version: {__version__}", f"Platform: {_platform()}", f"Status: {json.dumps(status.read(d / 'status.json') or {}, ensure_ascii=False)}", "",
+                 f"Version: {__version__}", f"Platform: {_platform()}", f"GPU: {_gpu()}", f"Status: {json.dumps(status.read(d / 'status.json') or {}, ensure_ascii=False)}", "",
                  "Recent crashes: " + (", ".join(p.name for p in reps) or "none"),
                  "Freezes recorded: " + (", ".join(p.name for p in live[-5:]) or "none"), "",
                  "## config.toml (calendar link removed)", "```", cfg.strip(), "```", ""]
-        logs = (("ecoscribe.log", 200), ("engine-worker.log", 40), ("supervisor.log", 30), ("detect.log", 20))
+        logs = (("ecoscribe.log", 200), ("engine-worker.log", 40), ("engine-worker-fault.log", 60),
+                ("gpu-failed.json", 5), ("supervisor.log", 30), ("detect.log", 20))
         if sys.platform == "darwin":  # native libraries (MLX, PyObjC) print their errors to stderr.log
             logs += (("stderr.log", 40),)
         for name, n in logs:

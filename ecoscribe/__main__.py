@@ -351,7 +351,14 @@ def main(argv=None) -> int:
 
     if cfg.whisper.on_demand:  # the model lives in a worker started at the tap, gone after idle
         from .engine_proc import EngineProxy, spawn_worker
-        engine = EngineProxy(cfg.whisper, cfg.text,
+        def on_device(device, fallback):  # the status and the user learn where dictation really runs (dictado-kux)
+            from . import gpu
+            status.write(status_path, device=device, fallback=fallback,
+                         model="small" if fallback else dictation_model(cfg.whisper)[0])
+            if fallback:
+                log.warning("dictating on %s: %s", device, fallback)
+                ui.flash(gpu.notice(fallback, gpu.driver_cuda()), 10.0)
+        engine = EngineProxy(cfg.whisper, cfg.text, on_device=on_device,
                              spawn=lambda: spawn_worker(args.config))  # the worker reads the same config
     else:
         engine = Engine(cfg.whisper, cfg.text)
