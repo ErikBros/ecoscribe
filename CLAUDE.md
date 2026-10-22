@@ -34,6 +34,7 @@ outcomes in plain words and only real choices (money, publishing, his desktop, w
     call it done only after he approves. Logic-only PRs skip this. `tools/before_after.py` builds the
     page (every window page at 980/1470/1920 px, only what changed, slider, Approve / Not this); write it
     into his local decision-page folder so his answer is saved (his personal CLAUDE.md has where).
+    Before showing it, the change passes `docs/look-checklist.md` (`npm run look` checks the testable part).
 11. **Installs on Erik's PC.** Check `%LOCALAPPDATA%\ecoscribe\meetings.json` before installing or
     restarting; never during a live meeting (the installer also waits). Builds leave ~0.5 GB installers
     in the build folder and Downloads: check C: free space before a build and offer to delete old Setups.
