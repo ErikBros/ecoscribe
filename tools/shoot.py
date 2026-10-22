@@ -30,7 +30,7 @@ SHOTS = {
     "historial-editar": "page=historial&hedit=1", "historial-aprender": "page=historial&learn=1",
     "insights": "page=insights&insights=1",
 }
-TALL = {"ajustes-largo": "page=ajustes&dirty=1", "ajustes-frases": "page=ajustes&sc=1", "insights-largo": "page=insights&insights=1"}
+TALL = {"inicio-largo": "page=inicio", "ajustes-largo": "page=ajustes&dirty=1", "ajustes-frases": "page=ajustes&sc=1", "insights-largo": "page=insights&insights=1"}
 
 
 def shot(web: Path, query: str, out: Path, size=(980, 690), scale=1.0) -> Path:

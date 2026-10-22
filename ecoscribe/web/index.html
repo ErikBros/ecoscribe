@@ -89,6 +89,18 @@
           <div class="home-tip" id="home-tip" hidden><p id="home-tip-text"></p><button type="button" class="home-tip-x" id="home-tip-x" aria-label="Hide this tip" title="Don't show this tip again">×</button></div>
         </div>
       </div>
+
+      <section class="card todos" id="todos" data-card="todos" hidden aria-labelledby="todos-title">  <!-- dictado-xuu: your own to-dos from the week's call summaries -->
+        <div class="todos-head">
+          <div class="todos-heading"><h3 id="todos-title">Your to-dos this week</h3><span class="muted small" id="todos-sub"></span></div>
+          <div class="segmented todos-weeks" role="radiogroup" aria-label="Week" id="todos-weeks">
+            <button type="button" class="seg" role="radio" data-back="0" aria-checked="true">This week</button>
+            <button type="button" class="seg" role="radio" data-back="1" aria-checked="false">Last week</button>
+          </div>
+        </div>
+        <div class="todos-people" id="todos-people"></div>
+        <p class="muted todos-empty" id="todos-empty" hidden></p>
+      </section>
     </section>
 
     <!-- REUNIONES -->

@@ -15,6 +15,7 @@ import re
 import subprocess
 import sys
 import time
+from datetime import date, timedelta
 from pathlib import Path
 
 from . import __version__, commands, config, diarize, hotkeys, export, ipc, meetings, paths, search, sessions, status, tomlw
@@ -585,6 +586,23 @@ class Api:
         return {"session": self._row(m, self._me()), "segments": export.turns(segs),  # read in turns, like the .md
                 "notes": export.read_notes(d), "summary": summ,
                 "exports": [p.name for p in d.glob("transcript.*") if p.suffix in (".txt", ".md", ".srt")]}
+
+    def week_todos(self, back: int = 0) -> dict:
+        """Home > the week's own to-dos from call summaries, by person (dictado-xuu). back=1: last week."""
+        from . import todos
+        cfg = self._load()
+        start = todos.monday(date.today()) - timedelta(days=7 * max(0, int(back or 0)))
+        w = todos.week(self._root(), cfg, start, self._data_dir / todos.DIR)
+        w.update(enabled=cfg.summaries.enabled, back=max(0, int(back or 0)))
+        return w
+
+    def todo_done(self, key: str, done: bool = True) -> dict:
+        """A to-do's tick on Home, kept in <data>/todos/done.json."""
+        from . import todos
+        if not str(key or "").strip():
+            return {"ok": False, "error": "Which to-do?"}
+        todos.set_done(self._data_dir / todos.DIR, str(key), bool(done))
+        return {"ok": True}
 
     def get_live(self, name: str, since: int = 0) -> dict:
         """live.jsonl lines after the first `since`: a 2-hour meeting is never re-sent whole."""

@@ -590,5 +590,29 @@ async function load(query) {
   await sleep(300);
   check(none.doc.querySelector("#r-replace").hidden, "nothing matches: no offer");
 }
+{ // Home > your own to-dos from the week's call summaries, by person (dictado-xuu)
+  const { window, doc } = await load("page=inicio");
+  await sleep(200);
+  const box = doc.querySelector("#todos");
+  const people = () => [...doc.querySelectorAll(".todo-person strong")].map((e) => e.textContent);
+  check(box && !box.hidden && people().join("|") === "Ana|Mia and Leo|Tom", "the week's to-dos show, one column per person: " + people());
+  check(doc.querySelector("#todos-sub").textContent.startsWith("6 of 7 still to do · from 4 calls"), "it says how many are left: " + doc.querySelector("#todos-sub").textContent);
+  check(doc.querySelector(".todo.unchecked .r-sum-miss")?.textContent === "Not found in the call", "a to-do whose words weren't found is marked");
+  const box2 = [...doc.querySelectorAll(".todo-tick input")].find((c) => !c.checked);
+  box2.checked = true; box2.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await sleep(150);
+  check(window.__todoDone && window.__todoDone[1] === true && doc.querySelector("#todos-sub").textContent.startsWith("5 of 7"), "a tick saves and counts it done");
+  doc.querySelector('#todos-weeks [data-back="1"]').click(); await sleep(150);
+  check(doc.querySelector("#todos-title").textContent === "Your to-dos last week" && people().join("|") === "Tom", "Last week shows last week's list");
+  doc.querySelector(".todo-from").click(); await sleep(200);
+  check(!doc.querySelector("#page-reuniones").hidden, "a to-do's call opens on the Meetings page");
+  const lit = await load("page=inicio/todos");
+  await sleep(200);
+  check(lit.doc.querySelector("#todos").classList.contains("card-lit"), "the Sunday notice's Open lands on the card, lit up");
+  const none = await load("page=inicio&todos=0");
+  await sleep(200);
+  check(!none.doc.querySelector("#todos").hidden && !none.doc.querySelector("#todos-empty").hidden
+    && none.doc.querySelector("#todos-empty").textContent.startsWith("None yet this week"), "no to-dos yet: the card says what will show up");
+}
 console.log(failed ? `\n${failed} FAILED` : "\nall ok");
 process.exit(failed ? 1 : 0);
