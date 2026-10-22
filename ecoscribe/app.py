@@ -26,6 +26,7 @@ from .routing import LANG_NAMES  # any language or mix (dictado-ehs)
 KEEP_AUDIO = 20  # dictations whose audio stays for Retry in History (dictado-a2r)
 SR = 16000
 PASTE_KEYS = "⌘V" if sys.platform == "darwin" else "Ctrl+V"  # dictado-cd2: the Mac's own words
+UNDO_S = 60.0  # dictado-ost: "scratch that" alone undoes the last paste this long after it, in the same window
 NOT_PASTED = {"clipboard_busy": "Couldn't paste",
               "no_text_box": f"No text box here: copied, paste with {PASTE_KEYS}"}  # dictado-bhe
 
@@ -33,7 +34,8 @@ NOT_PASTED = {"clipboard_busy": "Couldn't paste",
 class App:
     LIVE_EVERY_S = 2.0  # dictado-live: one quick pass this often while recording
     def __init__(self, cfg, recorder, engine, deliver_fn, ui, gate=None, history_path: Path | None = None,
-                 press_enter=None, screen=None, spool=None, window_title=None, app_id=None):
+                 press_enter=None, screen=None, spool=None, window_title=None, app_id=None, undo=None,
+                 window_now=None):
         self.cfg = cfg
         self.recorder = recorder
         self.engine = engine
@@ -42,6 +44,8 @@ class App:
         self.gate = gate
         self.history_path = history_path
         self.press_enter = press_enter or _press_enter
+        self.undo, self.window_now = undo, window_now  # dictado-ost: Ctrl+Z, the focused window (None: no undo)
+        self._last_paste: tuple | None = None  # (window, when, text) of the last paste
         self.spool = spool  # t0u.37: the recording on disk while it happens, for crash recovery
         self._window_title = window_title  # dictado-9jc.2: None -> ecoscribe.context.foreground_title
         self._app_id = app_id  # dictado-uee: read with the title (context.foreground_app) unless the title is given
@@ -91,6 +95,8 @@ class App:
                 self._cancel()
             elif action == "lang":
                 self.cycle_language()
+            elif action == "repaste":  # off the key thread: the paste waits for the dictation key to be let go
+                threading.Thread(target=self.paste_again, name="ecoscribe-repaste", daemon=True).start()
 
     def set_next_language(self, code: str | None) -> None:
         """The tray's 'Next dictation in': same as the key, picked directly (None = auto)."""
@@ -356,9 +362,19 @@ class App:
         if getattr(self.engine, "device", "cuda") == "cpu" and not self._warned_cpu:
             self._warned_cpu = True
             self.ui.flash("No GPU: slow mode")
+        undo_on = getattr(self.cfg.text, "self_corrections", False) or getattr(self.cfg.text, "voice_commands", False)
+        if res.text and undo_on:
+            from .corrections import scratch_only
+            if scratch_only(res.text):  # dictado-ost: "scratch that" alone takes back the last paste
+                self.undo_last()
+                return
         if res.text and getattr(self.cfg.text, "self_corrections", False):  # dictado-ehc: first, on what was said
             from .corrections import apply
             res = replace(res, text=apply(res.text, self.cfg))
+            if not res.text:  # all of it scratched: nothing to paste, but it was heard
+                self.ui.flash("Scratched", 1.2)
+                log.info("dictation scratched")
+                return
         enter = False
         if res.text and getattr(self.cfg.text, "voice_commands", False):
             from .text import voice_commands
@@ -393,6 +409,7 @@ class App:
             self.press_enter()
         stop_to_paste = int((time.monotonic() - t_stop) * 1000)
         self.last_text = res.text
+        self._last_paste = (getattr(dr, "window", 0), time.monotonic(), res.text) if dr.pasted else None
         if res.lang and "+" not in res.lang:  # a mixed one ("es+el") says nothing about the next
             self.last_lang = res.lang
         note = self._speech_note(res, to) if dr.pasted else None
@@ -409,6 +426,33 @@ class App:
         if not dr.pasted:
             self.ui.flash(NOT_PASTED.get(dr.reason, f"Copied: paste with {PASTE_KEYS}"), 4.0 if dr.reason == "no_text_box" else 2.0)
         return res, audio, dr, words, to
+
+    def undo_last(self) -> bool:
+        """Takes back the last paste with the window's own undo, only in the window it went into and
+        within UNDO_S: anywhere else Ctrl+Z would undo something the user typed."""
+        last, self._last_paste = self._last_paste, None
+        if (self.undo is None or not last or time.monotonic() - last[1] > UNDO_S
+                or (self.window_now is not None and self.window_now() != last[0])):
+            log.info("scratch that: nothing to take back here")
+            self.ui.flash("Nothing to take back here", 2.0)
+            return False
+        ok = bool(self.undo())
+        log.info("scratch that: last paste undone=%s", ok)
+        self.ui.flash("Took back the last dictation" if ok else "Couldn't take it back: press Ctrl+Z", 2.0)
+        return ok
+
+    def paste_again(self) -> None:
+        """Dictation key + R: the last dictation once more, at the cursor."""
+        text = self.last_text
+        if not text:
+            self.ui.flash("Nothing to paste yet", 1.5)
+            return
+        dr = self.deliver(text)
+        log.info("pasted again chars=%d target=%s pasted=%s reason=%s", len(text), dr.target_exe, dr.pasted, dr.reason)
+        if dr.pasted:
+            self._last_paste = (getattr(dr, "window", 0), time.monotonic(), text)
+        else:
+            self.ui.flash(NOT_PASTED.get(dr.reason, f"Copied: paste with {PASTE_KEYS}"), 2.0)
 
     def _speech_note(self, res, to: str) -> str | None:
         if to != "people" or not getattr(self.cfg.ui, "speech_feedback", False):

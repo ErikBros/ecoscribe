@@ -20,7 +20,7 @@ def main():
     root = tk.Tk()
     root.title(a.title)
     root.geometry(f"520x200+{a.x}+{a.y}")
-    text = tk.Text(root, font=("Segoe UI", 11))
+    text = tk.Text(root, font=("Segoe UI", 11), undo=True)  # Ctrl+Z like a real text box (dictado-ost)
     text.pack(fill="both", expand=True)
     text.focus_set()
     last = [None]

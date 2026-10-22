@@ -25,6 +25,10 @@ CAPABILITIES: dict[str, dict] = {
         "windows": "ecoscribe.platform.windows.hook:VK_LANG",
         "macos": "ecoscribe.platform.macos.keyhook:KC_LANG,HookThread",  # Right Command + L
     },
+    "Take back the last paste (\"scratch that\") and paste it again (dictation key + R)": {
+        "windows": "ecoscribe.platform.windows.deliver:undo_paste,foreground_window",  # + hook.VK_REPASTE
+        "macos": ("ticket", "dictado-cp1"),
+    },
     "Numpad Enter as a second dictation key": {
         "windows": "ecoscribe.platform.windows.hook:HookThread",  # HookThread.numpad_alias
         "macos": "ecoscribe.platform.macos.keyhook:HookThread",  # HookThread.numpad_alias (keycode 76)
