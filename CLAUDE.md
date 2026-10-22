@@ -29,6 +29,12 @@ outcomes in plain words and only real choices (money, publishing, his desktop, w
    "not needed" with a reason.
 9. **gh account:** the repo belongs to ErikBros. Use `GH_TOKEN=$(gh auth token --user ErikBros) gh ...`
    per command; never leave `gh auth switch` on the personal account (other sessions are work).
+10. **Design gate.** Any change to how a screen, the pill, a pop-up or a page looks or reads: render
+    before/after stills (2 to 3 variants when it's a choice of look), show Erik, and merge, install or
+    call it done only after he approves. Logic-only PRs skip this.
+11. **Installs on Erik's PC.** Check `%LOCALAPPDATA%\ecoscribe\meetings.json` before installing or
+    restarting; never during a live meeting (the installer also waits). Builds leave ~0.5 GB installers
+    in the build folder and Downloads: check C: free space before a build and offer to delete old Setups.
 
 ## Build & test
 
