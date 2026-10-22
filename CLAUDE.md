@@ -37,7 +37,7 @@ outcomes in plain words and only real choices (money, publishing, his desktop, w
     Before showing it, the change passes `docs/look-checklist.md` (`npm run look` checks the testable part).
 11. **Installs on Erik's PC.** Check `%LOCALAPPDATA%\ecoscribe\meetings.json` before installing or
     restarting; never during a live meeting (the installer also waits). Builds leave ~0.5 GB installers
-    in the build folder and Downloads: check C: free space before a build and offer to delete old Setups.
+    in the build folder (not in Downloads since dictado-38z): check C: free space before a build and offer to delete old Setups.
 
 ## Build & test
 
