@@ -102,12 +102,14 @@ def test_dictation_key_r_pastes_the_last_dictation_again(tmp_path):
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows hook")
 def test_hook_swallows_r_only_with_the_dictation_key_held():
-    from ecoscribe.platform.windows.hook import VK_REPASTE, HookThread
+    from ecoscribe.platform.windows.hook import VK_EDIT, VK_REPASTE, HookThread
     events = []
     h = HookThread(lambda a: None, RCTRL, 0.3, emit=events.append, consume=False)
-    assert not h.repaste_key(VK_REPASTE, True)  # a normal R: typed as usual
+    assert not h.action_key(VK_REPASTE, True)  # a normal R: typed as usual
     h._toggle_down = True
-    assert h.repaste_key(VK_REPASTE, True) and h.repaste_key(VK_REPASTE, True)
-    assert [e[0] for e in events] == ["repaste"]  # auto-repeat pastes once
+    assert h.action_key(VK_REPASTE, True) and h.action_key(VK_REPASTE, True)
+    assert h.action_key(VK_EDIT, True)
+    assert [e[0] for e in events] == ["repaste", "edit"]  # auto-repeat fires once
     h._toggle_down = False
-    assert h.repaste_key(VK_REPASTE, False) and not h._repaste_held
+    assert h.action_key(VK_REPASTE, False) and h.action_key(VK_EDIT, False) and not h._action_held
+    assert not h.action_key(0x43, True)  # Right Ctrl + C is untouched

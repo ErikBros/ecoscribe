@@ -29,6 +29,10 @@ CAPABILITIES: dict[str, dict] = {
         "windows": "ecoscribe.platform.windows.deliver:undo_paste,foreground_window",  # + hook.VK_REPASTE
         "macos": ("ticket", "dictado-cp1"),
     },
+    "Command mode (dictation key + E: say how to change the selection)": {
+        "windows": "ecoscribe.platform.windows.deliver:copy_selection",  # + hook.VK_EDIT
+        "macos": ("ticket", "dictado-waw"),
+    },
     "Numpad Enter as a second dictation key": {
         "windows": "ecoscribe.platform.windows.hook:HookThread",  # HookThread.numpad_alias
         "macos": "ecoscribe.platform.macos.keyhook:HookThread",  # HookThread.numpad_alias (keycode 76)

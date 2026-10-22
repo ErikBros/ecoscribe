@@ -58,6 +58,7 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Hotkey (tap / hold / combo, Esc cancel) | done (low-level keyboard hook) | done (CGEventTap, Right Command) |
 | Language key (dictation key + L picks the next language) | done (Right Ctrl + L, swallowed) | done (Right Command + L, swallowed; real desktop run) |
 | Take back the last paste ("scratch that") and paste it again (dictation key + R) | done ("scratch that" alone sends Ctrl+Z, only in the window the dictation went into and within 60 s; with voice commands or self-corrections on) (dictado-ost) | ticket dictado-cp1 |
+| Command mode (dictation key + E: say how to change the selection) | done (the selection by Ctrl+C, clipboard put back; Haiku's answer pasted over it, Ctrl+Z undoes; [text] command_mode, off by default) (dictado-ua2) | ticket dictado-waw |
 | Numpad Enter as a second dictation key | done (Settings > Numpad Enter dictates too; swallowed, the main Enter untouched) | done (keypad Enter, keycode 76, on an external keyboard; swallowed, Return untouched) |
 | No text box at the stop: keep it on the clipboard, say so | done (UI Automation: desktop, file lists, buttons; unknown windows still get the paste) | done (Accessibility role: Finder icons and lists, buttons; unknown still pastes; the pill says ⌘V) |
 | Paste text where the cursor is | done (clipboard + Ctrl+V) | done (NSPasteboard + Cmd+V) |

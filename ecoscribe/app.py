@@ -35,7 +35,7 @@ class App:
     LIVE_EVERY_S = 2.0  # dictado-live: one quick pass this often while recording
     def __init__(self, cfg, recorder, engine, deliver_fn, ui, gate=None, history_path: Path | None = None,
                  press_enter=None, screen=None, spool=None, window_title=None, app_id=None, undo=None,
-                 window_now=None):
+                 window_now=None, copy_selection=None):
         self.cfg = cfg
         self.recorder = recorder
         self.engine = engine
@@ -46,6 +46,8 @@ class App:
         self.press_enter = press_enter or _press_enter
         self.undo, self.window_now = undo, window_now  # dictado-ost: Ctrl+Z, the focused window (None: no undo)
         self._last_paste: tuple | None = None  # (window, when, text) of the last paste
+        self.copy_selection = copy_selection  # dictado-ua2: Ctrl+C of the selection (None: no command mode)
+        self._edit: str | None = None  # command mode: the selected text this recording will change
         self.spool = spool  # t0u.37: the recording on disk while it happens, for crash recovery
         self._window_title = window_title  # dictado-9jc.2: None -> ecoscribe.context.foreground_title
         self._app_id = app_id  # dictado-uee: read with the title (context.foreground_app) unless the title is given
@@ -97,6 +99,8 @@ class App:
                 self.cycle_language()
             elif action == "repaste":  # off the key thread: the paste waits for the dictation key to be let go
                 threading.Thread(target=self.paste_again, name="ecoscribe-repaste", daemon=True).start()
+            elif action == "edit":  # same: copying the selection waits for the key to be let go
+                threading.Thread(target=self.begin_edit, name="ecoscribe-edit", daemon=True).start()
 
     def set_next_language(self, code: str | None) -> None:
         """The tray's 'Next dictation in': same as the key, picked directly (None = auto)."""
@@ -278,7 +282,8 @@ class App:
             return
         self._pending += 1
         forced, self.next_lang = self.next_lang, None  # one dictation only
-        self._jobs.put((audio, t_stop, self._screen, spooled, forced))
+        edit, self._edit = self._edit, None
+        self._jobs.put((audio, t_stop, self._screen, spooled, forced, edit))
         self._screen = None
         self._refresh_ui()
 
@@ -290,6 +295,7 @@ class App:
                 log.exception("spool discard failed")
 
     def _cancel(self) -> None:
+        self._edit = None
         self.recorder.abort()
         self._discard_spool()
         if self.gate:
@@ -318,10 +324,10 @@ class App:
             job = self._jobs.get()
             if job is None:
                 return
-            audio, t_stop, screen, spooled, forced = job
+            audio, t_stop, screen, spooled, forced, edit = job
             done = None
             try:
-                done = self._process(audio, t_stop, screen, forced)
+                done = self._process_edit(audio, edit) if edit is not None else self._process(audio, t_stop, screen, forced)
             except Exception:
                 log.exception("transcription/delivery failed")
                 self.ui.flash("Error, see the log")
@@ -440,6 +446,52 @@ class App:
         log.info("scratch that: last paste undone=%s", ok)
         self.ui.flash("Took back the last dictation" if ok else "Couldn't take it back: press Ctrl+Z", 2.0)
         return ok
+
+    def begin_edit(self) -> None:
+        """Dictation key + E (command mode, dictado-ua2): copy the selection, then record what to change.
+        The tap that stops the recording sends both to Claude; the answer replaces the selection."""
+        if not getattr(self.cfg.text, "command_mode", False):
+            self.ui.flash("Command mode is off ([text] command_mode)", 2.5)
+            return
+        if self.copy_selection is None:
+            self.ui.flash("Command mode isn't on this computer yet", 2.5)
+            return
+        with self._lock:
+            if self.state != "idle" or not self.ready:
+                return
+        selection = self.copy_selection()
+        if not selection or not selection.strip():
+            self.ui.flash("Select some text first", 2.0)
+            return
+        with self._lock:
+            if self.state != "idle":
+                return
+            self._edit = selection
+            self._start()
+            if self.state != "recording":
+                self._edit = None
+                return
+        log.info("command mode: recording the instruction for %d selected chars", len(selection))
+        self.ui.flash("Say what to change, then tap the key", 2.5)
+
+    def _process_edit(self, audio, selection: str) -> None:
+        from .command_mode import EditError, edit
+        res = self.engine.transcribe(audio)  # the instruction
+        try:
+            new = edit(selection, res.text, self.cfg)
+        except EditError as e:
+            log.info("command mode: nothing changed (%s)", e)
+            self.ui.flash(f"{e}: nothing changed", 3.0)
+            return None
+        dr = self.deliver(new)  # pasted over the selection, which is still selected
+        log.info("command mode: %d -> %d chars target=%s pasted=%s reason=%s", len(selection), len(new),
+                 dr.target_exe, dr.pasted, dr.reason)
+        if dr.pasted:
+            self._last_paste = (getattr(dr, "window", 0), time.monotonic(), new)
+            self.ui.flash("Changed: Ctrl+Z undoes it", 2.0)
+        else:
+            self.ui.flash(NOT_PASTED.get(dr.reason, f"Copied: paste with {PASTE_KEYS}"), 3.0)
+        return None
 
     def paste_again(self) -> None:
         """Dictation key + R: the last dictation once more, at the cursor."""
