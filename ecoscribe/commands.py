@@ -102,6 +102,10 @@ def handler_for(ctl, watch=None, manual_key: str = "_manual", app=None):
             if app is None:
                 return {"ok": False, "error": "Dictation isn't running"}
             return app.delete_dictation(str(args.get("id") or ""), str(args.get("ts") or "") or None)
+        if cmd == "edit_dictation":  # History > Edit (dictado-1ph)
+            if app is None:
+                return {"ok": False, "error": "Dictation isn't running"}
+            return app.edit_dictation(str(args.get("id") or ""), str(args.get("ts") or "") or None, str(args.get("text") or ""))
         if cmd == "start_meeting":
             lang = args.get("lang") or (watch.lang_for(manual_key) if watch else "sv")
             if watch:

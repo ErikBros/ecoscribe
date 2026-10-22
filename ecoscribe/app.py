@@ -634,6 +634,16 @@ class App:
         log.info("history: deleted id=%s gone=%s", rid, gone)
         return {"ok": True, "gone": gone}
 
+    def edit_dictation(self, rid: str | None, ts: str | None, text: str) -> dict:
+        """History > Edit (dictado-1ph): the new text, under the history lock."""
+        from . import histfile
+        if not self.history_path:
+            return {"ok": False, "error": "No history"}
+        with self._lock:
+            done = histfile.edit(self.history_path, rid or None, ts or None, text)
+        log.info("history: edited id=%s found=%s", rid, done)
+        return {"ok": done} if done else {"ok": False, "error": "That dictation isn't in the history any more."}
+
     def _replace_history(self, rid: str, res) -> None:
         with self._lock:
             try:

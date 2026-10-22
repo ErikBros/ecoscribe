@@ -191,7 +191,7 @@ async function load(query) {
 }
 { // historial + search
   const { window, doc } = await load("page=historial");
-  check(doc.querySelectorAll(".h-item:not(.h-meeting)").length === 4, "history lists 4 dictations");
+  check(doc.querySelectorAll(".h-item:not(.h-meeting)").length === 5, "history lists 5 dictations");
   check(doc.querySelectorAll(".h-meeting").length === 5, "and the 5 meeting transcripts");
   const done = [...doc.querySelectorAll(".h-meeting")].find((li) => li.textContent.includes("Planering"));
   check(done && [...done.querySelectorAll("button")].map((b) => b.textContent).join(",") === "Open,Download .md", "a finished meeting: Open + Download .md");
@@ -478,6 +478,24 @@ async function load(query) {
   const mac = await load("page=ajustes&mac=1");
   await sleep(200);
   check(mac.doc.querySelector("#row-command-mode").hidden, "no command mode switch on the Mac yet");
+}
+{ // History > Edit, and learn the fixed name (dictado-1ph)
+  const { window, doc } = await load("page=historial");
+  await sleep(200);
+  const li = doc.querySelector('#history .h-item[data-id="d1b"]');
+  li.querySelector(".h-edit-btn").click();
+  const box = li.querySelector(".h-edit");
+  check(box && li.querySelector(".h-text").hidden, "Edit opens the text in a box");
+  box.value = "Send the draft to Quintavelle before lunch, she has the numbers.";
+  [...li.querySelectorAll(".h-edit-bar button")].find((b) => b.textContent === "Save").click(); await sleep(100);
+  check(window.__edited?.includes("Quintavelle") && li.querySelector(".h-text").textContent.includes("Quintavelle") && !li.querySelector(".h-edit"), "Save keeps the new text");
+  const chip = li.querySelector(".h-learn .h-learn-chip");
+  check(chip && chip.textContent === "+ Quintavelle", "the fixed name is offered");
+  chip.click(); await sleep(50);
+  check(JSON.stringify(window.__learned) === JSON.stringify(["word", "Quintavelle", ""]) && chip.classList.contains("done"), "a click learns it");
+  li.querySelector(".h-edit-btn").click();
+  li.querySelector(".h-edit").dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape" }));
+  check(!li.querySelector(".h-edit") && !li.querySelector(".h-text").hidden, "Escape cancels");
 }
 { // Meetings > the checked summary above the transcript (dictado-nl5)
   const { doc } = await load("page=reuniones/2026-10-05_0915_planering");
