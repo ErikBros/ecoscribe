@@ -1,7 +1,8 @@
 """Build Ecoscribe.exe (and optionally the installer). Run with Windows Python.
 
     python build.py              -> %USERPROFILE%\\ecoscribe-build\\dist\\Ecoscribe\\Ecoscribe.exe
-    python build.py --installer  -> also Ecoscribe-Setup-<ver>.exe (copied to Downloads)
+    python build.py --installer  -> also Ecoscribe-Setup-<ver>.exe, in the build folder only (the GitHub
+                                    release carries it; no 0.5 GB copy in Downloads, dictado-38z)
     python build.py --installer --install  -> then the release gate (tools/release_gate.py) and, only
                                                when every check passes, the install on this PC
 """
@@ -9,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import shutil
 import site
 import subprocess
 import sys
@@ -43,9 +43,7 @@ def installer() -> Path:
     subprocess.run([str(ISCC), f"/DAppVersion={v}", f"/DDistDir={OUT / 'dist' / 'Ecoscribe'}",
                     f"/O{OUT}", str(PKG / "ecoscribe.iss")], check=True)
     setup = OUT / f"Ecoscribe-Setup-{v}.exe"
-    dl = Path(os.environ["USERPROFILE"]) / "Downloads" / setup.name
-    shutil.copy2(setup, dl)
-    print(f"installer {setup}  ({setup.stat().st_size / 1e9:.2f} GB) -> {dl}")
+    print(f"installer {setup}  ({setup.stat().st_size / 1e9:.2f} GB)")
     return setup
 
 
