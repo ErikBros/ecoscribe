@@ -14,7 +14,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from . import __version__, export, search, sessions
+from . import __version__, export, meaning, search, sessions
 
 log = logging.getLogger(__name__)
 VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
@@ -40,9 +40,14 @@ TOOLS = [
                     "how many lines matched, and up to 3 of the best lines with time and speaker. Case and accents don't "
                     "matter (Greek too). Every word must appear in the call; a word also finds longer words that start "
                     "with it; put an exact phrase in double quotes. Calls are mostly in Swedish, English and Spanish: "
-                    "when looking for a topic, search again with the words in each of those languages.",
+                    "when looking for a topic, search again with the words in each of those languages. "
+                    "When no call has all the words, and search by meaning is on (it switches itself on after the "
+                    "first such miss), the calls closest in meaning come back instead, in any language, marked "
+                    "found_by: meaning with a score (about 0.7 unrelated to 0.9 the same thing said): read them "
+                    "before trusting them. by_meaning: true searches by meaning straight away (a topic, a question).",
      "inputSchema": {"type": "object", "properties": {
          "text": {"type": "string"},
+         "by_meaning": {"type": "boolean", "description": "Search by meaning instead of by words"},
          "since": {"type": "string", "description": "Only sessions on or after this date, YYYY-MM-DD"},
          "limit": {"type": "integer", "description": "At most this many calls (default 10)"}},
          "required": ["text"]}},
@@ -178,16 +183,57 @@ def read_meeting(root: Path, sid: str) -> str:
         return text
 
 
-def search_meetings(root: Path, text: str, limit: int = 10, since: str = "") -> list[dict]:
-    """dictado-8h8: ranked, accent-proof, grouped by call (search.py)."""
+MEANING = {"mode": "auto", "models_root": ""}  # [search] meaning and the models folder, set by main()
+INLINE_S = 20.0  # a search by meaning indexes at most this long itself; the background app does the rest
+_EMBEDDER: dict = {}
+
+
+def _by_meaning(root: Path, text: str, limit: int, keep) -> list[dict]:
+    """dictado-2i1 (meaning.py): the calls closest in meaning. ValueError when it isn't ready."""
+    if not meaning.switched_on(root, MEANING["mode"]):
+        raise ValueError("search by meaning is off: it switches on after a word search finds nothing, "
+                         "or with [search] meaning = \"on\" in Ecoscribe's config.toml")
+    if not meaning.model_ready(MEANING["models_root"]):
+        raise ValueError("search by meaning is getting ready: Ecoscribe downloads its model (about 0.55 GB) "
+                         "when nothing is recording; try again in a few minutes")
+    d = meaning.model_dir(MEANING["models_root"])
+    emb = _EMBEDDER.get(d) or _EMBEDDER.setdefault(d, meaning.Embedder(d))  # loaded once per Claude app run
+    idx = meaning.Index(root)
+    try:
+        left = idx.refresh(emb, budget_s=INLINE_S)
+        out = idx.search(text, emb, limit=limit, keep=keep)
+    finally:
+        idx.close()
+    if left:
+        log.info("meaning search ran with %d calls not indexed yet", left)
+        for r in out:
+            r["note"] = f"{left} more calls are still being indexed and were not searched"
+    return out
+
+
+def search_meetings(root: Path, text: str, limit: int = 10, since: str = "", by_meaning: bool = False) -> list[dict]:
+    """dictado-8h8: ranked, accent-proof, grouped by call (search.py). Nothing found: the miss is
+    counted, and the search by meaning answers when it is on (dictado-2i1)."""
     if not str(text or "").strip():
         raise ValueError("say what to look for")
     keep = lambda m: _visible(m) and (not since or str(m.get("created", ""))[:10] >= since[:10])  # noqa: E731
+    if by_meaning:
+        return _by_meaning(root, text, int(limit or 5), keep)
     idx = search.open_index(root)
     try:
-        return idx.search(text, limit=limit or 10, keep=keep)
+        found = idx.search(text, limit=limit or 10, keep=keep)
     finally:
         idx.close()
+    if found:
+        return found
+    meaning.log_miss(root)
+    try:
+        return _by_meaning(root, text, min(int(limit or 5), 5), keep)
+    except ValueError:  # not on or not ready: the word search's empty answer stands
+        return []
+    except Exception:
+        log.exception("search by meaning failed")
+        return []
 
 
 def _latest_call(root: Path) -> str:
@@ -213,8 +259,8 @@ def _call(root: Path, name: str, args: dict) -> dict:
         elif name == "read_meeting":
             out = read_meeting(root, args.get("id", ""))
         elif name == "search_meetings":
-            out = json.dumps(search_meetings(root, args.get("text", ""), args.get("limit", 10), args.get("since", "")),
-                             ensure_ascii=False, indent=1)
+            out = json.dumps(search_meetings(root, args.get("text", ""), args.get("limit", 10), args.get("since", ""),
+                                             bool(args.get("by_meaning"))), ensure_ascii=False, indent=1)
         elif name == "calls_with_person":
             rows = calls_with_person(root, args.get("name", ""), args.get("since", ""), args.get("limit", 30))
             out = json.dumps(rows, ensure_ascii=False, indent=1) if rows else (
@@ -282,6 +328,7 @@ def main(config_path: str | None = None) -> int:
     winutil.setup_logging(paths.data_dir() / "mcp.log", logging.INFO)
     cfg = config.load(Path(config_path) if config_path else paths.config_path())
     root = sessions.root_dir(cfg.transcribe.root)
+    MEANING.update(mode=cfg.search.meaning, models_root=cfg.transcribe.models_root)
     log.info("mcp server up root=%s", root)
     inp, out = std_pipes()
     serve(inp, out, root)

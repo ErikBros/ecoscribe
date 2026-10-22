@@ -176,6 +176,13 @@ class SummariesCfg:
 
 
 @dataclass
+class SearchCfg:
+    """dictado-2i1 (meaning.py): the Claude app's search by meaning. "auto" switches it on after the first
+    word search that found no call (the model, about 0.55 GB, downloads then); "on" / "off" force it."""
+    meaning: str = "auto"
+
+
+@dataclass
 class Config:
     hotkey: HotkeyCfg = field(default_factory=HotkeyCfg)
     audio: AudioCfg = field(default_factory=AudioCfg)
@@ -188,6 +195,7 @@ class Config:
     personal: PersonalCfg = field(default_factory=PersonalCfg)
     claude: ClaudeCfg = field(default_factory=ClaudeCfg)
     summaries: SummariesCfg = field(default_factory=SummariesCfg)
+    search: SearchCfg = field(default_factory=SearchCfg)
 
 
 def load(path: Path | None) -> Config:

@@ -32,6 +32,7 @@ def parse(argv):
     ap.add_argument("--summarize", metavar="DIR", help="write summary.md for one session with Claude Code, then exit")
     ap.add_argument("--engine-worker", action="store_true", help=argparse.SUPPRESS)
     ap.add_argument("--mcp", action="store_true", help="read-only MCP server over stdio, for the Claude app")
+    ap.add_argument("--meaning-index", action="store_true", help="bring the search-by-meaning index up to date, then exit")
     ap.add_argument("--supervise", action="store_true", help=argparse.SUPPRESS)  # the watchdog (t0u.37)
     ap.add_argument("--after-crash", metavar="REPORT", help=argparse.SUPPRESS)
     return ap.parse_args(argv)
@@ -192,6 +193,8 @@ def _start_meetings(cfg, data, ui, root, log, app=None):
     tracker = meetui.Tracker()
     from .summary import Sweeper
     sweeper = Sweeper(cfg, ctl.root, ipc.spawn)
+    from . import meaning
+    meaning_sweeper = meaning.Sweeper(cfg, ctl.root, ipc.spawn)
 
     def poll():
         try:
@@ -201,6 +204,7 @@ def _start_meetings(cfg, data, ui, root, log, app=None):
             for d in sweeper.tick(busy):
                 log.info("summary ready %s", Path(d).name)
                 ui.prompt("summary", str(d), None)  # dictado-nl5: Open goes to the meeting, summary on top
+            meaning_sweeper.tick(busy | ({str(sweeper.dir)} if sweeper.proc is not None else set()))
             line = meetui.last_live_line(st["meeting"]["dir"]) if st["meeting"] else None
             ui.set_meeting(st, meetui.meeting_view(st, time.time(), line))
             for kind, d in tracker.update(st):
@@ -233,6 +237,9 @@ def main(argv=None) -> int:
     if args.mcp:  # the Claude app's child process: stdio only, no mutex, no UI
         from .mcp_server import main as mcp_main
         winutil.hard_exit(mcp_main(args.config))
+    if args.meaning_index:  # worker process (dictado-2i1): the embedding model on the CPU, no UI
+        from .meaning import main as meaning_main
+        winutil.hard_exit(meaning_main(args.config))
     if args.engine_worker:  # on-demand dictation model, serves the background app over pipes
         from .engine_proc import worker_main
         winutil.hard_exit(worker_main(args.config))
