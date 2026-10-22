@@ -25,6 +25,8 @@ import time
 
 import numpy as np
 
+from . import gpu
+from .crash import exit_name
 from .engine import Result
 
 log = logging.getLogger(__name__)
@@ -112,17 +114,49 @@ def worker_main(config_path: str | None = None) -> int:
     """`ecoscribe --engine-worker [--config X]`: load the dictation model, serve until stdin closes."""
     from pathlib import Path
 
-    from . import config, paths, winutil
-    winutil.setup_logging(paths.data_dir() / "engine-worker.log", logging.INFO)
+    from . import __version__, config, gpu, paths, winutil
+    data = paths.data_dir()
+    winutil.setup_logging(data / "engine-worker.log", logging.INFO)
+    fault_log(data)
     winutil.add_cuda_dll_dirs()
     from .engine import Engine
     cfg = config.load(Path(config_path) if config_path else paths.config_path())
     engine = Engine(cfg.whisper, cfg.text)
+    driver = gpu.driver_cuda()
+    engine.skip_gpu = gpu.known_bad(data, __version__, driver)
     t0 = time.monotonic()
-    engine.load()
+    try:
+        engine.load(fallback=False)
+    except Exception as e:  # a GPU error: note it and leave, the next worker starts on the CPU (dictado-kux)
+        reason = f"{type(e).__name__}: {e}"
+        gpu.remember_bad(data, __version__, driver, reason)
+        log.error("whisper on %s failed (%s; driver supports CUDA %s): noted, the next worker runs on the CPU",
+                  cfg.whisper.device, reason, driver)
+        return gpu.FAILED_RC
     log.info("engine worker ready pid=%d device=%s load_s=%.1f", os.getpid(), engine.device, time.monotonic() - t0)
     serve(engine, *std_pipes())
     return 0
+
+
+FAULT_LOG = "engine-worker-fault.log"
+_fault_file = None  # open for the life of the worker: faulthandler writes to its fd
+
+
+def fault_log(data, keep: int = 256_000) -> None:
+    """A native crash in the worker (CTranslate2, CUDA) leaves every thread's stack in
+    engine-worker-fault.log instead of vanishing (the app only sees the pipe close)."""
+    global _fault_file
+    import faulthandler
+    from pathlib import Path
+    p = Path(data) / FAULT_LOG
+    try:
+        mode = "w" if p.exists() and p.stat().st_size > keep else "a"
+        _fault_file = open(p, mode, encoding="utf-8")  # noqa: SIM115 (must stay open)
+        _fault_file.write(f"--- engine worker pid={os.getpid()} started {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+        _fault_file.flush()
+        faulthandler.enable(_fault_file, all_threads=True)
+    except OSError:
+        log.exception("no fault log for the engine worker")
 
 
 def spawn_worker(config_path: str | None = None):
@@ -136,6 +170,14 @@ def spawn_worker(config_path: str | None = None):
 
 
 # ---------- app side ----------
+def _exit_code(w) -> int | None:
+    """The worker's exit code once its pipe closed (None while it runs: it hung)."""
+    try:
+        return w.proc.wait(1.0)
+    except subprocess.TimeoutExpired:
+        return None
+
+
 class _Worker:
     def __init__(self, proc):
         self.proc = proc
@@ -184,8 +226,10 @@ class _Worker:
 
 class EngineProxy:
     def __init__(self, cfg, text_cfg, spawn=spawn_worker, clock=time.monotonic, check_s: float | None = 30.0,
-                 ready_timeout_s: float = 120.0, reply_timeout_s: float | None = None):
+                 ready_timeout_s: float = 120.0, reply_timeout_s: float | None = None, on_device=None):
+        """on_device(device, fallback_reason): called when a worker says where it runs (status.json, a notice)."""
         self.cfg, self.text_cfg, self.spawn, self.clock = cfg, text_cfg, spawn, clock
+        self.on_device = on_device
         self.ready_timeout_s, self.reply_timeout_s = ready_timeout_s, reply_timeout_s
         self.device = cfg.device
         self.fallback_reason: str | None = None
@@ -206,6 +250,11 @@ class EngineProxy:
                 raise RuntimeError("engine closed")  # shutting down: never spawn a new worker
             if self._w is None or not self._w.alive():
                 if self._w is not None:
+                    rc = self._w.proc.poll()
+                    if rc == gpu.FAILED_RC:
+                        log.info("the engine worker found the GPU unusable: the next one runs on the CPU")
+                    elif rc is not None:
+                        log.warning("engine worker ended by itself (exit %s)", exit_name(rc))
                     self._w.kill()
                 log.info("starting engine worker")
                 self._w = _Worker(self.spawn())
@@ -220,11 +269,30 @@ class EngineProxy:
         except Exception:
             log.exception("could not start the engine worker")
 
-    def _ask(self, w: _Worker, audio: np.ndarray, timeout: float, words=None, extra=None) -> dict | None:
+    def _set_device(self, device: str, fallback: str | None) -> None:
+        changed = (device, fallback) != (self.device, self.fallback_reason)
+        self.device, self.fallback_reason = device, fallback
+        if changed and self.on_device:
+            try:
+                self.on_device(device, fallback)
+            except Exception:
+                log.exception("on_device failed")
+
+    def _reply_timeout(self, n: int) -> float:
+        """A worker on the CPU (small model, no GPU) needs far longer than one on the GPU."""
+        if self.reply_timeout_s:
+            return self.reply_timeout_s
+        secs = n / SR
+        return max(60.0, 10 * secs) if self.device == "cpu" else max(30.0, 3 * secs)
+
+    def _ask(self, w: _Worker, audio: np.ndarray, timeout: float | None, words=None, extra=None) -> dict | None:
+        """timeout None: by the audio's length and where the worker runs."""
         if not w.ready.wait(self.ready_timeout_s) or not w.alive() and w.replies.empty():
             return None
         if w.info.get("device"):
-            self.device, self.fallback_reason = w.info["device"], w.info.get("fallback")
+            self._set_device(w.info["device"], w.info.get("fallback"))
+        if timeout is None:
+            timeout = self._reply_timeout(len(audio))
         sent = threading.Event()
 
         def send():  # a worker that stopped reading would block this write forever
@@ -247,16 +315,22 @@ class EngineProxy:
 
     def transcribe(self, audio: np.ndarray, words=None, lang: str | None = None, prefer: str | None = None) -> Result:
         audio = np.asarray(audio, np.float32)
-        timeout = self.reply_timeout_s or max(30.0, 3 * len(audio) / SR)
         with self._lock:
-            for attempt in (1, 2):
+            attempt, gpu_noted = 0, False
+            while attempt < 2:
                 w = self._ensure()
-                reply = self._ask(w, audio, timeout, words, {k: v for k, v in (("lang", lang), ("prefer", prefer)) if v})
+                reply = self._ask(w, audio, None, words, {k: v for k, v in (("lang", lang), ("prefer", prefer)) if v})
                 if reply is not None and "error" not in reply:
                     self._last = self.clock()
-                    self.device, self.fallback_reason = reply.get("device", self.device), reply.get("fallback")
+                    self._set_device(reply.get("device", self.device), reply.get("fallback"))
                     return Result(text=reply["text"], lang=reply["lang"], speech_s=reply["speech_s"], ms=reply["ms"])
-                log.error("engine worker gave no answer (attempt %d, reply=%s): restarting it", attempt, reply)
+                rc = _exit_code(w)
+                if rc == gpu.FAILED_RC and not gpu_noted:  # not a failed try: the next worker starts on the CPU
+                    gpu_noted = True
+                    continue
+                attempt += 1
+                log.error("engine worker gave no answer (attempt %d, reply=%s, exit %s): restarting it", attempt,
+                          reply, exit_name(rc) if rc is not None else "none, still running")
                 w.kill()
                 with self._spawn_lock:
                     if self._w is w:

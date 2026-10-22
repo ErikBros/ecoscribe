@@ -1,6 +1,6 @@
 """A stand-in --engine-worker for test_engine_proc: speaks the real protocol.
 
-    python fake_engine_worker.py normal|die_after_first|hang|slow_ready
+    python fake_engine_worker.py normal|die_after_first|hang|slow_ready|gpu_failed|cpu
 """
 import os
 import sys
@@ -44,6 +44,10 @@ class FakeEngine:
         return Result(text=f"preview n{len(audio)}", lang=lang or "en", speech_s=len(audio) / 16000, ms=1)
 
 
+if mode == "gpu_failed":  # the real worker after a failed CUDA load: noted, exits before ready
+    os._exit(engine_proc.gpu.FAILED_RC)
 e = FakeEngine()
+if mode == "cpu":
+    e.device, e.fallback_reason = "cpu", "RuntimeError: CUDA failed with error CUDA driver version is insufficient"
 e.load()
 engine_proc.serve(e, *engine_proc.std_pipes())

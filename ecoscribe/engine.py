@@ -92,17 +92,24 @@ class Engine:
         self.model = None
         self.device = cfg.device
         self.fallback_reason: str | None = None
+        self.skip_gpu: str | None = None  # why the GPU failed before on this PC: straight to the CPU (gpu.py)
         self._load_lock = threading.Lock()
         self._busy = threading.Lock()  # a dictation waits for a preview pass; a preview never waits
         # Never free a model: destroying one after a long (>30 s) transcription throws
         # an uncaught C++ exception in CTranslate2 and aborts the process (2026-10-02).
         self._retired: list = []
 
-    def load(self) -> None:
+    def load(self, fallback: bool = True) -> None:
+        """fallback=False: a GPU error is raised instead of loading small/cpu in this process (the
+        engine worker then notes it and exits, gpu.py)."""
         with self._load_lock:
             if self.model is not None:
                 self._retired.append(self.model)
                 self.model = None
+            if self.skip_gpu and self.cfg.device != "cpu":
+                log.info("the GPU failed before on this PC (%s): small/cpu", self.skip_gpu)
+                self._cpu(self.skip_gpu)
+                return
             try:
                 name, compute_type = dictation_model(self.cfg)
                 self.model = self._make(name, self.cfg.device, compute_type)
@@ -110,11 +117,20 @@ class Engine:
                 self.fallback_reason = None
                 self._warmup()
             except Exception as e:  # CUDA missing/OOM: degrade instead of dying
-                self.fallback_reason = f"{type(e).__name__}: {e}"
-                log.error("whisper on %s failed (%s); falling back to small/cpu", self.cfg.device, self.fallback_reason)
-                self.model = self._make("small", "cpu", "int8")
-                self.device = "cpu"
-                self._warmup()
+                if self.model is not None:  # made but its warm-up failed: retire it, never destroy it
+                    self._retired.append(self.model)
+                    self.model = None
+                if not fallback and _is_gpu_error(e):
+                    raise
+                log.error("whisper on %s failed (%s: %s); falling back to small/cpu", self.cfg.device,
+                          type(e).__name__, e)
+                self._cpu(f"{type(e).__name__}: {e}")
+
+    def _cpu(self, reason: str) -> None:
+        self.fallback_reason = reason
+        self.model = self._make("small", "cpu", "int8")
+        self.device = "cpu"
+        self._warmup()
 
     def _detect(self, chunk: np.ndarray, langs: list[str], full: bool = False) -> str:
         """The language of one piece among `langs`. The quick way feeds the encoder only the piece

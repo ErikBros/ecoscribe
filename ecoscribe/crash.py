@@ -189,14 +189,30 @@ def clean_live(data: Path, alive_pids: set[int]) -> None:
             p.unlink(missing_ok=True)
 
 
+def awake_clock():
+    """Seconds the PC has been awake. Windows' time.monotonic keeps counting while the PC sleeps, so a
+    night asleep read as a 3-hour freeze (dictado-kux); QueryUnbiasedInterruptTime stops. The macOS and
+    Linux monotonic clocks already stop."""
+    if sys.platform != "win32":
+        return time.monotonic
+    import ctypes
+    f = ctypes.windll.kernel32.QueryUnbiasedInterruptTime
+
+    def clock() -> float:
+        t = ctypes.c_ulonglong(0)  # one per call: beat() and check() run on different threads
+        f(ctypes.byref(t))
+        return t.value / 1e7  # 100 ns units
+    return clock
+
+
 class FreezeWatch:
     """Notices the app's main (tk) thread not answering: today's crashes froze first and
     Windows offered to force-close Ecoscribe, while every key on the PC lagged behind the hook.
     The main loop calls beat() every 0.5 s; if no beat comes for `limit_s`, every thread's
     stack goes to crashes/live/freeze-<pid>-<n>.log and the log says so. Once per freeze."""
 
-    def __init__(self, data: Path, pid: int, limit_s: float = 3.0, clock=time.monotonic):
-        self.dir, self.pid, self.limit, self.clock = crashes_dir(data) / "live", pid, limit_s, clock
+    def __init__(self, data: Path, pid: int, limit_s: float = 3.0, clock=None):
+        self.dir, self.pid, self.limit, self.clock = crashes_dir(data) / "live", pid, limit_s, clock or awake_clock()
         self.last = clock()
         self.frozen = False
         self.count = 0
