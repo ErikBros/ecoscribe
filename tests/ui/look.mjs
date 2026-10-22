@@ -23,7 +23,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // the same pages tools/shoot.py photographs
 const PAGES = {
-  inicio: "page=inicio", historial: "page=historial", ajustes: "page=ajustes", bienvenida: "page=bienvenida&welcome=1",
+  inicio: "page=inicio", historial: "page=historial", ajustes: "page=ajustes", "ajustes-estilos": "page=ajustes&styles=1", bienvenida: "page=bienvenida&welcome=1",
   "setup-models": "page=bienvenida&welcome=1&sstep=models", "setup-mic": "page=bienvenida&welcome=1&sstep=mic",
   "setup-shortcut": "page=bienvenida&welcome=1&sstep=shortcut", "setup-try": "page=bienvenida&welcome=1&sstep=try",
   "setup-done": "page=bienvenida&welcome=1&sstep=done", detenido: "page=inicio&state=stopped",

@@ -44,7 +44,10 @@ def foreground_title() -> str:
 APP_IDS = {"com.apple.mail": "mail", "com.apple.mobilesms": "messages", "com.microsoft.outlook": "outlook",
            "com.readdle.smartemail-mac": "spark", "com.anthropic.claudefordesktop": "claude", "com.openai.chat": "chatgpt",
            "com.apple.terminal": "terminal", "com.googlecode.iterm2": "iterm2", "com.mitchellh.ghostty": "ghostty",
-           "dev.warp.warp-stable": "warp", "com.microsoft.vscode": "code", "dev.zed.zed": "zed"}
+           "dev.warp.warp-stable": "warp", "com.microsoft.vscode": "code", "dev.zed.zed": "zed",
+           # dictado-h0m: more terminals and mail apps for Style per app (app_styles.kind)
+           "net.kovidgoyal.kitty": "kitty", "org.alacritty": "alacritty", "com.github.wez.wezterm": "wezterm",
+           "org.mozilla.thunderbird": "thunderbird", "com.superhuman.electron": "superhuman", "it.bloop.airmail2": "airmail"}
 
 
 def app_key(bundle: str) -> str:

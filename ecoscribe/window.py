@@ -40,6 +40,13 @@ def _voice_command_list() -> list[dict]:
             for _, what, langs in VOICE_COMMANDS]
 
 
+def _app_style_rows(saved) -> list[dict]:
+    """Settings > Style per app (dictado-h0m): one row per kind of app, the saved table over the defaults."""
+    from .app_styles import EXAMPLES, KINDS, table
+    t = table(saved)
+    return [{"kind": k, "label": label, "apps": EXAMPLES[k], **t[k]} for k, label in KINDS]
+
+
 def _correction_list() -> list[dict]:
     """Settings > Fix it when you correct yourself > See all phrases (dictado-bd6): the tables the rules use."""
     from .corrections import SCRATCH, TRIGGERS
@@ -242,6 +249,8 @@ class Api:
                 "extra_languages": list(c.whisper.extra_languages),
                 "snippets": [{"trigger": k, "text": v} for k, v in c.text.snippets.items()],
                 "replacements": [{"heard": k, "write": v} for k, v in c.text.replacements.items()],
+                "per_app_styles": c.text.per_app_styles,
+                "app_styles": _app_style_rows(c.text.app_styles),
             },
             "speakers_addon": diarize.addon_exe().is_file(),
             "auto_update_supported": sys.platform == "win32",  # dictado-nmo: the Inno Setup installer
@@ -319,6 +328,9 @@ class Api:
                     if k and v and k not in table:
                         table[k] = v
                 c.text.replacements = dict(list(table.items())[:200])
+            if "app_styles" in values:  # dictado-h0m: [{kind, capital, full_stop, commands}]
+                from .app_styles import clean_table
+                c.text.app_styles = clean_table(values["app_styles"])
             if "extra_languages" in values:  # dictado-ehs: Add a language / remove one
                 c.whisper.extra_languages = valid_extra(values["extra_languages"])
                 avail = available(c.whisper.extra_languages)
@@ -358,7 +370,7 @@ class Api:
                                          "unmute": ("audio", "unmute_while_recording"),
                                          "on_demand": ("whisper", "on_demand"),
                                          "speakers": ("meetings", "speakers"),
-                                         "voice_commands": ("text", "voice_commands"),
+                                         "voice_commands": ("text", "voice_commands"), "per_app_styles": ("text", "per_app_styles"),
                                          "self_corrections": ("text", "self_corrections"), "command_mode": ("text", "command_mode"),
                                          "screen_names": ("text", "screen_names"),
                                          "hold_to_talk": ("hotkey", "hold_to_talk"), "numpad_enter": ("hotkey", "numpad_enter"),

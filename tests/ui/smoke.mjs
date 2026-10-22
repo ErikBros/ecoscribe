@@ -94,6 +94,28 @@ async function load(query) {
   check(sent && sent.theme === "light" && Object.keys(sent).length === 1 && doc.querySelector("#toast").textContent === "Saved." && !errors.length,
         "saves only the theme, no restart: " + JSON.stringify(sent) + " / " + doc.querySelector("#toast").textContent);
 }
+{ // ajustes: Style per app (dictado-h0m)
+  const { window, doc, errors } = await load("page=ajustes");
+  const rows = () => [...doc.querySelectorAll("#st-rows tr")];
+  const sw = doc.querySelector("#f-per-app");
+  check(sw && !sw.checked && rows().length === 4 && doc.querySelector("#st-wrap").classList.contains("off")
+    && rows().every((r) => [...r.querySelectorAll("input")].every((i) => i.disabled)), "Style per app: off by default, four rows, greyed out");
+  check(rows()[0].querySelector(".st-sample").textContent === "check the logs first"
+    && rows()[3].querySelector(".st-sample").textContent === "Check the logs first.", "each row shows how a sentence comes out");
+  sw.checked = true; sw.dispatchEvent(new window.Event("change", { bubbles: true }));
+  const vcCol = rows()[1].querySelector('[data-opt="commands"]');
+  check(!rows()[1].querySelector('[data-opt="full_stop"]').disabled && vcCol.disabled && !doc.querySelector("#st-vc-off").hidden,
+    "on: the switches work; voice commands wait for the Behaviour switch");
+  const fs = rows()[1].querySelector('[data-opt="full_stop"]');
+  fs.checked = true; fs.dispatchEvent(new window.Event("change", { bubbles: true }));
+  check(rows()[1].querySelector(".st-sample").textContent.endsWith("."), "the sample follows the switch");
+  let sent = null;
+  const api = window.__ecoscribe.api, orig = api.save_settings;
+  api.save_settings = async (x) => { sent = x; return orig(x); };
+  doc.querySelector("#save").click(); await sleep(100);
+  check(sent && sent.per_app_styles === true && sent.app_styles.find((r) => r.kind === "chat").full_stop === true
+    && Object.keys(sent).length === 2 && !errors.length, "saves the switch and the table: " + JSON.stringify(sent));
+}
 { // ajustes: voice memory (t0u.32)
   const { window, doc } = await load("page=ajustes");
   await sleep(50);

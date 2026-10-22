@@ -26,6 +26,7 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Your words (spelling list) | done | done |
 | Snippets | done | done |
 | Voice commands + full list in Settings | done | done (real desktop run: line break + Enter, no command words typed) |
+| Style per app: terminal, chat, email, everything else, each with capital at the start, full stop at the end and voice commands on or off, picked by the app (or browser site) the text goes into; Settings > Dictation > Style per app, off by default (dictado-h0m) | done | check on Mac (shared code; bundle ids for the app) |
 | Self-corrections: "scratch that" drops the sentence before it (rules); "no wait", "no perdón", "nej förlåt", "όχι συγγνώμη" send that dictation to Claude Haiku, 5 s limit, else the text as heard ([text] self_corrections, off by default) (dictado-ehc) | done (config.toml only; Settings switch: dictado-bd6) | check on Mac (dictado-1xg) |
 | Meetings: live transcript, notes, Me / Others, exports, Copy for Claude | done | check on Mac (dictado-tjn): needs the System Audio Recording permission |
 | Meeting / file languages incl. Greek + Spanish mixed | done | done (GPU test passes on mlx) |
@@ -71,6 +72,7 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | No text box at the stop: keep it on the clipboard, say so | done (UI Automation: desktop, file lists, buttons; unknown windows still get the paste) | done (Accessibility role: Finder icons and lists, buttons; unknown still pastes; the pill says ⌘V) |
 | Dark mode follows the system (Settings > Appearance: Match / Light / Dark) | done (Windows app mode) | done (macOS appearance) |
 | Title bar matches the window's light or dark look | done (Windows 11 dark title bar) | follows the system appearance; a forced Light or Dark: dictado-zkh |
+| Which app gets the paste, read just before it (Style per app) | done (process name + window title) | done (bundle id + window title through Accessibility) |
 | Paste text where the cursor is | done (clipboard + Ctrl+V) | done (NSPasteboard + Cmd+V) |
 | Names on your screen | done (UI Automation, one COM thread) | done (Accessibility API) |
 | Speech engine on the GPU | done (faster-whisper, CUDA) | done (mlx-whisper, Metal) |

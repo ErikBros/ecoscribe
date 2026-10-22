@@ -60,9 +60,15 @@ function demoApi() {
   const dl = { running: false, error: null, models: {} };  // the demo model download
   let settings = {
     values: { hotkey: "rctrl", mic: "Anker PowerConf", languages: "en", sounds: true, overlay: true, live_text: true, insights: params.get("insights") === "1", speech_feedback: false, unmute: true, startup: true,
-      meet_mode: "prompt", meet_end: "10", meet_lang: "sv", on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: false, self_corrections: false, command_mode: false, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, update_check: true, auto_update: params.get("auto") === "1", theme: params.get("theme") || "system",
+      meet_mode: "prompt", meet_end: "10", meet_lang: "sv", on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: params.get("styles") === "1", self_corrections: false, command_mode: false, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, update_check: true, auto_update: params.get("auto") === "1", theme: params.get("theme") || "system",
       export_dir: "C:/x/Downloads", export_default: true,
-      snippets: [{ trigger: "my email", text: "alex@example.com" }], replacements: [{ heard: "poll request", write: "pull request" }] },
+      snippets: [{ trigger: "my email", text: "alex@example.com" }], replacements: [{ heard: "poll request", write: "pull request" }],
+      per_app_styles: params.get("styles") === "1",
+      app_styles: [
+        { kind: "terminal", label: "Terminal", apps: "Windows Terminal, PowerShell, iTerm2, Warp", capital: false, full_stop: false, commands: true },
+        { kind: "chat", label: "Chat", apps: "Slack, Teams, WhatsApp, Claude, ChatGPT, and their sites", capital: true, full_stop: false, commands: true },
+        { kind: "email", label: "Email", apps: "Outlook, Mail, Thunderbird, Gmail in a browser", capital: true, full_stop: true, commands: true },
+        { kind: "other", label: "Everything else", apps: "Word, Notepad, a code editor, any other app", capital: true, full_stop: true, commands: true }] },
     options: {
       hotkeys: [{ value: "rctrl", label: "Right Ctrl (recommended)" }, { value: "scrolllock", label: "Scroll Lock" }, { value: "pause", label: "Pause" }, { value: "f13", label: "F13" }],
       mics: [{ value: "", label: DEFAULT_MIC }, { value: "Headset (Zone Vibe 100)", label: "Zone Vibe 100" }, { value: "Anker PowerConf", label: "Anker PowerConf C20" }],
@@ -1577,7 +1583,50 @@ function formValues() {
       .filter((x) => x.trigger && x.text.trim()),
     replacements: $$(".rep").map((r) => ({ heard: $(".rep-heard", r).value.trim(), write: $(".rep-write", r).value.trim() }))
       .filter((x) => x.heard && x.write),
+    per_app_styles: $("#f-per-app").checked,
+    app_styles: $$("#st-rows tr").map((tr) => ({ kind: tr.dataset.kind,
+      ...Object.fromEntries(ST_OPTS.map(([o]) => [o, $(`[data-opt="${o}"]`, tr).checked])) })),
   };
+}
+// Style per app (dictado-h0m): one row per kind of app, three switches, and how a sentence comes out there.
+const ST_OPTS = [["capital", "Capital at the start"], ["full_stop", "Full stop at the end"], ["commands", "Voice commands"]];
+const ST_SAMPLE = "Check the logs first.";
+function stSample(st) {
+  let t = ST_SAMPLE;
+  if (!st.capital) t = t[0].toLowerCase() + t.slice(1);
+  if (!st.full_stop) t = t.replace(/\.$/, "");
+  return t;
+}
+function stylesCard(rows) {
+  const body = $("#st-rows"); body.innerHTML = "";
+  for (const r of rows || []) {
+    const tr = document.createElement("tr"); tr.dataset.kind = r.kind;
+    const th = document.createElement("th"); th.scope = "row";
+    th.innerHTML = '<span class="row-label"></span><span class="muted small"></span>';
+    th.children[0].textContent = r.label; th.children[1].textContent = r.apps;
+    tr.append(th);
+    for (const [o, label] of ST_OPTS) {
+      const td = document.createElement("td"), i = document.createElement("input"); td.className = "st-opt";
+      i.type = "checkbox"; i.className = "switch"; i.dataset.opt = o; i.checked = !!r[o];
+      i.setAttribute("aria-label", `${r.label}: ${label}`);
+      i.onchange = () => { stylesState(); dirty(); };
+      td.append(i); tr.append(td);
+    }
+    const td = document.createElement("td"), sample = document.createElement("span"); sample.className = "st-sample";
+    td.append(sample); tr.append(td);
+    body.append(tr);
+  }
+  stylesState();
+}
+function stylesState() {
+  const on = $("#f-per-app").checked, vc = $("#f-voice-commands").checked;
+  $("#st-wrap").classList.toggle("off", !on);
+  for (const tr of $$("#st-rows tr")) {
+    const st = Object.fromEntries(ST_OPTS.map(([o]) => [o, $(`[data-opt="${o}"]`, tr).checked]));
+    $(".st-sample", tr).textContent = stSample(st);
+    for (const i of $$("input", tr)) i.disabled = !on || (i.dataset.opt === "commands" && !vc);
+  }
+  $("#st-vc-off").hidden = !on || vc;
 }
 // Languages you dictate in (dictado-ehs): English + Swedish built in; "Add a language" for the rest.
 let extraLangs = [], langNames = {}, baseLangs = ["en", "sv"];
@@ -1743,6 +1792,10 @@ async function renderSettings() {
   $("#reps").innerHTML = "";
   for (const x of s.values.replacements || []) repRow(x.heard, x.write);
   $("#rep-add").onclick = () => { $(".rep-heard", repRow()).focus(); };
+  $("#f-per-app").checked = !!s.values.per_app_styles;
+  stylesCard(s.values.app_styles);
+  $("#f-per-app").onchange = $("#f-voice-commands").onchange = () => { stylesState(); dirty(); };
+  if (params.get("styles") === "1") $("#styles-card").scrollIntoView?.({ block: "start" });  // screenshot
   $("#f-speakers").checked = s.values.speakers && s.speakers_addon;
   $("#f-speakers").disabled = !s.speakers_addon;
   $("#f-speakers-help").textContent = s.speakers_addon

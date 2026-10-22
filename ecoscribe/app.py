@@ -35,7 +35,7 @@ class App:
     LIVE_EVERY_S = 2.0  # dictado-live: one quick pass this often while recording
     def __init__(self, cfg, recorder, engine, deliver_fn, ui, gate=None, history_path: Path | None = None,
                  press_enter=None, screen=None, spool=None, window_title=None, app_id=None, undo=None,
-                 window_now=None, copy_selection=None):
+                 window_now=None, copy_selection=None, target_app=None):
         self.cfg = cfg
         self.recorder = recorder
         self.engine = engine
@@ -51,6 +51,7 @@ class App:
         self.spool = spool  # t0u.37: the recording on disk while it happens, for crash recovery
         self._window_title = window_title  # dictado-9jc.2: None -> ecoscribe.context.foreground_title
         self._app_id = app_id  # dictado-uee: read with the title (context.foreground_app) unless the title is given
+        self._target_app = target_app  # dictado-h0m: the app in front before the paste (None: deliver.foreground_exe)
         self._screen_factory = screen  # None: ecoscribe.context.ScreenNames (read lazily, Windows only)
         self._screen = None
         self._live = None  # dictado-live: the pill's live transcript for the recording in progress
@@ -382,7 +383,8 @@ class App:
                 log.info("dictation scratched")
                 return
         enter = False
-        if res.text and getattr(self.cfg.text, "voice_commands", False):
+        style = self._style()  # dictado-h0m: None unless per-app styles are on
+        if res.text and getattr(self.cfg.text, "voice_commands", False) and (style is None or style["commands"]):
             from .text import voice_commands
             text, enter = voice_commands(res.text)
             res = replace(res, text=text)
@@ -390,6 +392,9 @@ class App:
                 self.press_enter()
                 log.info("voice command: enter only")
                 return
+        if res.text and style is not None:  # before Replace and Snippets: what those write stays as written
+            from .app_styles import apply
+            res = replace(res, text=apply(res.text, style))
         if res.text:  # dictado-y52: "quote ... end quote" -> "..."
             from .text import spoken_quotes
             res = replace(res, text=spoken_quotes(res.text))
@@ -512,14 +517,36 @@ class App:
         from .coach import markers, pill_note
         return pill_note(markers(res.text, res.lang))
 
+    def _readers(self) -> None:
+        if self._window_title is None:
+            from .context import foreground_app, foreground_title
+            self._window_title, self._app_id = foreground_title, self._app_id or foreground_app
+
+    def _style(self) -> dict | None:
+        """dictado-h0m: the style of the kind of app in front right now (it gets the paste), or None
+        when per-app styles are off. The title is only read to tell the kind; it isn't kept."""
+        if not getattr(self.cfg.text, "per_app_styles", False):
+            return None
+        from . import app_styles
+        try:
+            self._readers()
+            if self._target_app is None:
+                from .deliver import foreground_exe
+                self._target_app = foreground_exe
+            app = (self._app_id() if self._app_id else "") or self._target_app()
+            k = app_styles.kind(app, self._window_title())
+        except Exception:
+            log.debug("app kind unknown", exc_info=True)
+            k = "other"
+        log.info("app style: %s", k)
+        return app_styles.table(getattr(self.cfg.text, "app_styles", None))[k]
+
     def _audience(self, target) -> str:
         """dictado-9jc.2: people / ai / other, from the app and (in a browser) the tab's title, read once
         right after the paste. Only the label is kept, never the title."""
         from .coach import audience
         try:
-            if self._window_title is None:
-                from .context import foreground_app, foreground_title
-                self._window_title, self._app_id = foreground_title, self._app_id or foreground_app
+            self._readers()
             app = self._app_id() if self._app_id else ""
             return audience(app or target, self._window_title())
         except Exception:

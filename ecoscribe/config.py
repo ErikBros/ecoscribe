@@ -77,6 +77,10 @@ class TextCfg:
     screen_names: bool = True
     replacements: dict = field(default_factory=dict)  # dictado-b7u: heard -> written, anywhere ("poll request" -> "pull request")
     snippets: dict = field(default_factory=dict)  # t0u.29: spoken trigger -> saved text ("my email" -> ...)
+    # dictado-h0m (app_styles.py): a style per kind of app (terminal, chat, email, other), picked at the paste:
+    # capital at the start, full stop at the end, voice commands. Off: every app as today.
+    per_app_styles: bool = False
+    app_styles: dict = field(default_factory=dict)  # {"chat": {"full_stop": false}, ...}; missing = app_styles.DEFAULTS
     # dictado-ehc (corrections.py): "scratch that" drops the sentence before it; a dictation with "no wait"
     # and the like goes to Claude (the user's Claude Code login), so off by default
     self_corrections: bool = False

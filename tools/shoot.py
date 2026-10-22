@@ -21,6 +21,7 @@ SHOTS = {
     "cargando": "page=inicio&state=loading",
     "gpu-descarga": "page=inicio&gpurt=downloading", "gpu-fallo": "page=inicio&gpurt=failed",  # dictado-7e1
     "ajustes-cambios": "page=ajustes&dirty=1",
+    "ajustes-estilos": "page=ajustes&styles=1",  # Style per app, switched on (dictado-h0m)
     "reuniones": "page=reuniones", "reuniones-vacia": "page=reuniones&rec=0",
     "reunion-directo": "page=reuniones/2026-10-05_1400_retro",
     "reunion-lista": "page=reuniones/2026-10-05_0915_planering",

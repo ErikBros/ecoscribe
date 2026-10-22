@@ -647,6 +647,20 @@ select:hover { border-color: var(--line-strong); }
 .vc-table th { text-align: left; font-weight: 600; color: var(--ink-soft); padding: 6px 8px; border-bottom: 1px solid var(--line); }
 .vc-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
 
+/* dictado-h0m: Style per app */
+.st-wrap { padding: 4px 0 14px; transition: opacity .15s; }
+.st-wrap.off { opacity: .5; }
+.st-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.st-table th, .st-table td { padding: 10px 8px; border-top: 1px solid var(--line); vertical-align: middle; text-align: left; }
+.st-table thead th { border-top: 0; font-weight: 600; color: var(--ink-soft); font-size: 12.5px; padding-top: 4px; white-space: nowrap; }
+.st-table .st-opt { text-align: center; width: 1%; padding-left: 14px; padding-right: 14px; }
+.st-table tbody th { font-weight: 400; min-width: 190px; }
+.st-table tbody th > span { display: block; }
+.st-table .switch { display: block; margin: 0 auto; }
+.st-sample { display: inline-block; padding: 4px 9px; border-radius: var(--radius-sm); background: var(--paper);
+  border: 1px solid var(--line); white-space: nowrap; }
+.st-note { margin: 8px 0 0; }
+
 /* dictation-languages: tick any mix */
 .lang-checks { display: flex; flex-wrap: wrap; gap: 8px; }
 .lang-check { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--line);

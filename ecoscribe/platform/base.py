@@ -49,6 +49,10 @@ CAPABILITIES: dict[str, dict] = {
         "windows": "ecoscribe.platform.windows.desktop:dark_title_bar",  # DWMWA_USE_IMMERSIVE_DARK_MODE
         "macos": ("ticket", "dictado-zkh"),  # follows the system already; a forced theme needs NSApp.appearance
     },
+    "Which app gets the paste, read just before it (Style per app)": {  # dictado-h0m
+        "windows": "ecoscribe.platform.windows.deliver:foreground_exe",  # + context.foreground_title for a browser tab
+        "macos": "ecoscribe.platform.macos.context:foreground_app,app_key,foreground_title",  # bundle id, not the translated name
+    },
     "Paste text where the cursor is": {
         "windows": "ecoscribe.platform.windows.deliver:deliver,set_clipboard_text",
         "macos": "ecoscribe.platform.macos.deliver:deliver,set_clipboard_text",
