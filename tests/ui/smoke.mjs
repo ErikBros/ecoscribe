@@ -223,6 +223,39 @@ async function load(query) {
     "GPU part download failed, why in the tooltip");
   check(doc.querySelector("#fact-engine") && (await load("page=inicio")).doc.querySelector("#fact-engine").textContent === "GPU · fast", "GPU as before");
 }
+{ // dictado-nmo: Install when idle, then the steps it goes through
+  const { window, doc, errors } = await load("page=inicio&update=1");
+  await sleep(50);
+  const idle = doc.querySelector("#update-idle"), get = doc.querySelector("#update-get");
+  check(!idle.hidden && !get.hidden, "the row offers Install when idle next to Download");
+  idle.click(); await sleep(50);
+  check(window.__updInstall === "1.18.0" && idle.hidden && get.hidden, "Install when idle okays that version; the buttons go");
+  check(/42%/.test(doc.querySelector("#update-sub").textContent) && /never during a call/.test(doc.querySelector("#update-sub").textContent),
+    "it says how far the download is and that it never installs during a call");
+  for (const [q, re] of [["ready", /is ready/], ["failed", /is out/]]) {
+    const { doc: d } = await load("page=inicio&update=" + q);
+    await sleep(50);
+    check(re.test(d.querySelector("#update-title").textContent), q + ": the title says so");
+    check(d.querySelector("#update-idle").hidden && d.querySelector("#update-get").hidden === (q === "ready"), q + ": the right buttons");
+  }
+  const { doc: mac } = await load("page=inicio&update=1&mac=1");
+  await sleep(50);
+  check(mac.querySelector("#update-idle").hidden && !mac.querySelector("#update-get").hidden, "the Mac keeps Download only");
+  check(errors.length === 0, "no JS errors with Install when idle: " + errors.join("; "));
+}
+{ // ajustes: Install new versions by itself (dictado-nmo), off by default, Windows only
+  const { window, doc } = await load("page=ajustes");
+  const sw = doc.querySelector("#f-auto-update");
+  check(sw?.checked === false && !doc.querySelector("#row-auto-update").hidden, "Install new versions by itself is there and off");
+  sw.checked = true; sw.dispatchEvent(new window.Event("change", { bubbles: true }));
+  let sent = null;
+  const api = window.__ecoscribe.api, orig = api.save_settings;
+  api.save_settings = async (x) => { sent = x; return orig(x); };
+  doc.querySelector("#save").click(); await sleep(100);
+  check(sent && sent.auto_update === true && Object.keys(sent).length === 1, "turning it on saves only that: " + JSON.stringify(sent));
+  const { doc: mac } = await load("page=ajustes&mac=1");
+  check(mac.querySelector("#row-auto-update").hidden, "the Mac hides it (dictado-6gr)");
+}
 { // stopped
   const { doc } = await load("page=inicio&state=stopped");
   check(doc.querySelector("#hero-actions button")?.textContent === "Start Ecoscribe", "stopped offers start button");

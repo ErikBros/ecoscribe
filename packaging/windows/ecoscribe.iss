@@ -54,7 +54,8 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
   ValueData: """{app}\Ecoscribe.exe"""; Tasks: startup; Flags: uninsdeletevalue
 
 [Run]
-Filename: "{app}\Ecoscribe.exe"; Description: "Open Ecoscribe"; Flags: nowait postinstall
+; a silent self-update at Quit passes /LAUNCH=0: Ecoscribe stays closed (dictado-nmo)
+Filename: "{app}\Ecoscribe.exe"; Description: "Open Ecoscribe"; Flags: nowait postinstall; Check: ShouldLaunch
 
 [InstallDelete]
 ; the 1.0 script deploy started itself from here; the installed app uses the Run key
@@ -71,6 +72,12 @@ Type: filesandordirs; Name: "{localappdata}\ecoscribe\runtime"
 [Code]
 const
   RunKey = 'Software\Microsoft\Windows\CurrentVersion\Run';
+
+{ /LAUNCH=0 (Ecoscribe's self-update when the user quit): don't start the app after installing. }
+function ShouldLaunch(): Boolean;
+begin
+  Result := ExpandConstant('{param:LAUNCH|1}') <> '0';
+end;
 
 procedure StopEcoscribe();
 var

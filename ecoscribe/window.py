@@ -221,13 +221,14 @@ class Api:
                 "screen_names": c.text.screen_names,
                 "hold_to_talk": c.hotkey.hold_to_talk, "numpad_enter": c.hotkey.numpad_enter, "voice_memory": c.meetings.voice_memory,
                 "calendar_url": c.meetings.calendar_url, "my_name": c.meetings.my_name, "debug_log": c.ui.debug_log,
-                "update_check": c.ui.update_check,
+                "update_check": c.ui.update_check, "auto_update": c.ui.auto_update,
                 "export_dir": str(self._export_dir()), "export_default": not c.ui.export_dir,
                 "extra_languages": list(c.whisper.extra_languages),
                 "snippets": [{"trigger": k, "text": v} for k, v in c.text.snippets.items()],
                 "replacements": [{"heard": k, "write": v} for k, v in c.text.replacements.items()],
             },
             "speakers_addon": diarize.addon_exe().is_file(),
+            "auto_update_supported": sys.platform == "win32",  # dictado-nmo: the Inno Setup installer
             "voice_command_list": _voice_command_list(),
             "correction_list": _correction_list(),
             "options": {
@@ -327,7 +328,8 @@ class Api:
                                          "screen_names": ("text", "screen_names"),
                                          "hold_to_talk": ("hotkey", "hold_to_talk"), "numpad_enter": ("hotkey", "numpad_enter"),
                                          "voice_memory": ("meetings", "voice_memory"),
-                                         "debug_log": ("ui", "debug_log"), "update_check": ("ui", "update_check")}.items():
+                                         "debug_log": ("ui", "debug_log"), "update_check": ("ui", "update_check"),
+                                         "auto_update": ("ui", "auto_update")}.items():
                 if key in values:
                     setattr(getattr(c, section), name, bool(values[key]))
         except ValueError as e:
@@ -1099,10 +1101,23 @@ class Api:
     def update_notice(self) -> dict:
         """Home: {"version", "url"} when a newer release is out and not dismissed; {} otherwise.
         Only reads what the app's daily check saved (updates.py): never waits on the network."""
-        from . import updates
-        if not self._load().ui.update_check:
+        from . import selfupdate, updates
+        cfg = self._load()
+        if not cfg.ui.update_check:
             return {}
-        return updates.notice(updates.load(self._data_dir), __version__) or {}
+        st = updates.load(self._data_dir)
+        n = updates.notice(st, __version__)
+        if not n:
+            return {}
+        return {**n, **selfupdate.home_state(st, __version__, cfg.ui.auto_update)}
+
+    def install_update_when_idle(self, version: str = "") -> dict:
+        """Home > Install when idle (dictado-nmo): the background app gets this version and installs it
+        when nothing is recording, dictating or being transcribed and nobody is at the computer, or at Quit."""
+        from . import selfupdate
+        if not selfupdate.SUPPORTED:
+            return {"ok": False}
+        return {"ok": selfupdate.allow_once(self._data_dir, version)}
 
     def open_update(self) -> dict:
         from . import updates

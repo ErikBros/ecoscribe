@@ -15,6 +15,8 @@ SHOTS = {
     **{f"setup-{k}": f"page=bienvenida&welcome=1&sstep={k}{q}" for k, q in
        (("permissions", "&mac=1"), ("models", ""), ("mic", ""), ("shortcut", ""), ("try", ""), ("done", ""))},
     "inicio-version": "page=inicio&update=1",
+    "inicio-version-descarga": "page=inicio&update=dl", "inicio-version-lista": "page=inicio&update=ready",
+    "inicio-version-fallo": "page=inicio&update=failed",  # Install when idle's steps (dictado-nmo)
     "detenido": "page=inicio&state=stopped",
     "cargando": "page=inicio&state=loading",
     "gpu-descarga": "page=inicio&gpurt=downloading", "gpu-fallo": "page=inicio&gpurt=failed",  # dictado-7e1
