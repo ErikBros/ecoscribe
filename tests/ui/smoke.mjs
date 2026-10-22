@@ -78,6 +78,13 @@ async function load(query) {
   doc.querySelector("#voices-forget").click(); await sleep(100);
   check(doc.querySelector("#voices-row").hidden, "forget all voices empties the list");
 }
+{ // "Command mode is off" box > Open Settings: Settings at the With Claude card, lit (dictado-1b7)
+  const { doc, errors } = await load("page=ajustes/claude");
+  await sleep(50);
+  const card = doc.querySelector('[data-card="claude"]');
+  check(!doc.querySelector("#page-ajustes").hidden && card && card.classList.contains("card-lit") && !errors.length,
+        "ajustes/claude: Settings open at the With Claude card, which lights up");
+}
 { // ajustes: Claude app (t0u.31)
   const { window, doc } = await load("page=ajustes");
   await sleep(50);

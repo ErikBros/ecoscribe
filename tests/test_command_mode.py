@@ -93,8 +93,8 @@ def test_a_failed_edit_pastes_nothing(tmp_path, monkeypatch):
 def test_off_or_nothing_selected_records_nothing(tmp_path):
     app, _ = _app(tmp_path, on=False)
     app.on_action("edit")
-    assert wait(lambda: flashes(app)) and app.state == "idle"
-    assert "Command mode is off ([text] command_mode)" in flashes(app)
+    assert wait(lambda: any(e[0] == "prompt" for e in app.ui.events)) and app.state == "idle"
+    assert ("prompt", "cmdoff", None, None) in app.ui.events  # a box with a button to the switch (dictado-1b7)
     app, _ = _app(tmp_path, selection="")
     app.on_action("edit")
     assert wait(lambda: "Select some text first" in flashes(app)) and app.state == "idle"

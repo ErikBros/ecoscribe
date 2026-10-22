@@ -152,6 +152,16 @@ class Api:
         missing file ("File not found"), which is how the first-run window used to open."""
         return self._page
 
+    def take_page(self) -> str | None:
+        """A page another process asked this open window to show (ipc.open_ui), once."""
+        p = self._data_dir / ipc.PAGE_FILE
+        try:
+            page = p.read_text(encoding="utf-8").strip()
+            p.unlink()
+        except OSError:
+            return None
+        return page or None
+
     # ---------------- status ----------------
     def get_status(self) -> dict:
         s = status.read(self._data_dir / "status.json") or {}

@@ -312,6 +312,8 @@ async function copy(text, btn) {
 const PAGES = ["inicio", "reuniones", "historial", "insights", "ajustes"];
 let current = null;
 async function show(page) {
+  let card = null;  // "ajustes/claude": Settings, scrolled to that card, which lights up (dictado-1b7)
+  if (page && page.startsWith("ajustes/")) { card = page.slice("ajustes/".length); page = "ajustes"; }
   if (page && page.startsWith("reuniones/")) { r.open = page.slice("reuniones/".length); r.next = 0; r.status = null; $("#r-segs").innerHTML = ""; page = "reuniones"; }
   if (!PAGES.includes(page)) page = "inicio";
   if (current === "ajustes" && page !== "ajustes") await stopMicTest();
@@ -324,6 +326,12 @@ async function show(page) {
   if (page === "historial") await renderHistory();
   if (page === "insights") await renderInsights();
   if (page === "ajustes") await renderSettings();
+  const el = card && $(`[data-card="${card}"]`);
+  if (el) {
+    if (el.dataset.sec && window.__secShow) window.__secShow(el.dataset.sec);  // its Settings tab
+    el.scrollIntoView?.({ block: "start" });
+    el.classList.remove("card-lit"); void el.offsetWidth; el.classList.add("card-lit");
+  }
 }
 
 /* ---------------------------------------------------------------- insights (dictado-3je) */
@@ -1984,6 +1992,10 @@ async function boot() {
   const w = await api.get_welcome();
   if (page === "bienvenida" || !w.done) openSetup();
   setInterval(refreshStatus, 1500);
+  setInterval(async () => {  // a notice's button asked this open window for a page (Windows; macOS calls show)
+    const p = api.take_page ? await api.take_page().catch(() => null) : null;
+    if (p) show(p);
+  }, 1000);
   if (params.get("demo") === "1" && params.get("retrymenu") === "1") setTimeout(() => $(".h-retry button")?.click(), 300);  // screenshot
   if (params.get("demo") === "1" && params.get("models") === "scroll") setTimeout(() => $("#m-rows").scrollIntoView(), 300);  // screenshot
   if (params.get("demo") === "1" && params.get("addlangs")) setTimeout(() => { sx.langs.push(...params.get("addlangs").split(",")); paintLangs(); }, 300);  // screenshot

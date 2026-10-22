@@ -180,6 +180,8 @@ def _start_meetings(cfg, data, ui, root, log, app=None):
             ipc.open_ui("reuniones/" + Path(prompt.app).name)
         elif choice == "mic":  # "Didn't hear you, twice": the mic picker and its test
             ipc.open_ui("ajustes")
+        elif choice == "claude":  # "Command mode is off": Settings at the With Claude card
+            ipc.open_ui("ajustes/claude")
         else:
             watch.answer(choice, lang)
     ui.prompts = PromptWindow(root, on_answer)

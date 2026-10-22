@@ -450,11 +450,11 @@ class App:
     def begin_edit(self) -> None:
         """Dictation key + E (command mode, dictado-ua2): copy the selection, then record what to change.
         The tap that stops the recording sends both to Claude; the answer replaces the selection."""
-        if not getattr(self.cfg.text, "command_mode", False):
-            self.ui.flash("Command mode is off ([text] command_mode)", 2.5)
-            return
         if self.copy_selection is None:
             self.ui.flash("Command mode isn't on this computer yet", 2.5)
+            return
+        if not getattr(self.cfg.text, "command_mode", False):
+            self.ui.prompt("cmdoff", None, None)  # where to turn it on, with a button to the switch
             return
         with self._lock:
             if self.state != "idle" or not self.ready:
