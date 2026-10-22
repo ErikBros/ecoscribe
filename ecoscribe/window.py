@@ -116,6 +116,9 @@ def _copy(text: str) -> None:
     set_clipboard_text(text, private=False)
 
 
+REPLACE_BACKUP = "transcript.before-replace.json"  # dictado-9lo: the transcript before the Replace list, for Undo
+BUSY = "It's still being written: try again when it has finished."
+
 MAILTO_MAX = 1800  # longer mailto: links get cut by Windows and some mail programs: copy the transcript instead
 
 
@@ -737,14 +740,90 @@ class Api:
         sessions.rename(self._session(name), title)
         return {"ok": True}
 
-    def delete_session(self, name: str) -> dict:
-        d = self._session(name)
+    def _busy(self, d: Path, speakers: bool = False) -> bool:
+        """Recording, transcribing or queued (or, with speakers, the speakers pass that rewrites transcript.json)."""
         st = meetings.read_state(self._data_dir)
         busy = {Path(x["dir"]).name for x in (st.get(k) for k in ("meeting", "job", "next_meeting")) if x}
         busy |= {Path(q).name for q in st.get("queue", [])}
-        if d.name in busy or sessions.read_meta(d).get("status") in meetings.ACTIVE:
+        m = sessions.read_meta(d)
+        return (d.name in busy or m.get("status") in meetings.ACTIVE
+                or (speakers and m.get("speakers") in ("pending", "running")))
+
+    def delete_session(self, name: str) -> dict:
+        d = self._session(name)
+        if self._busy(d):
             return {"ok": False, "error": "It's running: stop it before deleting it"}
         sessions.delete(d)
+        return {"ok": True}
+
+    # ---------- the Replace list on a saved transcript (dictado-9lo) ----------
+    def _replace_plan(self, name: str):
+        """(folder, transcript.json, the replaced segments, {heard: places}, the Replace list)."""
+        from .text import replace_counted
+        d = self._session(name)
+        table = dict(self._load().text.replacements)
+        try:
+            tr = json.loads((d / "transcript.json").read_text(encoding="utf-8"))
+            segs = tr["segments"]
+        except (OSError, ValueError, KeyError):
+            return d, None, [], {}, table
+        texts, counts = replace_counted([s.get("text", "") for s in segs], table)
+        return d, tr, [{**s, "text": t} for s, t in zip(segs, texts)], counts, table
+
+    @staticmethod
+    def _digest(p: Path) -> str:
+        import hashlib
+        return hashlib.sha256(p.read_bytes()).hexdigest()
+
+    def _can_undo_replace(self, d: Path) -> bool:
+        """Only right after: the backup is there and transcript.json is still what Apply wrote."""
+        after = (sessions.read_meta(d).get("replaced") or {}).get("after")
+        try:
+            return bool(after) and (d / REPLACE_BACKUP).is_file() and self._digest(d / "transcript.json") == after
+        except OSError:
+            return False
+
+    def replace_preview(self, name: str) -> dict:
+        """How many places the current Replace list would change in this transcript, per pair."""
+        d, tr, _, counts, table = self._replace_plan(name)
+        if self._busy(d, speakers=True):
+            return {"ok": False, "error": BUSY}
+        pairs = sorted(({"heard": k, "write": table.get(k, ""), "n": n} for k, n in counts.items()), key=lambda x: -x["n"])
+        return {"ok": True, "places": sum(counts.values()), "pairs": pairs, "empty": not table,
+                "undo": self._can_undo_replace(d)}
+
+    def apply_replacements(self, name: str) -> dict:
+        """Apply the Replace list to the saved transcript: transcript.json and its exports; the audio is
+        never touched. The transcript before it is kept as transcript.before-replace.json for one Undo."""
+        d, tr, segs, counts, table = self._replace_plan(name)
+        if self._busy(d, speakers=True):
+            return {"ok": False, "error": BUSY}
+        if not table:
+            return {"ok": False, "error": "Your Replace list is empty: add pairs in Settings › Languages and words."}
+        places = sum(counts.values())
+        if tr is None or not places:
+            return {"ok": True, "places": 0}
+        import shutil
+        tmp = d / (REPLACE_BACKUP + ".tmp")
+        shutil.copyfile(d / "transcript.json", tmp)  # the exact file, not a re-dump
+        sessions.replace_retry(tmp, d / REPLACE_BACKUP)
+        sessions._write_json(d / "transcript.json", {**tr, "segments": segs})
+        sessions.write_meta(d, replaced={"places": places, "after": self._digest(d / "transcript.json")})
+        export.write_all(d, self._me())
+        return {"ok": True, "places": places}
+
+    def undo_replacements(self, name: str) -> dict:
+        """Put back the transcript from before Apply, while nothing else has changed it since."""
+        d = self._session(name)
+        if self._busy(d, speakers=True):
+            return {"ok": False, "error": BUSY}
+        if not (d / REPLACE_BACKUP).is_file():
+            return {"ok": False, "error": "There's nothing to undo."}
+        if not self._can_undo_replace(d):
+            return {"ok": False, "error": "The transcript changed after the Replace list was applied, so it can't be undone."}
+        sessions.replace_retry(d / REPLACE_BACKUP, d / "transcript.json")
+        sessions.write_meta(d, replaced=None)
+        export.write_all(d, self._me())
         return {"ok": True}
 
     def open_folder(self, name: str) -> dict:
