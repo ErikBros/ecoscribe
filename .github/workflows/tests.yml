@@ -36,3 +36,5 @@ jobs:
         run: |
           npm install --no-audit --no-fund
           node tests/ui/smoke.mjs
+      - name: Look checklist (jsdom, docs/look-checklist.md)
+        run: node tests/ui/look.mjs

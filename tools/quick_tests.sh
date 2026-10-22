@@ -2,11 +2,11 @@
 # Fast checks (about 15 s) that Claude's finish check runs after a turn that edited app code
 # (.claude/quick-tests.json). The full suites stay in CLAUDE.md "Build & test" and CI.
 #   tools/quick_tests.sh py    core unit tests on Windows Python (from WSL)
-#   tools/quick_tests.sh js    the window's JavaScript (jsdom)
+#   tools/quick_tests.sh js    the window's JavaScript and the look checklist (jsdom)
 set -e
 cd "$(dirname "$0")/.."
 case "${1:-py}" in
-  js) exec npm run --silent smoke ;;
+  js) npm run --silent smoke && exec npm run --silent look ;;
   py)
     . tools/winpy.sh
     files=()
