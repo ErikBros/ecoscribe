@@ -11,6 +11,30 @@ import os
 import pytest
 
 MAC = sys.platform == "darwin"
+
+
+def _config_without_after_hook() -> None:
+    """Workers the tests start read the user's config (models, devices: what the GPU tests run on),
+    never their [transcribe] after_transcribe: that is the user's own program, and it would run on
+    test files and change them under the test. Windows: a copy of config.toml without that line,
+    in APPDATA for this run and every process it starts. (macOS keeps config and models in one
+    folder; ticket dictado-t6c.)"""
+    if MAC or os.environ.get("ECOSCRIBE_TEST_APPDATA"):
+        return
+    import re
+    import tempfile
+    real = Path(os.environ.get("APPDATA", Path.home())) / "ecoscribe" / "config.toml"
+    roaming = Path(tempfile.mkdtemp(prefix="ecoscribe-test-appdata-"))
+    (roaming / "ecoscribe").mkdir()
+    if real.exists():
+        text = real.read_text(encoding="utf-8")
+        (roaming / "ecoscribe" / "config.toml").write_text(
+            re.sub(r"(?ms)^\s*after_transcribe\s*=\s*(\[.*?\]|[^\n]*)$", "", text), encoding="utf-8")
+    os.environ["APPDATA"] = os.environ["ECOSCRIBE_TEST_APPDATA"] = str(roaming)
+
+
+_config_without_after_hook()
+
 # Windows-only modules (SendInput, the LL hook): run on the PC; macOS has its own tests for its versions
 collect_ignore = ["test_deliver_win.py", "test_hook_win.py", "test_hook_process.py"] if MAC else []
 
