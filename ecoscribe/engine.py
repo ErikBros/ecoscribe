@@ -135,6 +135,10 @@ class Engine:
     def _detect(self, chunk: np.ndarray, langs: list[str], full: bool = False) -> str:
         """The language of one piece among `langs`. The quick way feeds the encoder only the piece
         (faster-whisper: ~25 ms instead of ~160 ms for the 30 s window), used only when sure; full=True pads to 30 s."""
+        return self._detect_how(chunk, langs, full)[0]
+
+    def _detect_how(self, chunk: np.ndarray, langs: list[str], full: bool = False) -> tuple[str, bool]:
+        """_detect, and whether the answer came from the full check (dictado-8iu: never ask it twice)."""
         m = self.model
         if not full and hasattr(m, "feature_extractor") and hasattr(m, "model"):
             from faster_whisper.transcribe import get_ctranslate2_storage
@@ -151,11 +155,11 @@ class Engine:
             _, _, probs = m.detect_language(chunk)
         p = {k: v for k, v in probs if k in langs}
         if not p:
-            return langs[0]
+            return langs[0], full
         best = max(p, key=p.get)
         if not full and p[best] < QUICK_SURE:
-            return self._detect(chunk, langs, full=True)
-        return best
+            return self._detect_how(chunk, langs, full=True)
+        return best, full
 
     @staticmethod
     def _pieces(audio: np.ndarray) -> list[tuple[float, float]]:
@@ -173,14 +177,14 @@ class Engine:
         ps = self._pieces(audio)
         if len(ps) < 2:
             return None
-        got = [(a, b, self._detect(audio[int(a * SR):int(b * SR)], langs)) for a, b in ps]
+        got = [(a, b, *self._detect_how(audio[int(a * SR):int(b * SR)], langs)) for a, b in ps]
         dur: dict[str, float] = {}
-        for a, b, lang in got:
+        for a, b, lang, _full in got:
             dur[lang] = dur.get(lang, 0.0) + b - a
         main = max(dur, key=dur.get)
         runs: list[tuple[float, float, str]] = []
-        for a, b, lang in got:
-            if lang != main:
+        for a, b, lang, was_full in got:
+            if lang != main and not was_full:  # a full answer is the same on a repeat: no second ask
                 lang = self._detect(audio[int(a * SR):int(b * SR)], langs, full=True)
             if runs and runs[-1][2] == lang:
                 runs[-1] = (runs[-1][0], b, lang)
