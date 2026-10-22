@@ -94,8 +94,8 @@ function demoApi() {
   const sess = [
     ...(rec ? [S("2026-10-05_1400_retro", "Sprint retro", 12, "recording", { duration_s: null })] : []),
     S("2026-10-05_1130_podcast", "Super Easy Greek 12", 40, "running", { lang: "el", lang_name: "Greek", source: "import", pct: 42, duration_s: 412 }),
-    S("2026-10-05_0915_planering", "Planering vecka 41", 60 * 5, "done"),
-    S("2026-10-04_1600_kund", "Client call", 60 * 22, "done", { lang: "en", lang_name: "English", duration_s: 2710, speakers: "done", speaker_names: { "Speaker 2": "Ana" } }),
+    S("2026-10-05_0915_planering", "Planering vecka 41", 60 * 5, "done", { summary: "done" }),
+    S("2026-10-04_1600_kund", "Client call", 60 * 22, "done", { lang: "en", lang_name: "English", duration_s: 2710, speakers: "done", speaker_names: { "Speaker 2": "Ana" }, summary: "running" }),
     S("2026-10-03_1000_fallo", "Meeting", 60 * 50, "failed", { error: "CUDA out of memory", duration_s: 300 }),
   ];
   const SEGS = [
@@ -111,6 +111,12 @@ function demoApi() {
     { t0: 21.4, t1: 26.9, text: "I can confirm that on Friday after I talk to legal.", speaker: "Speaker 3" },
     { t0: 27.3, t1: 31.0, text: "Great, then we lock the plan today.", speaker: "Me" },
   ];
+  const SUMMARY = { kind: "job", checked: 2, total: 3,  // dictado-nl5: what summary.json holds, invented
+    summary: "Retro om den långsamma deployen i torsdags: orsaken var cachen efter migreringen.",
+    decisions: [{ text: "Rensa cachen efter varje migrering", at: "00:00:16", quote: "Vi glömde att rensa den efter migreringen", checked: true }],
+    todos: [{ text: "Skriv in åtgärden i nästa sprint", at: "00:00:22", quote: "då skriver vi in det som en åtgärd", checked: true },
+            { text: "Boka en genomgång med plattformsteamet", at: "00:00:25", quote: "vi bokar en genomgång med plattformsteamet", checked: false }],
+    open_questions: [] };
   let liveN = 2;
   const notes = { "2026-10-05_1400_retro": "- Is the export date firm?\n- Ask legal about the format" };
   const find = (n) => sess.find((s) => s.name === n);
@@ -119,7 +125,7 @@ function demoApi() {
   return {
     list_sessions: async (q) => ({ items: sess.filter((s) => !q || s.title.toLowerCase().includes(q.toLowerCase())), state: mstate() }),
     get_session: async (n) => ({ session: find(n), segments: find(n)?.status !== "done" ? [] : n.endsWith("kund") ? SEGS_MULTI : SEGS,
-      exports: ["transcript.txt"], notes: notes[n] || "" }),
+      exports: ["transcript.txt"], notes: notes[n] || "", summary: find(n)?.summary === "done" ? SUMMARY : null }),
     voices_info: async () => window.__noVoices ? { count: 0, names: [], on: true } : { count: 2, names: ["Ana", "Tom"], on: true },
     crashes: async () => (params.get("crash") === "1" ? { items: [{ name: "2026-10-06_140325", when: "2026-10-06 140325", exit: MAC ? "unknown" : "0xC0000005 (access violation)" }], gave_up: false } : { items: [], gave_up: false }),
     copy_crash_report: async () => ({ ok: true }), dismiss_crash: async () => ({ ok: true }),
@@ -824,10 +830,57 @@ async function openSession(name) {
   $("#r-jump").hidden = true;
   await renderDetail(name);
 }
+/* the call's summary (dictado-nl5): every point with its moment in the call, and marked when its words weren't found */
+const SUM_SECTIONS = [["decisions", "Decisions"], ["todos", "To-dos"], ["open_questions", "Open questions"]];
+const atSecs = (at) => String(at || "").split(":").reduce((t, x) => t * 60 + (Number(x) || 0), 0);
+function renderSummary(s, summ) {
+  const box = $("#r-summary");
+  box.hidden = !(summ || s.summary === "running");
+  if (box.hidden) return;
+  $("#r-sum-check").textContent = summ ? `${summ.checked} of ${summ.total} points found in the call` : "";
+  const text = $("#r-sum-text");
+  text.textContent = summ ? (summ.summary || "") : "Writing the summary…";
+  text.classList.toggle("muted", !summ);
+  const lists = $("#r-sum-lists");
+  lists.textContent = "";
+  if (!summ) return;
+  for (const [key, title] of SUM_SECTIONS) {
+    const items = summ[key] || [];
+    if (!items.length) continue;
+    const h = document.createElement("h4"); h.className = "r-sum-h"; h.textContent = title;
+    const ul = document.createElement("ul"); ul.className = "r-sum-list";
+    for (const it of items) {
+      const li = document.createElement("li");
+      const txt = document.createElement("span"); txt.className = "r-sum-item";
+      txt.textContent = it.text + (it.who ? ` (${it.who})` : "");
+      const at = document.createElement("button"); at.type = "button"; at.className = "r-sum-at";
+      at.textContent = fmtT(atSecs(it.at)); at.title = "Go to this moment in the transcript";
+      at.onclick = () => jumpTo(atSecs(it.at));
+      li.append(txt, at);
+      if (!it.checked) {
+        li.classList.add("unchecked");
+        const miss = document.createElement("span"); miss.className = "r-sum-miss"; miss.textContent = "Not found in the call";
+        miss.title = "The words this point came from aren't in the transcript near that moment: check it before you rely on it.";
+        li.append(miss);
+      }
+      ul.append(li);
+    }
+    lists.append(h, ul);
+  }
+}
+function jumpTo(t) {  // the last line that starts at or before t
+  const lines = [...$$("#r-segs .r-seg")];
+  const li = lines.filter((x) => Number(x.dataset.t0) <= t + 1).pop() || lines[0];
+  if (!li) return;
+  const list = $("#r-segs");
+  list.scrollTop = li.offsetTop - list.offsetTop - 8;
+  li.classList.remove("r-seg-hit"); void li.offsetWidth; li.classList.add("r-seg-hit");
+}
 function whoName(label) { return r.names[label] || SPEAKER[label] || label || ""; }  // transcripts before 1.2.1 say Yo / Otros
 function segLi(s, editable) {
   const li = document.createElement("li");
   li.className = "r-seg";
+  li.dataset.t0 = s.t0;
   const t = document.createElement("span");
   t.className = "r-t"; t.textContent = fmtT(s.t0);
   const who = document.createElement("span");
@@ -854,7 +907,7 @@ function segLi(s, editable) {
 async function renderDetail(name) {
   $("#r-list-view").hidden = true; $("#r-detail-view").hidden = false;
   const live = r.status === null || r.status === "recording" || r.status === "stopping" || r.status === "finalizing";
-  let s, segs = null;
+  let s, segs = null, summ = null;
   try {
     if (live) {
       const out = await api.get_live(name, r.next);
@@ -870,7 +923,7 @@ async function renderDetail(name) {
     }
     if (!s || !(s.status === "recording" || s.status === "finalizing" || s.status === "stopping")) {
       const out = await api.get_session(name);
-      s = out.session; segs = out.segments;
+      s = out.session; segs = out.segments; summ = out.summary || null;
       notesIn(out.notes);
     }
   } catch (e) {
@@ -914,6 +967,7 @@ async function renderDetail(name) {
     list.innerHTML = "";
     for (const x of segs) list.append(segLi(x, s.status === "done"));
   }
+  renderSummary(s, s.status === "done" ? summ : null);
   const n = $("#r-segs").childElementCount;
   $("#r-segs-empty").hidden = n > 0;
   $("#r-segs-empty-text").textContent = s.status === "failed" ? `Failed: ${s.error || "unknown error"}`

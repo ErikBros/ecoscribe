@@ -212,6 +212,14 @@ def test_done_prompt_says_which_meeting(tmp_path):
     assert meetui.Prompt("done", str(tmp_path / "gone"), None, opened_at=0.0).question == ""  # no meta: no line
 
 
+def test_summary_prompt_says_which_meeting_and_opens_it(tmp_path):  # dictado-nl5
+    d = sessions.create("Weekly planning", "sv", "meeting", tmp_path)
+    sessions.write_meta(d, duration_s=23 * 60 + 10)
+    p = meetui.Prompt("summary", str(d), None, opened_at=0.0)
+    assert p.title == "Summary ready" and p.question == "Weekly planning · 23 min"
+    assert [c for _l, c in p.buttons] == ["abrir", "hide"]
+
+
 def test_nomic_prompt_names_the_mic():
     p = meetui.Prompt("nomic", "Zone Vibe 100", None, opened_at=0.0)
     assert "Zone Vibe 100" in p.question and [c for _l, c in p.buttons] == ["mic", "hide"]

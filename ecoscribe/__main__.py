@@ -198,6 +198,7 @@ def _start_meetings(cfg, data, ui, root, log, app=None):
             busy = {x["dir"] for x in (st["meeting"], st["job"], st["next_meeting"]) if x} | set(st["queue"])
             for d in sweeper.tick(busy):
                 log.info("summary ready %s", Path(d).name)
+                ui.prompt("summary", str(d), None)  # dictado-nl5: Open goes to the meeting, summary on top
             line = meetui.last_live_line(st["meeting"]["dir"]) if st["meeting"] else None
             ui.set_meeting(st, meetui.meeting_view(st, time.time(), line))
             for kind, d in tracker.update(st):

@@ -201,3 +201,15 @@ def test_voice_commands_setting_round_trips(env):
     assert api.get_settings()["values"]["voice_commands"] is False  # off by default
     assert api.save_settings({"voice_commands": True})["ok"]
     assert api.get_settings()["values"]["voice_commands"] is True
+
+
+def test_get_session_carries_the_checked_summary(env):  # dictado-nl5
+    api, root, *_ = env
+    d = make(root, "Retro", 2, segs=[{"t0": 0, "t1": 2, "text": "Hej", "speaker": "Others"}])
+    assert api.get_session(d.name)["summary"] is None and api.get_session(d.name)["session"]["summary"] is None
+    sessions.write_meta(d, summary="done")
+    (d / "summary.json").write_text(json.dumps({"summary": "Kort.", "checked": 1, "total": 1}), encoding="utf-8")
+    s = api.get_session(d.name)
+    assert s["summary"]["checked"] == 1 and s["session"]["summary"] == "done"
+    (d / "summary.json").write_text("{half", encoding="utf-8")  # being written: no card, no error
+    assert api.get_session(d.name)["summary"] is None
