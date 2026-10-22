@@ -36,6 +36,7 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Meeting names, guests and Email participants from Google Calendar by signing in (no iCal link needed; an older meeting looks its event up on Email participants) | done (dictado-k19; token DPAPI-encrypted) | check on Mac (dictado-k19; token in an owner-only file) |
 | Meeting name from the Google Meet tab when the calendar has no event (no link, or the secret address is turned off) | done | check on Mac (dictado-4ar: window titles via Accessibility) |
 | Your own command after a transcript is done ([transcribe] after_transcribe in config.toml; gets the session folder, runs detached) | done | check on Mac (shared code; detached with start_new_session) |
+| Personal calls: Signal / WhatsApp / Telegram / Discord, a title starting "p-", or a language listed in [personal]; automatic steps over meetings touch only these (dictado-qlj) | done | done (shared code) |
 | File transcription (drag and drop) | done | done (installed app: Greek file on the Apple GPU, 2.4% WER) |
 | First-run setup: languages, speech models (both recommended, with download progress), mic test, dictation key, a first dictation, summary; Settings > Run setup again | done | done (checked with a fresh data folder: both models downloaded with a moving bar, the first dictation pasted into the box) |
 | Crash reports, freeze traces, watchdog restart | done | done |

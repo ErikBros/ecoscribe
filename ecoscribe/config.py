@@ -140,6 +140,16 @@ class MeetingsCfg:
 
 
 @dataclass
+class PersonalCfg:
+    """dictado-qlj: which recorded sessions count as personal. Automatic steps over meetings (summaries)
+    only ever touch these; asking about any session by hand still works. A session's own meta
+    "personal": true/false wins over the rules below."""
+    apps: list = field(default_factory=lambda: ["signal", "whatsapp", "telegram", "discord"])
+    languages: list = field(default_factory=list)  # e.g. ["el"]: a call in this language is personal (a language class)
+    title_prefix: str = "p-"  # a title that starts with this marks a call personal by hand
+
+
+@dataclass
 class Config:
     hotkey: HotkeyCfg = field(default_factory=HotkeyCfg)
     audio: AudioCfg = field(default_factory=AudioCfg)
@@ -149,6 +159,7 @@ class Config:
     limits: LimitsCfg = field(default_factory=LimitsCfg)
     transcribe: TranscribeCfg = field(default_factory=TranscribeCfg)
     meetings: MeetingsCfg = field(default_factory=MeetingsCfg)
+    personal: PersonalCfg = field(default_factory=PersonalCfg)
 
 
 def load(path: Path | None) -> Config:
