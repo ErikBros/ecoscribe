@@ -9,11 +9,12 @@ shown for approval (CLAUDE.md rule 10). `tests/ui/look.mjs` checks the ones a te
 2. **No placeholders.** No "—" or empty boxes: say what is missing ("No mic yet"). (**test**)
 3. **The words match the state.** Stopped or loading: no "tap the key"; failed: say what failed and what to do. (**test**)
 4. **Status shows once per screen.** One place says Ready / Recording / Stopped. (**test**)
-5. **One colour set.** Colours, sizes and corner radii come from the `:root` tokens; the count of colours written
-   elsewhere may only go down. (**test**, a ratchet)
+5. **One colour set.** Colours, font sizes and corner radii come from the `:root` tokens in app.css (the light set
+   matches `ecoscribe/palette.py`); `tests/test_look_tokens.py` fails on any value written elsewhere. Check the
+   screen in dark mode too (`&theme=dark` on a demo page; `tools/shoot.py` has the `-oscuro` shots). (**test**)
 6. **One badge family.** Status chips share one shape, size and type; only the token colour changes.
 7. **A primary button never looks disabled while it works.** Disabled looks only when a click does nothing.
 8. **Numbers line up.** Tabular figures in tables, lists and timers.
 9. **Uses the width.** Checked at 980 (the window), 1470 and 1920 px: no half-empty screen at desktop width,
    nothing cut off in the window.
-10. **One icon style.** Same stroke width and size as the icons next to it.
+10. **One icon style.** Same stroke width (`--icon-stroke`, **test**) and size as the icons next to it.

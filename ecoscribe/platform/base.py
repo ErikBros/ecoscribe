@@ -41,6 +41,14 @@ CAPABILITIES: dict[str, dict] = {
         "windows": "ecoscribe.platform.windows.context:focus_kind,classify_focus",
         "macos": "ecoscribe.platform.macos.context:focus_kind,classify_focus",  # Accessibility: the focused element's role
     },
+    "Dark mode follows the system (Settings > Appearance: Match / Light / Dark)": {  # dictado-u9h
+        "windows": "ecoscribe.platform.windows.desktop:system_dark",  # AppsUseLightTheme; the page: prefers-color-scheme
+        "macos": "ecoscribe.platform.macos.desktop:system_dark",  # AppleInterfaceStyle
+    },
+    "Title bar matches the window's light or dark look": {  # dictado-u9h
+        "windows": "ecoscribe.platform.windows.desktop:dark_title_bar",  # DWMWA_USE_IMMERSIVE_DARK_MODE
+        "macos": ("ticket", "dictado-zkh"),  # follows the system already; a forced theme needs NSApp.appearance
+    },
     "Paste text where the cursor is": {
         "windows": "ecoscribe.platform.windows.deliver:deliver,set_clipboard_text",
         "macos": "ecoscribe.platform.macos.deliver:deliver,set_clipboard_text",

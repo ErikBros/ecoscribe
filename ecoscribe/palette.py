@@ -25,6 +25,11 @@ CLAY_BRIGHT = "#e06a35"   # the dot on the "a call started" tile
 TILE_CALL = "#3a2a22"     # the icon tile of "a call started"
 TILE_NOTE = "#2a3542"     # the icon tile of every other prompt
 
+# dictado-u9h: the window in dark mode (its page colour, before the page paints) and the prompt box's
+# transparency key (not a colour anyone sees)
+PAPER_DARK = "#10161c"
+COLOR_KEY = "#010203"
+
 
 def rgb(hex_color: str) -> tuple[int, int, int]:
     h = hex_color.lstrip("#")

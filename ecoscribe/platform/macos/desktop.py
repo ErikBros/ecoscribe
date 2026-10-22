@@ -27,3 +27,12 @@ def input_names() -> list[str]:
 
 WEBVIEW_GUI = "cocoa"
 DEFAULT_MIC_LABEL = "System default"
+
+
+def system_dark() -> bool:
+    """dictado-u9h: macOS is in Dark appearance (System Settings > Appearance)."""
+    try:
+        out = subprocess.run(["defaults", "read", "-g", "AppleInterfaceStyle"], capture_output=True, text=True, timeout=2)
+        return out.stdout.strip().lower() == "dark"
+    except Exception:
+        return False

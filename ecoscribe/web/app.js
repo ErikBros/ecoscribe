@@ -60,7 +60,7 @@ function demoApi() {
   const dl = { running: false, error: null, models: {} };  // the demo model download
   let settings = {
     values: { hotkey: "rctrl", mic: "Anker PowerConf", languages: "en", sounds: true, overlay: true, live_text: true, insights: params.get("insights") === "1", speech_feedback: false, unmute: true, startup: true,
-      meet_mode: "prompt", meet_end: "10", meet_lang: "sv", on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: false, self_corrections: false, command_mode: false, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, update_check: true, auto_update: params.get("auto") === "1",
+      meet_mode: "prompt", meet_end: "10", meet_lang: "sv", on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: false, self_corrections: false, command_mode: false, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, update_check: true, auto_update: params.get("auto") === "1", theme: params.get("theme") || "system",
       export_dir: "C:/x/Downloads", export_default: true,
       snippets: [{ trigger: "my email", text: "alex@example.com" }], replacements: [{ heard: "poll request", write: "pull request" }] },
     options: {
@@ -70,6 +70,7 @@ function demoApi() {
       base_languages: ["en", "sv"],
       all_languages: [{ value: "el", label: "Greek" }, { value: "de", label: "German" }, { value: "es", label: "Spanish" }, { value: "fr", label: "French" }],
       meet_modes: [{ value: "prompt", label: "Ask" }, { value: "auto", label: "Start by itself" }, { value: "off", label: "Don't detect" }],
+      themes: [{ value: "system", label: MAC ? "Match macOS" : "Match Windows" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }],
       meet_ends: [{ value: "5", label: "5 seconds" }, { value: "10", label: "10 seconds" }, { value: "15", label: "15 seconds" }, { value: "30", label: "30 seconds" }, { value: "60", label: "1 minute" }, { value: "120", label: "2 minutes" }],
       meet_langs: [{ value: "en", label: "English" }, { value: "sv", label: "Swedish" }, { value: "en,sv", label: "English + Swedish" }, { value: "auto", label: "Detect" }],
     },
@@ -276,6 +277,8 @@ function demoApi() {
     clear_history: async () => { history.length = 0; return { ok: true }; },
     open_log: async () => ({ ok: true }),
     get_welcome: async () => ({ done: params.get("welcome") !== "1" }),
+    get_theme: async () => ({ theme: settings.values.theme }),
+    window_theme: async () => ({ ok: true }),
     finish_welcome: async () => ({ ok: true }),
     setup_info: async (langs) => {
       const big = (langs || "").split(",").some((c) => c && !["en", "es", "de", "fr"].includes(c));
@@ -601,7 +604,7 @@ async function renderInsights() {
     tipValue: `${v} ${v === 1 ? "dictation" : "dictations"}`, tipLabel: `${String(h).padStart(2, "0")}:00-${String((h + 1) % 24).padStart(2, "0")}:00` })),
     (i) => i % 6 === 0);
   const busy = d.rhythm.hours.indexOf(peak), hh = (h) => `${String(h % 24).padStart(2, "0")}:00`;  // dictado-7qo
-  $("#i-hours-note").textContent = `The dark bar is your busiest hour, ${hh(busy)}-${hh(busy + 1)}.`;
+  $("#i-hours-note").textContent = `The highlighted bar is your busiest hour, ${hh(busy)}-${hh(busy + 1)}.`;
   const n = d.rhythm.days.length;
   columns($("#i-days"), d.rhythm.days.map((x, i) => {
     const dt = new Date(x.date + "T12:00:00");
@@ -1566,6 +1569,7 @@ function formValues() {
     speakers: $("#f-speakers").checked, voice_commands: $("#f-voice-commands").checked,
     self_corrections: $("#f-self-corrections").checked, command_mode: $("#f-command-mode").checked,
     screen_names: $("#f-screen-names").checked, hold_to_talk: $("#f-hold").checked, numpad_enter: $("#f-numpad-enter").checked,
+    theme: $("#f-theme").value || "system",
     voice_memory: $("#f-voice-memory").checked, debug_log: $("#f-debug-log").checked, update_check: $("#f-update-check").checked, auto_update: $("#f-auto-update").checked, calendar_url: $("#f-calendar").value.trim(), my_name: $("#f-my-name").value.trim(),
     vocabulary: $("#f-vocabulary").value.split("\n").map((w) => w.trim()).filter(Boolean).join("\n"),
     snippets: $$(".snip").map((r) => ({ trigger: $(".snip-trigger", r).value.trim().toLowerCase().replace(/\s+/g, " "),
@@ -1711,6 +1715,10 @@ async function renderSettings() {
   $("#f-update-check").checked = s.values.update_check !== false;
   $("#f-auto-update").checked = !!s.values.auto_update;  // dictado-nmo: off by default
   $("#row-auto-update").hidden = !s.auto_update_supported;  // the Mac: Download only (dictado-6gr)
+  fillSelect($("#f-theme"), s.options.themes || [{ value: "system", label: "Match Windows" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }],
+             s.values.theme || "system");
+  applyTheme(s.values.theme || "system");  // back to the saved one (Discard, or a preview left unsaved)
+  $("#f-theme").onchange = () => { applyTheme($("#f-theme").value, false); dirty(); };  // a preview until Save
   const vc = $("#vc-rows"); vc.innerHTML = "";
   if (params.get("vc") === "1") $("#vc-list").open = true;  // screenshot
   for (const r of s.voice_command_list || []) {
@@ -1771,7 +1779,8 @@ async function save() {
   saved = v;
   $("#savebar").hidden = true;
   if ("insights" in changed) $("#nav-insights").hidden = !v.insights;
-  const needsRestart = Object.keys(changed).some((k) => k !== "startup" && k !== "insights");
+  if ("theme" in changed) applyTheme(v.theme);
+  const needsRestart = Object.keys(changed).some((k) => k !== "startup" && k !== "insights" && k !== "theme");
   toast(!needsRestart ? "Saved." : r.restarting ? "Saved. Ecoscribe restarts, a few seconds."
     : "Saved. It applies the next time Ecoscribe starts.");
   refreshStatus();
@@ -2195,8 +2204,20 @@ function setupWire() {
 }
 
 /* ---------------------------------------------------------------- boot */
+/* Light or dark (dictado-u9h): index.html's head picks it before the first paint from the last choice; the
+   saved one is checked here, and "system" keeps following the OS while the window is open. */
+let themeChoice = "system";
+function applyTheme(choice, remember = true) {
+  if (remember) { themeChoice = choice || "system"; store("ecoscribe.theme", themeChoice); }
+  const c = choice || "system";
+  const dark = c === "dark" || (c !== "light" && !!window.matchMedia?.("(prefers-color-scheme: dark)").matches);
+  document.documentElement.dataset.theme = dark ? "dark" : "light";
+  try { api?.window_theme?.(dark)?.catch?.(() => {}); } catch {}
+}
 async function boot() {
   api = getApi();
+  try { applyTheme(params.get("theme") || (await api.get_theme()).theme); } catch { applyTheme(store("ecoscribe.theme") || "system"); }
+  window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", () => applyTheme(themeChoice, false));
   if (MAC) macify();
   try { R_LANGS = (await api.get_settings()).options.meet_langs.map((o) => [o.value, o.label]); } catch {}
   for (const b of $$(".nav-item")) b.onclick = () => { if (b.dataset.page === "reuniones") r.open = null; show(b.dataset.page); };
@@ -2264,6 +2285,7 @@ function macify() {
   set("#hk-hint", HK_HINT);
   for (const el of $$(".tip .keys kbd.key")) if (el.textContent === "Ctrl") el.textContent = "⌘";
   const startup = $("#row-startup .row-label"); if (startup) startup.textContent = "Open at login";
+  set("#theme-help", "Light or dark. Match macOS follows the Mac's own setting (System Settings, Appearance).");
   const unmute = $("#f-unmute"); if (unmute) unmute.closest("label").hidden = true;  // a PC fix (mics muted at 0)
   for (const el of $$("#page-ajustes .muted")) {  // dictado-p7c: Mac words in Settings
     el.innerHTML = el.innerHTML.replaceAll("this PC", "this Mac")

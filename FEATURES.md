@@ -19,6 +19,7 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Pill with timer, level and cancel hint | done (minimal: dot, waveform, timer; the hint for 2 s) | done (dictado-dlm: breathing dot, 24-bar waveform, timer; keycaps hint for 2 s; pill A since dictado-v5g) |
 | Pill A: every state and notice is one 40 px dark capsule (turning arc for Writing it down, a language badge, a struck mic + the mic's name, a warning ring); notice.py turns a flash into icon + words + detail | done (dictado-v5g) | done (dictado-v5g: the same capsule, arc, badge, struck mic and warning ring; flashes through notice(); drawn offscreen and checked against the board) |
 | Window: Home, History, Meetings, Settings | done | done |
+| One look: every colour, corner and font size of the window from the tokens in app.css (matching palette.py), checked by tests/test_look_tokens.py; dark mode that follows the system or Settings > Appearance (dictado-u9h) | done | check on Mac (shared page; WKWebView follows the system) |
 | Languages: English + Swedish built in, "Add a language" for any of Whisper's 100; dictation auto-detects among the ticked ones | done | done (auto-detect: English + Spanish at the Mac desktop, 100 % recall; "Add a language": German + Finnish added in the real Settings page, saved, in the menu bar and meeting lists, removed again (tools/mac_lang_check.py); dictated at the desktop, 100 % recall, Finnish moves dictation to large-v3) |
 | Several languages in one dictation (Spanish + Greek...): each piece between pauses in its own language | done (a breath at the switch is enough; +0.1-0.6 s) | done (mlx quick piece check, ~0.1 s a piece; es + el on large-v3: 12 s mixed dictation in 2.3-2.9 s, right in 7 of 8 real clips) |
 | Pill shows the language it heard, tray "Next dictation in" | done | check on Mac |
@@ -68,6 +69,8 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Command mode (dictation key + E: say how to change the selection) | done (the selection by Ctrl+C, clipboard put back; Haiku's answer pasted over it, Ctrl+Z undoes; [text] command_mode, off by default) (dictado-ua2) | ticket dictado-waw |
 | Numpad Enter as a second dictation key | done (Settings > Numpad Enter dictates too; swallowed, the main Enter untouched) | done (keypad Enter, keycode 76, on an external keyboard; swallowed, Return untouched) |
 | No text box at the stop: keep it on the clipboard, say so | done (UI Automation: desktop, file lists, buttons; unknown windows still get the paste) | done (Accessibility role: Finder icons and lists, buttons; unknown still pastes; the pill says ⌘V) |
+| Dark mode follows the system (Settings > Appearance: Match / Light / Dark) | done (Windows app mode) | done (macOS appearance) |
+| Title bar matches the window's light or dark look | done (Windows 11 dark title bar) | follows the system appearance; a forced Light or Dark: dictado-zkh |
 | Paste text where the cursor is | done (clipboard + Ctrl+V) | done (NSPasteboard + Cmd+V) |
 | Names on your screen | done (UI Automation, one COM thread) | done (Accessibility API) |
 | Speech engine on the GPU | done (faster-whisper, CUDA) | done (mlx-whisper, Metal) |

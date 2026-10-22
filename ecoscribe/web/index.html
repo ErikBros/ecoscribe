@@ -5,15 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ecoscribe</title>
 <link rel="stylesheet" href="app.css">
+<script>  /* dictado-u9h: light or dark before the first paint (Settings > Appearance, else the system's) */
+  (function () {
+    var t = null; try { t = localStorage.getItem("ecoscribe.theme"); } catch (e) {}
+    var q = new URLSearchParams(location.search).get("theme"); if (q) t = q;
+    var dark = t === "dark" || (t !== "light" && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+  })();
+</script>
 </head>
 <body>
 <div class="shell">
   <aside class="side">
     <div class="brand">
       <svg class="mark" viewBox="0 0 48 48" aria-hidden="true"><!-- logo A, Lines (dictado-6oe.1) -->
-        <rect width="48" height="48" rx="11" fill="var(--aegean)"/>
-        <path d="M13 15h22M13 24h15M13 33h22" stroke="var(--paper)" stroke-width="4.2" stroke-linecap="round"/>
-        <circle cx="34" cy="24" r="2.6" fill="#e58a5f"/>
+        <rect width="48" height="48" rx="11" fill="var(--logo)"/>
+        <path d="M13 15h22M13 24h15M13 33h22" stroke="var(--logo-line)" stroke-width="4.2" stroke-linecap="round"/>
+        <circle cx="34" cy="24" r="2.6" fill="var(--clay-light)"/>
       </svg>
       <div>
         <div class="brand-name">Ecoscribe</div>
@@ -257,7 +265,7 @@
             <div id="i-pace-rows"></div>
             <div class="i-sub">Messages to people, by words a minute</div>
             <div class="i-chart" id="i-pace-hist" data-label="Messages to people by pace"></div>
-            <p class="muted small" id="i-pace-note">Listeners follow most easily at about 130-160 words a minute (the darker bars). That's information, not a goal: slower is fine when it's clear.</p>
+            <p class="muted small" id="i-pace-note">Listeners follow most easily at about 130-160 words a minute (the highlighted bars). That's information, not a goal: slower is fine when it's clear.</p>
           </div>
         </div>
         <div class="card i-card" id="i-meet-card">
@@ -432,6 +440,8 @@
 
         <div class="card group" data-sec="dictation">
           <div class="group-head"><h3>Behaviour</h3></div>
+          <label class="row"><span class="row-text"><span class="row-label">Appearance</span><span class="muted small" id="theme-help">Light or dark. Match Windows follows Windows' own setting (Personalisation, Colours).</span></span>
+            <select name="theme" id="f-theme"></select></label>
           <label class="row toggle-row"><span class="row-text"><span class="row-label">Free the GPU when you're not dictating</span>
             <span class="muted small">The model loads when you tap the key (while you talk) and unloads after 10 minutes without dictating.</span></span>
             <input type="checkbox" class="switch" name="on_demand" id="f-on-demand"></label>
@@ -507,7 +517,7 @@
 <!-- SETUP (dictado-zpz): the first run, full window. Steps are shown or skipped per platform. -->
 <div class="setup" id="setup" hidden>
   <aside class="s-side">  <!-- a dark side panel listing the steps (dictado-6oe.8) -->
-    <div class="s-brand"><svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="11" fill="#23557a"/><path d="M13 15h22M13 24h15M13 33h22" stroke="#f6f5f1" stroke-width="4.2" stroke-linecap="round"/><circle cx="34" cy="24" r="2.6" fill="#e58a5f"/></svg>Ecoscribe</div>
+    <div class="s-brand"><svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="11" fill="var(--logo)"/><path d="M13 15h22M13 24h15M13 33h22" stroke="var(--logo-line)" stroke-width="4.2" stroke-linecap="round"/><circle cx="34" cy="24" r="2.6" fill="var(--clay-light)"/></svg>Ecoscribe</div>
     <ol class="s-steps" id="s-steps" aria-label="Setup steps"></ol>
     <p class="s-side-note">Everything runs on this computer. Nothing you say leaves it.</p>
   </aside>

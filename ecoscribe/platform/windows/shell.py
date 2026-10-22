@@ -43,7 +43,7 @@ SW_HIDE, SW_SHOWNOACTIVATE = 0, 4
 HWND_TOPMOST = w.HWND(-1)
 SWP_NOSIZE, SWP_NOACTIVATE = 0x1, 0x10
 W, H = 210, 44  # the window before its first picture
-KEY = "#010203"  # transparent color key, gives the prompt box round corners
+KEY = P.COLOR_KEY  # transparent color key, gives the prompt box round corners
 _u = ctypes.WinDLL("user32", use_last_error=True)  # own handles: argtypes here don't leak to other modules
 _gdi = ctypes.WinDLL("gdi32")
 

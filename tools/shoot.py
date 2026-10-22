@@ -31,6 +31,11 @@ SHOTS = {
     "reunion-sin-invitados": "page=reuniones/2026-10-05_0915_planering&noguests=1&email=1",  # Email participants, no invite (dictado-qxr)
     "historial-editar": "page=historial&hedit=1", "historial-aprender": "page=historial&learn=1",
     "insights": "page=insights&insights=1",
+    # dark mode (dictado-u9h)
+    **{f"{k}-oscuro": f"{q}&theme=dark" for k, q in (("inicio", "page=inicio"), ("historial", "page=historial"),
+       ("ajustes", "page=ajustes"), ("reunion-lista", "page=reuniones/2026-10-05_0915_planering"),
+       ("reuniones", "page=reuniones"), ("insights", "page=insights&insights=1"), ("bienvenida", "page=bienvenida&welcome=1"),
+       ("ajustes-cambios", "page=ajustes&dirty=1"))},
 }
 TALL = {"inicio-largo": "page=inicio", "ajustes-largo": "page=ajustes&dirty=1", "ajustes-frases": "page=ajustes&sc=1", "insights-largo": "page=insights&insights=1"}
 
