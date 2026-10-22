@@ -2,6 +2,8 @@
 
     python build.py              -> %USERPROFILE%\\ecoscribe-build\\dist\\Ecoscribe\\Ecoscribe.exe
     python build.py --installer  -> also Ecoscribe-Setup-<ver>.exe (copied to Downloads)
+    python build.py --installer --install  -> then the release gate (tools/release_gate.py) and, only
+                                               when every check passes, the install on this PC
 """
 from __future__ import annotations
 
@@ -51,9 +53,14 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--installer", action="store_true")
     ap.add_argument("--skip-freeze", action="store_true")
+    ap.add_argument("--install", action="store_true", help="release gate, then install (needs --installer)")
     a = ap.parse_args()
     OUT.mkdir(exist_ok=True)
     if not a.skip_freeze:
         freeze()
-    if a.installer:
-        installer()
+    setup = installer() if a.installer else None
+    if a.install:
+        if setup is None:
+            raise SystemExit("--install needs --installer")
+        import release_gate
+        raise SystemExit(release_gate.run(setup, do_install=True))

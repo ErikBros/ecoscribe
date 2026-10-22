@@ -59,6 +59,9 @@ If this session installed a build on Erik's computer: `ecoscribe/__init__.py` on
 and GitHub has release `vX.Y.Z` (marked latest, notes on what's new) with the installer:
 `Ecoscribe-Setup-X.Y.Z.exe` from Windows, `Ecoscribe-X.Y.Z.dmg` from the Mac. Never install over a live
 meeting or file job: check for `--meeting` / `--transcribe` / `--speakers` processes first.
+On Windows, install only through `tools/build.py --installer --install`: the release gate
+(`tools/release_gate.py`) checks disk room, no live or queued meeting, version, unit tests and the built
+app's GPU selftest, installs only when all PASS, and prints the `Installed:` / `Running now:` lines.
 
 ## 5. Tickets
 
