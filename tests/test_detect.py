@@ -183,3 +183,76 @@ def test_meet_name_none_without_a_named_meet_tab():
     assert meet_name([("Google Meet - Google Chrome", "chrome"), ("Calendar - Google Chrome", "chrome")]) is None
     assert meet_name([("Meet - Sprint retro | Microsoft Teams", "ms-teams")]) is None  # not a browser
     assert meet_name([]) is None
+
+
+# ---------- why (not) a call: explain, the detector log line, the probe (dictado-nhn) ----------
+from ecoscribe import detect as _d  # noqa: E402
+
+
+def talk(app):
+    return MicUse(app=app, in_use=True, start=1, stop=0, talking=True)
+
+
+def test_explain_says_why_each_app_on_the_mic_is_or_is_not_a_call():
+    lines = _d.explain([use("zoom"), use("chrome"), use("ecoscribe"), use("notes"), use("slack", False)],
+                       [("Inbox - Mail", "chrome")])
+    assert lines == ["chrome: browser on the mic, plays no sound and no meeting tab title -> not a call",
+                     "ecoscribe: Ecoscribe itself on the mic -> ignored",
+                     "notes: on the mic, not a known call app or browser -> not a call",
+                     "zoom: call app on the mic -> a call"]
+    assert _d.explain([talk("chrome")], []) == ["chrome: browser on the mic and playing sound -> a call"]
+    assert _d.explain([use("chrome")], [("Meet - abc-defg-hij", "chrome")]) == [
+        "chrome: browser on the mic with a meeting tab title in a window -> a call"]
+    assert _d.explain([], []) == ["no app holds the mic"]
+
+
+def test_signal_summary_has_app_names_and_flags_never_a_title():
+    titles = [("Meet - Secret project review", "chrome")]
+    s = _d.signal_summary([talk("chrome"), use("slack"), use("ecoscribe")], titles,
+                          health={"mic_api": "ok", "accessibility": "not granted"})
+    assert s == "mic=chrome+sound,slack title=yes accessibility=not-granted"
+    assert "Secret" not in s
+    assert _d.signal_summary([], [], health={"mic_api": "unavailable"}) == "mic=- mic_api=unavailable"
+    assert _d.signal_summary([use("msteams")], titles) == "mic=msteams"  # the title flag only with a browser on the mic
+
+
+def test_probe_prints_the_signals_and_the_verdict_without_titles():
+    frames = iter([[], [use("zoom")], [use("zoom")], [use("zoom")]])
+    t = [0.0]
+    lines = []
+
+    def tick(_s):
+        t[0] += 1.0
+    rc = _d.probe(seconds=3, interval=1, out=lines.append, read_mic=lambda: next(frames),
+                  read_titles=lambda: [("Meet - Secret project review", "chrome")], read_running=lambda: None,
+                  read_front=lambda: "zoom", read_health=lambda: {"accessibility": "not granted"},
+                  clock=lambda: t[0], sleep=tick)
+    text = "\n".join(lines)
+    assert rc == 0
+    assert "mic: nobody" in text and "mic: zoom" in text and "front: zoom" in text
+    assert "zoom: call app on the mic -> a call" in text
+    assert "=> Ecoscribe would now offer to record the zoom call" in text
+    assert "accessibility: not granted" in text and "terminal's grant" in text
+    assert "Secret" not in text
+
+
+def test_probe_survives_a_broken_reader():
+    t = [0.0]
+    lines = []
+
+    def boom():
+        raise PermissionError("no access")
+
+    def tick(_s):
+        t[0] += 1.0
+    _d.probe(seconds=1, out=lines.append, read_mic=lambda: [use("msteams")], read_titles=boom,
+             read_running=lambda: None, read_front=lambda: "", read_health=lambda: {}, clock=lambda: t[0], sleep=tick)
+    text = "\n".join(lines)
+    assert "! window titles failed: PermissionError: no access" in text
+    assert "msteams: call app on the mic -> a call" in text
+
+
+def test_probe_command_line(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(_d, "probe", lambda seconds, interval, raw, out: seen.update(s=seconds, raw=raw) or 0)
+    assert _d.main(["--seconds", "5", "--raw"]) == 0 and seen == {"s": 5.0, "raw": True}

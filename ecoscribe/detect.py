@@ -75,6 +75,15 @@ def meet_name(titles) -> str | None:
     return None
 
 
+OWN_APPS = ("ecoscribe", "python", "pythonw")
+
+
+def meeting_titled(titles) -> bool:
+    """A meeting tab's title is in a browser window. titles: (title, exe) pairs or bare titles (owner unknown)."""
+    return any(MEETING_TITLE.search(t if isinstance(t, str) else t[0])
+               for t in titles if isinstance(t, str) or t[1] in BROWSERS)
+
+
 def is_call_app(app: str) -> bool:
     # prefix match: packaged names carry suffixes (whatsappdesktop)
     return app in CALL_APPS or any(app.startswith(c) for c in CALL_APPS)
@@ -108,18 +117,20 @@ def call_app_now(uses: list[MicUse], running: set[str] | None = None, foreground
 
 
 if __import__("sys").platform == "darwin":  # Core Audio process objects + Accessibility (ecoscribe/platform/macos/detect.py)
-    from .platform.macos.detect import foreground_app, read_consent, running_apps, window_titles  # noqa: F401
+    from .platform.macos.detect import (BROWSER_APPS, foreground_app, health, read_consent,  # noqa: F401
+                                        running_apps, window_titles)
     from .platform.macos.procs import exe_of_pid as _exe_of_pid  # noqa: F401
     CALL_APPS = CALL_APPS | {"facetime"}
-    BROWSERS = BROWSERS | {"safari"}
+    BROWSERS = BROWSERS | BROWSER_APPS  # safari, arc, vivaldi...: the Mac reader names them
 else:  # the consent store, EnumWindows, the process list (ecoscribe/platform/windows/detect.py)
-    from .platform.windows.detect import _exe_of_pid, foreground_app, read_consent, running_apps, window_titles  # noqa: F401
+    from .platform.windows.detect import (_exe_of_pid, foreground_app, health, read_consent,  # noqa: F401
+                                          running_apps, window_titles)
 
 
 class Detector:
     """Feed it a poll every couple of seconds; it returns start / end events."""
 
-    def __init__(self, grace_s: float = 10.0, own_apps=("ecoscribe", "python", "pythonw"), debounce_polls: int = 2):
+    def __init__(self, grace_s: float = 10.0, own_apps=OWN_APPS, debounce_polls: int = 2):
         self.grace_s = grace_s
         # python/pythonw are excluded because Ecoscribe runs as Python in development; neither is a
         # call app nor a browser, so this can never hide a real meeting.
@@ -141,8 +152,7 @@ class Detector:
         in_use = {u.app for u in uses if u.in_use and u.app not in self.own
                   and not (running is not None and u.nonpackaged and u.app not in running)}
         talking = {u.app for u in uses if u.in_use and u.talking}
-        titled = any(MEETING_TITLE.search(t if isinstance(t, str) else t[0])
-                     for t in titles if isinstance(t, str) or t[1] in BROWSERS)
+        titled = meeting_titled(titles)
         if self.app is None:
             calls = sorted(a for a in in_use if is_call_app(a))
             browsers = sorted(a for a in in_use if a in BROWSERS and (titled or a in talking))
@@ -164,3 +174,122 @@ class Detector:
             app, self.app, self.released_at = self.app, None, None
             return Event("end", app, now)
         return None
+
+
+# ---------- why (not) a call: the detector log and the probe (dictado-nhn) ----------
+def _seen(uses, running, own) -> list:
+    return sorted((u for u in uses if u.in_use and u.app not in own
+                   and not (running is not None and u.nonpackaged and u.app not in running)), key=lambda u: u.app)
+
+
+def explain(uses: list[MicUse], titles: list, running: set[str] | None = None, own=OWN_APPS) -> list[str]:
+    """One line per app on the mic: is it a call to the Detector, and why (app names only, never a title)."""
+    titled = meeting_titled(titles)
+    lines = []
+    for u in sorted((u for u in uses if u.in_use), key=lambda u: u.app):
+        a = u.app
+        if a in own:
+            lines.append(f"{a}: Ecoscribe itself on the mic -> ignored")
+        elif running is not None and u.nonpackaged and a not in running:
+            lines.append(f"{a}: marked as using the mic but not running (a leftover) -> ignored")
+        elif is_call_app(a):
+            lines.append(f"{a}: call app on the mic -> a call")
+        elif a in BROWSERS:
+            if u.talking:
+                lines.append(f"{a}: browser on the mic and playing sound -> a call")
+            elif titled:
+                lines.append(f"{a}: browser on the mic with a meeting tab title in a window -> a call")
+            else:
+                lines.append(f"{a}: browser on the mic, plays no sound and no meeting tab title -> not a call")
+        else:
+            lines.append(f"{a}: on the mic, not a known call app or browser -> not a call")
+    return lines or ["no app holds the mic"]
+
+
+def signal_summary(uses: list[MicUse], titles: list, running: set[str] | None = None, health: dict | None = None,
+                   own=OWN_APPS) -> str:
+    """'mic=chrome+sound,slack title=no': what the detector sees, for detect.log when it changes. The title flag
+    only when a browser is on the mic; health only what isn't fine (mic_api=unavailable, accessibility=...)."""
+    seen = _seen(uses, running, own)
+    parts = ["mic=" + (",".join(u.app + ("+sound" if u.talking else "") for u in seen) or "-")]
+    if any(u.app in BROWSERS for u in seen):
+        parts.append("title=" + ("yes" if meeting_titled(titles) else "no"))
+    for k, v in sorted((health or {}).items()):
+        if v not in ("ok", "granted", "unknown"):
+            parts.append(f"{k}={v.replace(' ', '-')}")
+    return " ".join(parts)
+
+
+def _safe(fn, default, errors: list, name: str):
+    try:
+        return fn()
+    except Exception as e:  # the probe shows a broken reader instead of dying on it
+        errors.append(f"{name} failed: {type(e).__name__}: {e}")
+        return default
+
+
+def probe(seconds: float = 120.0, interval: float = 1.0, raw: bool = False, out=print, read_mic=None,
+          read_titles=None, read_running=None, read_front=None, read_health=None, read_raw=None,
+          clock=None, sleep=None) -> int:
+    """Print each detection signal live: who is on the mic (and plays sound), the app in front, whether a
+    meeting tab title is in a browser window (never the title), and the verdict. Records nothing.
+    seconds <= 0: until Ctrl+C. raw (macOS): every audio process with its bundle id and the app it counts as."""
+    import sys as _sys
+    import time as _time
+    read_mic, read_titles = read_mic or read_consent, read_titles or window_titles
+    read_running, read_front, read_health = read_running or running_apps, read_front or foreground_app, read_health or health
+    clock, sleep = clock or _time.monotonic, sleep or _time.sleep
+    if raw and read_raw is None and _sys.platform == "darwin":
+        from .platform.macos.detect import app_of_process, audio_processes
+
+        def read_raw():
+            return [(pid, b, cap, play, app_of_process(pid, b)) for pid, b, cap, play in (audio_processes() or [])]
+    out("Ecoscribe call-detection probe: records nothing, shows no window titles (only whether a meeting tab is "
+        "there). Start or join a call now; Ctrl+C stops.")
+    det = Detector()
+    t0 = clock()
+    try:
+        while True:
+            errors: list[str] = []
+            uses = _safe(read_mic, [], errors, "mic reader")
+            titles = _safe(read_titles, [], errors, "window titles")
+            running = _safe(read_running, None, errors, "running apps")
+            front = _safe(read_front, "", errors, "front app")
+            hl = _safe(read_health, {}, errors, "health")
+            now = clock()
+            seen = _seen(uses, running, OWN_APPS)
+            mic = ", ".join(u.app + (" (+sound)" if u.talking else "") for u in seen) or "nobody"
+            line = (f"[{now - t0:5.0f}s] mic: {mic} | front: {front or '?'} | meeting title in a browser window: "
+                    f"{'yes' if meeting_titled(titles) else 'no'}")
+            if hl:
+                line += " | " + ", ".join(f"{k}: {v}" for k, v in sorted(hl.items()))
+            rows = _safe(read_raw, [], errors, "audio processes") if raw and read_raw is not None else []
+            out(line)
+            for e in errors:
+                out("   ! " + e)
+            for x in explain(uses, titles, running):
+                out("   " + x)
+            for pid, bundle, cap, play, app in rows:
+                out(f"   process {pid} {bundle or '-'} mic={'yes' if cap else 'no'} sound={'yes' if play else 'no'}"
+                    f" -> {app or '?'}")
+            ev = det.update(uses, titles, now, running)
+            if ev is not None:
+                out(f"   => Ecoscribe would now {'offer to record' if ev.kind == 'start' else 'end'} the {ev.app} call")
+            if hl.get("accessibility") not in (None, "granted", "unknown"):
+                out("   (Accessibility is granted per app: run from a terminal, this is the terminal's grant)")
+            if seconds > 0 and now - t0 >= seconds:
+                return 0
+            sleep(interval)
+    except KeyboardInterrupt:
+        return 0
+
+
+def main(argv=None) -> int:
+    """python -m ecoscribe.callprobe [--seconds N] [--raw]: the live signals, for a real-call check."""
+    import argparse
+    ap = argparse.ArgumentParser(prog="python -m ecoscribe.callprobe", description=probe.__doc__)
+    ap.add_argument("--seconds", type=float, default=120.0, help="how long (0: until Ctrl+C)")
+    ap.add_argument("--interval", type=float, default=1.0)
+    ap.add_argument("--raw", action="store_true", help="macOS: every audio process, its bundle id and app")
+    args = ap.parse_args(argv)
+    return probe(args.seconds, args.interval, raw=args.raw, out=lambda s: print(s, flush=True))

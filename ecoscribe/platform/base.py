@@ -70,8 +70,8 @@ CAPABILITIES: dict[str, dict] = {
         "macos": "ecoscribe.platform.macos.systap:Loopback",  # Core Audio process tap (ecoscribe-systap helper)
     },
     "Call detection (who uses the mic, call windows)": {
-        "windows": "ecoscribe.platform.windows.detect:read_consent,window_titles,running_apps",
-        "macos": "ecoscribe.platform.macos.detect:read_consent,window_titles,running_apps",
+        "windows": "ecoscribe.platform.windows.detect:read_consent,window_titles,running_apps,health",
+        "macos": "ecoscribe.platform.macos.detect:read_consent,window_titles,running_apps,health",
     },
     "Tray / menu bar, pill and prompt box": {
         "windows": "ecoscribe.platform.windows.shell:Tray,Overlay,PromptWindow",
