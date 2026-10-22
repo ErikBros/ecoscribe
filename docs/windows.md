@@ -74,7 +74,7 @@ Version 1.12.0 (October 2026). The interface is in English.
 - **Please tell the people on the call that you're transcribing.** In many places that's expected, and in some it's required.
 
 ### Ask Claude about your meetings
-If you use the Claude desktop app: Settings > Meetings > Claude app > **Connect**, then quit and reopen Claude. Now you can ask it "summarize yesterday's call" or "what did Ana say about the budget?". It can only read your transcripts (and your notes), never change them, and it runs on your PC. To undo, remove the `ecoscribe` entry under `mcpServers` in Claude's `claude_desktop_config.json`.
+If you use the Claude desktop app: Settings > Meetings > Claude app > **Connect**, then quit and reopen Claude. Now you can ask it "summarize yesterday's call", "what did Ana say about the budget?" or "my calls with Ana" (it finds them by the names you gave the voices, the calendar invite's guests and the title). It can only read your transcripts (and your notes), never change them, and it runs on your PC. To undo, remove the `ecoscribe` entry under `mcpServers` in Claude's `claude_desktop_config.json`.
 
 ### Insights and speech coaching
 Settings > **Insights tab** adds a tab with what your dictations say about how you talk, worked out on your PC from your history:
