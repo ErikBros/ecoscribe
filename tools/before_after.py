@@ -31,7 +31,10 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from shoot import APP, SHOTS, shot  # noqa: E402
+from shoot import APP, SHOTS, TALL, shot  # noqa: E402
+
+PAGES = {**SHOTS, **TALL}  # a tall page shows what's below the fold (only when named in --pages)
+TALL_H = 2300
 
 SIZES = {980: 690, 1470: 920, 1920: 1080}
 NOISE = 16  # a channel difference below this is font smoothing, not a change
@@ -82,7 +85,7 @@ def shoot_all(sources: dict[str, Path], out: Path, pages: list[str], widths: lis
     def one(job):
         name, src, page, w = job
         png = out / f"{name}-{page}-{w}.png"
-        shot(src, SHOTS[page], png, size=(w, SIZES.get(w, 900)))
+        shot(src, PAGES[page], png, size=(w, TALL_H if page in TALL else SIZES.get(w, 900)))
         return job, png
     res: dict = {}
     with ThreadPoolExecutor(4) as ex:
@@ -93,7 +96,7 @@ def shoot_all(sources: dict[str, Path], out: Path, pages: list[str], widths: lis
 
 def build(title: str, round_id: str, sources: list[str], shots: dict, widths: list[int], variants: bool) -> str:
     screens, same = [], []
-    for (page, w), pngs in sorted(shots.items(), key=lambda kv: (kv[0][1], list(SHOTS).index(kv[0][0]))):
+    for (page, w), pngs in sorted(shots.items(), key=lambda kv: (kv[0][1], list(PAGES).index(kv[0][0]))):
         if variants:
             screens.append({"page": page, "w": w, "imgs": {s: b64(pngs[s]) for s in sources}})
             continue
@@ -307,7 +310,7 @@ def main(argv=None) -> int:
     ap.add_argument("--out", required=True, help="the HTML page to write")
     ap.add_argument("--round", help="decision id for a page server (default from the out file name)")
     ap.add_argument("--title", default="Ecoscribe: look change")
-    ap.add_argument("--pages", help="comma list of pages (default all): " + ",".join(SHOTS))
+    ap.add_argument("--pages", help="comma list of pages (default all but the tall ones): " + ",".join(PAGES))
     ap.add_argument("--widths", default="980,1470,1920")
     a = ap.parse_args(argv)
     out = Path(a.out)

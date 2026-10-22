@@ -23,7 +23,7 @@ SHOTS = {
     "reunion-cola": "page=reuniones/2026-10-05_1130_podcast",
     "insights": "page=insights&insights=1",
 }
-TALL = {"ajustes-largo": "page=ajustes&dirty=1", "insights-largo": "page=insights&insights=1"}
+TALL = {"ajustes-largo": "page=ajustes&dirty=1", "ajustes-frases": "page=ajustes&sc=1", "insights-largo": "page=insights&insights=1"}
 
 
 def shot(web: Path, query: str, out: Path, size=(980, 690), scale=1.0) -> Path:

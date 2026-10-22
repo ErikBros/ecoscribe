@@ -39,6 +39,13 @@ def _voice_command_list() -> list[dict]:
             for _, what, langs in VOICE_COMMANDS]
 
 
+def _correction_list() -> list[dict]:
+    """Settings > Fix it when you correct yourself > See all phrases (dictado-bd6): the tables the rules use."""
+    from .corrections import SCRATCH, TRIGGERS
+    return [{"what": what, **{lang: ", ".join(f'"{p}"' for p in ps) for lang, ps in table.items()}}
+            for what, table in (("Drops the sentence before it", SCRATCH), ("Claude applies the correction", TRIGGERS))]
+
+
 # Kept for older callers: the built-in dictation languages (dictado-ehs; added ones come from the config).
 LANGUAGES = [("en", "English"), ("sv", "Swedish")]
 
@@ -195,6 +202,7 @@ class Api:
                 "meet_mode": c.meetings.mode, "meet_end": str(int(c.meetings.grace_s)), "meet_lang": c.meetings.default_lang, "on_demand": c.whisper.on_demand,
                 "speakers": c.meetings.speakers, "vocabulary": "\n".join(c.text.vocabulary),
                 "voice_commands": c.text.voice_commands,
+                "self_corrections": c.text.self_corrections, "command_mode": c.text.command_mode,  # dictado-bd6
                 "screen_names": c.text.screen_names,
                 "hold_to_talk": c.hotkey.hold_to_talk, "numpad_enter": c.hotkey.numpad_enter, "voice_memory": c.meetings.voice_memory,
                 "calendar_url": c.meetings.calendar_url, "my_name": c.meetings.my_name, "debug_log": c.ui.debug_log,
@@ -205,6 +213,7 @@ class Api:
             },
             "speakers_addon": diarize.addon_exe().is_file(),
             "voice_command_list": _voice_command_list(),
+            "correction_list": _correction_list(),
             "options": {
                 "hotkeys": [{"value": v, "label": l} for v, l in HOTKEYS],
                 "mics": mics,
@@ -298,6 +307,7 @@ class Api:
                                          "on_demand": ("whisper", "on_demand"),
                                          "speakers": ("meetings", "speakers"),
                                          "voice_commands": ("text", "voice_commands"),
+                                         "self_corrections": ("text", "self_corrections"), "command_mode": ("text", "command_mode"),
                                          "screen_names": ("text", "screen_names"),
                                          "hold_to_talk": ("hotkey", "hold_to_talk"), "numpad_enter": ("hotkey", "numpad_enter"),
                                          "voice_memory": ("meetings", "voice_memory"),

@@ -60,7 +60,7 @@ function demoApi() {
   const dl = { running: false, error: null, models: {} };  // the demo model download
   let settings = {
     values: { hotkey: "rctrl", mic: "Anker PowerConf", languages: "en", sounds: true, overlay: true, live_text: true, insights: params.get("insights") === "1", speech_feedback: false, unmute: true, startup: true,
-      meet_mode: "prompt", meet_end: "10", meet_lang: "sv", on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: false, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true,
+      meet_mode: "prompt", meet_end: "10", meet_lang: "sv", on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: false, self_corrections: false, command_mode: false, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true,
       export_dir: "C:/x/Downloads", export_default: true,
       snippets: [{ trigger: "my email", text: "alex@example.com" }], replacements: [{ heard: "poll request", write: "pull request" }] },
     options: {
@@ -78,6 +78,8 @@ function demoApi() {
     voice_command_list: [{ what: "Paragraph break", en: '"new paragraph"', es: '"nuevo párrafo", "punto y aparte"', sv: '"nytt stycke"' },
       { what: "Line break", en: '"new line"', es: '"nueva línea"', sv: '"ny rad"' },
       { what: "Press Enter after the text (at the very end only)", en: '"send it", "press enter"', es: '"envíalo", "enviar"', sv: '"skicka"' }],
+    correction_list: [{ what: "Drops the sentence before it", en: '"scratch that", "delete that", "strike that"', es: '"borra eso", "tacha eso"', sv: '"stryk det", "sudda det"', el: '"σβήσε το", "σβήσ\' το"' },
+      { what: "Claude applies the correction", en: '"no wait", "sorry I mean", "sorry I meant", "correction"', es: '"no perdón", "no espera", "perdón quise decir", "corrijo"', sv: '"nej förlåt", "nej vänta", "förlåt jag menar", "rättelse"', el: '"όχι συγγνώμη", "όχι περίμενε", "συγγνώμη εννοώ"' }],
   };
   const history = [
     { ts: iso(2), text: "Can you check why the deploy failed last night and send me the logs before the standup? ", target: "WindowsTerminal.exe", pasted: true, id: "d1", audio: true },
@@ -1170,6 +1172,7 @@ function formValues() {
     sounds: $("#f-sounds").checked, overlay: $("#f-overlay").checked, live_text: $("#f-live-text").checked, insights: $("#f-insights").checked, speech_feedback: $("#f-speech-feedback").checked, unmute: $("#f-unmute").checked, startup: $("#f-startup").checked,
     meet_mode: $("#f-meet-mode").value, meet_end: $("#f-meet-end").value, meet_lang: $("#f-meet-lang").value, on_demand: $("#f-on-demand").checked,
     speakers: $("#f-speakers").checked, voice_commands: $("#f-voice-commands").checked,
+    self_corrections: $("#f-self-corrections").checked, command_mode: $("#f-command-mode").checked,
     screen_names: $("#f-screen-names").checked, hold_to_talk: $("#f-hold").checked, numpad_enter: $("#f-numpad-enter").checked,
     voice_memory: $("#f-voice-memory").checked, debug_log: $("#f-debug-log").checked, calendar_url: $("#f-calendar").value.trim(), my_name: $("#f-my-name").value.trim(),
     vocabulary: $("#f-vocabulary").value.split("\n").map((w) => w.trim()).filter(Boolean).join("\n"),
@@ -1300,6 +1303,10 @@ async function renderSettings() {
   $("#f-on-demand").checked = s.values.on_demand;
   $("#f-vocabulary").value = s.values.vocabulary || "";
   $("#f-voice-commands").checked = !!s.values.voice_commands;
+  $("#f-self-corrections").checked = !!s.values.self_corrections;  // dictado-bd6
+  $("#f-command-mode").checked = !!s.values.command_mode;
+  $("#row-command-mode").hidden = MAC;  // the Mac has no command mode yet (dictado-waw)
+  for (const k of $$(".cm-key")) k.textContent = s.values.hotkey_label || hotkeyLabel(s.values.hotkey);
   $("#f-screen-names").checked = s.values.screen_names !== false;
   $("#f-hold").checked = !!s.values.hold_to_talk; $("#f-numpad-enter").checked = !!s.values.numpad_enter;
   holdFits();
@@ -1315,6 +1322,13 @@ async function renderSettings() {
     const tr = document.createElement("tr");
     for (const k of ["what", "en", "es", "sv"]) { const td = document.createElement("td"); td.textContent = r[k] || ""; tr.append(td); }
     vc.append(tr);
+  }
+  const sc = $("#sc-rows"); sc.innerHTML = "";
+  if (params.get("sc") === "1") $("#sc-list").open = true;  // screenshot
+  for (const r of s.correction_list || []) {
+    const tr = document.createElement("tr");
+    for (const k of ["what", "en", "es", "sv", "el"]) { const td = document.createElement("td"); td.textContent = r[k] || ""; tr.append(td); }
+    sc.append(tr);
   }
   $("#dbg-copy").onclick = async () => { await api.copy_debug_info(); toast("Copied. Paste it to Claude."); };
   $("#dbg-open").onclick = () => api.open_logs_folder();

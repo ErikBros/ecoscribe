@@ -421,3 +421,14 @@ def test_session_rows_carry_people_and_app_for_the_meeting_page(tmp_path):
     S.write_meta(d, app="msteams", calendar={"title": "Weekly planning", "attendees": ["Ana Ruiz", "Bo Lind"]})
     row = Api._row(S.read_meta(d) | {"dir": str(d)})
     assert row["people"] == ["Ana Ruiz", "Bo Lind"] and row["app"] == "msteams"
+
+
+def test_claude_switches_round_trip_with_their_phrase_list(api):  # dictado-bd6
+    v = api.get_settings()
+    assert v["values"]["self_corrections"] is False and v["values"]["command_mode"] is False
+    rows = {r["what"]: r for r in v["correction_list"]}
+    assert '"scratch that"' in rows["Drops the sentence before it"]["en"]
+    assert '"no wait"' in rows["Claude applies the correction"]["en"] and rows["Claude applies the correction"]["el"]
+    assert api.save_settings({"self_corrections": True, "command_mode": True})["ok"]
+    c = config.load(api._config_path)
+    assert c.text.self_corrections is True and c.text.command_mode is True
