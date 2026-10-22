@@ -356,6 +356,9 @@ class App:
         if getattr(self.engine, "device", "cuda") == "cpu" and not self._warned_cpu:
             self._warned_cpu = True
             self.ui.flash("No GPU: slow mode")
+        if res.text and getattr(self.cfg.text, "self_corrections", False):  # dictado-ehc: first, on what was said
+            from .corrections import apply
+            res = replace(res, text=apply(res.text, self.cfg))
         enter = False
         if res.text and getattr(self.cfg.text, "voice_commands", False):
             from .text import voice_commands

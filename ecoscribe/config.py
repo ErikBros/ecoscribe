@@ -77,6 +77,11 @@ class TextCfg:
     screen_names: bool = True
     replacements: dict = field(default_factory=dict)  # dictado-b7u: heard -> written, anywhere ("poll request" -> "pull request")
     snippets: dict = field(default_factory=dict)  # t0u.29: spoken trigger -> saved text ("my email" -> ...)
+    # dictado-ehc (corrections.py): "scratch that" drops the sentence before it; a dictation with "no wait"
+    # and the like goes to Claude (the user's Claude Code login), so off by default
+    self_corrections: bool = False
+    correction_model: str = "haiku"
+    correction_timeout_s: float = 5.0  # Haiku through Claude Code answered in 2.4-3.2 s; slower = the text as heard
 
 
 @dataclass
