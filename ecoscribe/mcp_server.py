@@ -2,9 +2,9 @@
 
 Claude desktop (or any MCP client) starts it as a child process and talks newline-delimited
 JSON-RPC 2.0 over stdin/stdout. Four read-only tools over the transcripts folder:
-list_meetings, read_meeting, search_meetings, calls_with_person. Nothing is sent anywhere and
-nothing is changed (only search.py's index, a cache next to the transcripts, is written):
-the client gets only what it asks for. No SDK: the protocol subset is small and stable.
+list_meetings, read_meeting, search_meetings, calls_with_person, and one prompt, "Debrief my call"
+(debrief_call). Nothing is sent anywhere and nothing is changed (only search.py's index, a cache next
+to the transcripts, is written): the client gets only what it asks for. No SDK: the protocol subset is small and stable.
 """
 from __future__ import annotations
 
@@ -58,6 +58,30 @@ TOOLS = [
          "since": {"type": "string", "description": "Only sessions on or after this date, YYYY-MM-DD"},
          "limit": {"type": "integer", "description": "At most this many calls (default 30)"}},
          "required": ["name"]}},
+]
+
+
+DEBRIEF = """Debrief this call for me ("Me" in the transcript is me). Answer in the language I write to you in; \
+quotes stay in the language spoken.
+
+1. To-dos: every to-do from the call, mine and what the others promised me, one per line: what, who, by when \
+(only if a date was said), with the [hh:mm:ss] time and the words it comes from. When the call has a checked \
+summary, start from its to-dos and leave out items marked "not found in the call".
+2. Tickets: propose one ticket per to-do: a short title, one or two lines with the time and quote, the owner, \
+the due date if one was said. Create nothing yet. Ask me which ones to make, and make only the ones I say OK to, \
+with the task or issue tool I have connected; with none connected, give them ready to paste.
+3. Follow-up: draft a short follow-up message to the other side, ready to paste: what we agreed, who does what, \
+by when. Plain words, no filler, in the language the call was held in.
+
+Never open my mailbox or calendar, never send, schedule or invite anything, and never create a ticket before \
+I say OK. Only use what the call says; when something is unclear, say so instead of guessing."""
+
+PROMPTS = [
+    {"name": "debrief_call", "title": "Debrief my call",
+     "description": "Your call's to-dos as proposed tickets (made only after your OK) and a follow-up message to "
+                    "paste. Reads nothing but the call.",
+     "arguments": [{"name": "id", "required": False,
+                    "description": "The call's id from list_meetings; empty = your latest finished call"}]},
 ]
 
 
@@ -166,6 +190,21 @@ def search_meetings(root: Path, text: str, limit: int = 10, since: str = "") -> 
         idx.close()
 
 
+def _latest_call(root: Path) -> str:
+    for m in sessions.list_sessions(root):
+        if _visible(m) and m.get("status") == "done":
+            return Path(m["dir"]).name
+    raise FileNotFoundError("no finished call yet")
+
+
+def debrief(root: Path, sid: str = "") -> dict:
+    """dictado-2mu: the 'Debrief my call' prompt: the steps, then the call itself (its summary first)."""
+    sid = str(sid or "").strip() or _latest_call(root)
+    text = read_meeting(root, sid)
+    return {"description": f"Debrief of {sid}",
+            "messages": [{"role": "user", "content": {"type": "text", "text": f"{DEBRIEF}\n\n---\n\n{text}"}}]}
+
+
 def _call(root: Path, name: str, args: dict) -> dict:
     try:
         if name == "list_meetings":
@@ -195,7 +234,8 @@ def handle(root: Path, msg: dict) -> dict | None:
     if method == "initialize":
         asked = params.get("protocolVersion")
         result = {"protocolVersion": asked if asked in VERSIONS else VERSIONS[0],
-                  "capabilities": {"tools": {}}, "serverInfo": {"name": "ecoscribe", "version": __version__},
+                  "capabilities": {"tools": {}, "prompts": {}},
+                  "serverInfo": {"name": "ecoscribe", "version": __version__},
                   "instructions": "The user's meetings and calls, transcribed locally by Ecoscribe. Read-only."}
     elif method == "ping":
         result = {}
@@ -203,6 +243,15 @@ def handle(root: Path, msg: dict) -> dict | None:
         result = {"tools": TOOLS}
     elif method == "tools/call":
         result = _call(root, params.get("name", ""), params.get("arguments") or {})
+    elif method == "prompts/list":
+        result = {"prompts": PROMPTS}
+    elif method == "prompts/get":
+        try:
+            if params.get("name") != "debrief_call":
+                raise ValueError(f"unknown prompt {params.get('name')}")
+            result = debrief(root, (params.get("arguments") or {}).get("id", ""))
+        except (OSError, ValueError) as e:
+            return {"jsonrpc": "2.0", "id": mid, "error": {"code": -32602, "message": str(e)}}
     else:
         return {"jsonrpc": "2.0", "id": mid, "error": {"code": -32601, "message": f"method not found: {method}"}}
     return {"jsonrpc": "2.0", "id": mid, "result": result}
