@@ -478,6 +478,7 @@ async function load(query) {
   const mac = await load("page=ajustes&mac=1");
   await sleep(200);
   check(mac.doc.querySelector("#row-command-mode").hidden, "no command mode switch on the Mac yet");
+}
 { // History > Edit, and learn the fixed name (dictado-1ph)
   const { window, doc } = await load("page=historial");
   await sleep(200);
