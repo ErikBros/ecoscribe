@@ -302,6 +302,7 @@ async function show(page) {
   if (!PAGES.includes(page)) page = "inicio";
   if (current === "ajustes" && page !== "ajustes") await stopMicTest();
   current = page;
+  $("#side-status").hidden = page === "inicio";  // Home's hero says it (dictado-9jf)
   for (const p of PAGES) $(`#page-${p}`).hidden = p !== page;
   for (const b of $$(".nav-item")) b.classList.toggle("active", b.dataset.page === page);
   if (page === "inicio") await renderInicio();
@@ -555,6 +556,13 @@ const STATE_TEXT = {
   error: ["Error", "Something failed at startup"],
   stopped: ["Stopped", "Ecoscribe isn't running"],
 };
+// what the hero says under the title while dictation can't start (dictado-9jf: no "tap the key" then)
+const STATE_HOW = {
+  loading: "The speech model is loading. Dictation works in a few seconds.",
+  restarting: "Ecoscribe restarts with your new settings. Back in a few seconds.",
+  error: "Open the log to see what failed, then start Ecoscribe again from the tray.",
+  stopped: "Start it to dictate again. Your settings and history are kept.",
+};
 let lastStatus = null;
 async function refreshStatus() {
   let s;
@@ -565,12 +573,17 @@ async function refreshStatus() {
   const side = $("#side-status");
   side.dataset.state = state;
   $(".side-status-text", side).textContent = state === "ready" ? `Ready · ${hotkeyLabel(s.hotkey)}` : short;
+  side.hidden = current === "inicio";  // Home's hero says it: status once per screen (dictado-9jf)
   $("#ver").textContent = `v${s.version || ""}`;
   paintFacts(s, state);  // the sidebar card, on every page (dictado-6oe.3)
   if (current === "inicio") paintHero(s, state, short, long);
 }
 function paintFacts(s, state) {
-  const none = state === "stopped" ? "—" : "…";
+  // stopped: what it doesn't know yet, said once instead of three dashes (dictado-9jf)
+  const off = state === "stopped" && !s.mic && !s.device;
+  $(".side-facts").hidden = off;
+  $("#side-off").hidden = !off;
+  const none = "…";
   $("#fact-mic").textContent = s.mic ? (s.fell_back ? DEFAULT_MIC : prettyMic(s.mic)) : none;
   $("#fact-mic").title = s.mic || "";
   const langs = s.languages || [];
@@ -581,8 +594,6 @@ function paintFacts(s, state) {
 }
 function paintHero(s, state, short, long) {
   $(".hero").dataset.state = state;
-  $("#hero-badge").dataset.state = state;
-  $("#hero-badge-text").textContent = short;
   $("#hero-title").textContent = long;
   const actions = $("#hero-actions");
   actions.innerHTML = "";
@@ -597,7 +608,9 @@ function paintHero(s, state, short, long) {
     b.onclick = () => api.open_log();
     actions.append(b);
   }
-  if (s.hotkey && s.hotkey.includes("+")) {  // a combo: no tap, and no Esc cancel (tray > Cancel recording)
+  if (STATE_HOW[state]) {  // can't dictate right now: say why, not how to dictate
+    $("#hero-how").textContent = STATE_HOW[state];
+  } else if (s.hotkey && s.hotkey.includes("+")) {  // a combo: no tap, and no Esc cancel (tray > Cancel recording)
     $("#hero-how").textContent = `Press ${hotkeyLabel(s.hotkey)}, talk, and press it again. The text appears wherever the cursor is.`;
   } else if (s.hotkey) {  // the user's own key, as a keycap
     $("#hero-how").innerHTML = `Tap <kbd class="key key-wide"></kbd>, talk, and tap it again. The text appears wherever the cursor is.`;

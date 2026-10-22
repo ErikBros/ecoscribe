@@ -34,6 +34,7 @@
     </nav>
     <div class="side-card">  <!-- what Home's facts were (dictado-6oe.3) -->
       <div class="side-status" id="side-status"><span class="dot"></span><span class="side-status-text">Checking…</span></div>
+      <div class="side-off" id="side-off" hidden>Mic, language and engine show here once it runs.</div>
       <div class="side-facts">
         <span title="Microphone"><span class="sr">Mic: </span><span id="fact-mic">…</span></span>
         <span><span class="sr">Languages: </span><span id="fact-lang"></span></span>
@@ -57,7 +58,6 @@
       </div>
       <div class="hero" data-state="ready">  <!-- the dictate banner (dictado-6oe.3) -->
         <div class="hero-state">
-          <span class="state-badge" id="hero-badge"><span class="dot"></span><span id="hero-badge-text">…</span></span>
           <h2 id="hero-title">Checking Ecoscribe…</h2>
           <p class="hero-how" id="hero-how">Tap <kbd class="key key-wide">Right Ctrl</kbd>, talk, and tap it again. The text appears wherever the cursor is.</p>
           <div class="hero-actions" id="hero-actions"></div>
