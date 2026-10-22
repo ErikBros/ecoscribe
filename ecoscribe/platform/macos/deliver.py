@@ -26,6 +26,7 @@ class DeliveryResult:
     target_exe: str
     reason: str
     waited_ms: int = 0
+    window: int = 0  # the window it was pasted into: set on Windows only so far (dictado-cp1)
 
 
 class ClipboardBusy(Exception):
