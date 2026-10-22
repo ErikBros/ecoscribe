@@ -25,6 +25,7 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Your words (spelling list) | done | done |
 | Snippets | done | done |
 | Voice commands + full list in Settings | done | done (real desktop run: line break + Enter, no command words typed) |
+| Self-corrections: "scratch that" drops the sentence before it (rules); "no wait", "no perdón", "nej förlåt", "όχι συγγνώμη" send that dictation to Claude Haiku, 5 s limit, else the text as heard ([text] self_corrections, off by default) (dictado-ehc) | done (config.toml only; Settings switch: dictado-bd6) | check on Mac (dictado-1xg) |
 | Meetings: live transcript, notes, Me / Others, exports, Copy for Claude | done | check on Mac (dictado-tjn): needs the System Audio Recording permission |
 | Meeting / file languages incl. Greek + Spanish mixed | done | done (GPU test passes on mlx) |
 | Meeting pill: a small chip (dot + timer) that shows the live line when the mouse is on it | done | done (dictado-f6o: polls the mouse, stays click-through; checked on screen) |
@@ -83,4 +84,4 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Setup: permissions step (first run) | not needed: Windows asks for no permission to listen, type or watch the keyboard | done (Microphone, Accessibility, Input Monitoring: Allow shows macOS's own prompt, then Open settings; ticks live; once both key permissions are on, the app restarts itself so the key works at once) |
 | Setup: speech model download with progress | done (bytes from the download, both models, Continue once the needed one is there) | done (mlx weights, bytes off the network so xet downloads move too, never backwards: dictado-kuu) |
 | Installer | done (.exe, Inno Setup) | done (Ecoscribe.app + .dmg, com.erikbros.ecoscribe, self-signed: this Mac only; a public build needs a Developer ID) |
-| Claude Code from the app (summaries) | done (wsl.exe, a login shell: Claude Code lives in WSL) | ticket dictado-1xg (a zsh login shell; not yet tried on the Mac) |
+| Claude Code from the app (summaries, self-corrections) | done (wsl.exe, a login shell: Claude Code lives in WSL) | ticket dictado-1xg (a zsh login shell; not yet tried on the Mac) |
