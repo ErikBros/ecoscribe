@@ -94,6 +94,28 @@ async function load(query) {
   check(sent && sent.theme === "light" && Object.keys(sent).length === 1 && doc.querySelector("#toast").textContent === "Saved." && !errors.length,
         "saves only the theme, no restart: " + JSON.stringify(sent) + " / " + doc.querySelector("#toast").textContent);
 }
+{ // ajustes: Style per app (dictado-h0m), a menu per kind of app
+  const { window, doc, errors } = await load("page=ajustes");
+  const rows = () => [...doc.querySelectorAll("#st-rows .st-row")];
+  const look = (i) => rows()[i].querySelector(".st-look"), vcOf = (i) => rows()[i].querySelector(".st-vc input");
+  const sw = doc.querySelector("#f-per-app");
+  check(sw && !sw.checked && rows().length === 4 && doc.querySelector("#st-wrap").classList.contains("off")
+    && rows().every((r) => [...r.querySelectorAll("select, input")].every((i) => i.disabled)), "Style per app: off by default, four rows, greyed out");
+  check(look(0).selectedOptions[0].textContent === "check the logs first" && look(3).selectedOptions[0].textContent === "Check the logs first."
+    && [...look(1).options].map((o) => o.textContent).join("|") === "Check the logs first.|Check the logs first|check the logs first",
+    "each menu shows how a sentence comes out");
+  sw.checked = true; sw.dispatchEvent(new window.Event("change", { bubbles: true }));
+  check(!look(1).disabled && vcOf(1).disabled && !doc.querySelector("#st-vc-off").hidden,
+    "on: the menus work; voice commands wait for the Behaviour switch");
+  look(1).value = "1,1"; look(1).dispatchEvent(new window.Event("change", { bubbles: true }));
+  let sent = null;
+  const api = window.__ecoscribe.api, orig = api.save_settings;
+  api.save_settings = async (x) => { sent = x; return orig(x); };
+  doc.querySelector("#save").click(); await sleep(100);
+  const chat = sent && sent.app_styles.find((r) => r.kind === "chat");
+  check(sent && sent.per_app_styles === true && chat.full_stop === true && chat.capital === true && typeof chat.commands === "boolean"
+    && Object.keys(sent).length === 2 && !errors.length, "saves the switch and the menus: " + JSON.stringify(sent));
+}
 { // ajustes: voice memory (t0u.32)
   const { window, doc } = await load("page=ajustes");
   await sleep(50);

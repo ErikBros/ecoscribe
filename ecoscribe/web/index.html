@@ -469,6 +469,15 @@
           <label class="row toggle-row" id="row-auto-update"><span class="row-text"><span class="row-label">Install new versions by itself</span><span class="muted small">Gets a new version in the background and installs it when you step away from the computer or quit Ecoscribe. Never during a call, while a meeting is being saved or while you dictate.</span></span>
             <input type="checkbox" class="switch" name="auto_update" id="f-auto-update"></label>
         </div>
+        <div class="card group" data-sec="dictation" id="styles-card">  <!-- dictado-h0m: per-app styles -->
+          <div class="group-head"><h3>Style per app</h3><p class="muted">A terminal wants "git status", a chat line has no full stop. When it pastes, Ecoscribe looks at the app you're typing into (in a browser, at the site) and writes the text the way that row says. Only the kind of app is used; nothing is kept.</p></div>
+          <label class="row toggle-row"><span class="row-text"><span class="row-label">Different style per app</span><span class="muted small">Off: every app gets the text the same way, as today.</span></span>
+            <input type="checkbox" class="switch" name="per_app_styles" id="f-per-app"></label>
+          <div class="st-wrap" id="st-wrap">
+            <div class="st-rows" id="st-rows"></div>
+            <p class="muted small st-note" id="st-vc-off" hidden>Voice commands are off in Behaviour: turn them on there to use them per app.</p>
+          </div>
+        </div>
         <div class="card group" data-sec="dictation" data-card="claude">
           <div class="group-head"><h3>With Claude</h3><p class="muted">These send the text to Claude through your Claude Code login on this PC, and nothing else. Off until you turn them on.</p></div>
           <!-- dictado-bd6: the two features that send text to Claude, through the user's own Claude Code login -->

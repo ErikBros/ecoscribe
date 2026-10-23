@@ -647,6 +647,16 @@ select:hover { border-color: var(--line-strong); }
 .vc-table th { text-align: left; font-weight: 600; color: var(--ink-soft); padding: 6px 8px; border-bottom: 1px solid var(--line); }
 .vc-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
 
+/* dictado-h0m: Style per app */
+.st-wrap { padding: 4px 0 14px; transition: opacity .15s; }
+.st-wrap.off { opacity: .5; }
+.st-row .row-text { flex: 1; max-width: none; }
+.st-ctl { display: flex; align-items: center; gap: 18px; }
+.st-ctl select { min-width: 230px; }
+.st-vc { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.st-vc span { white-space: nowrap; }
+.st-note { margin: 8px 0 0; }
+
 /* dictation-languages: tick any mix */
 .lang-checks { display: flex; flex-wrap: wrap; gap: 8px; }
 .lang-check { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--line);
