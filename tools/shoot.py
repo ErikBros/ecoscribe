@@ -29,6 +29,9 @@ SHOTS = {
     "ajustes-estilos-oscuro": "page=ajustes&styles=1&theme=dark",  # Style per app in dark (dictado-lrm)
     "reuniones": "page=reuniones", "reuniones-vacia": "page=reuniones&rec=0",
     "reunion-directo": "page=reuniones/2026-10-05_1400_retro",
+    # what the meeting records (dictado-s1a): your mic silent, the call on another output, and in dark
+    "reunion-fuentes-mic": "page=reuniones/2026-10-05_1400_retro&src=mic", "reunion-fuentes-sistema": "page=reuniones/2026-10-05_1400_retro&src=system",
+    "reunion-fuentes-oscuro": "page=reuniones/2026-10-05_1400_retro&src=mic&theme=dark",
     "reunion-lista": "page=reuniones/2026-10-05_0915_planering",
     "reunion-cola": "page=reuniones/2026-10-05_1130_podcast",
     "reunion-resumiendo": "page=reuniones/2026-10-04_1600_kund",

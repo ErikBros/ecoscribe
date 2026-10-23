@@ -61,6 +61,10 @@ CAPABILITIES: dict[str, dict] = {
         "windows": "ecoscribe.platform.windows.shell:Overlay",  # Overlay.remember_at, _chip_mouse; meetui.Drag
         "macos": ("ticket", "dictado-8dy"),
     },
+    "Which mic and output a call app uses (the meeting follows the call, the page shows it)": {  # dictado-s1a, 297, c7v
+        "windows": "ecoscribe.platform.windows.audio_route:call_devices,sessions",  # each app's audio session per device
+        "macos": ("ticket", "dictado-7bw"),
+    },
     "Paste text where the cursor is": {
         "windows": "ecoscribe.platform.windows.deliver:deliver,set_clipboard_text",
         "macos": "ecoscribe.platform.macos.deliver:deliver,set_clipboard_text",

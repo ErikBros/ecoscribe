@@ -398,6 +398,39 @@ h3 { margin: 0; font: 700 var(--fs-lead)/1.3 var(--font-display); letter-spacing
 .r-people ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-body); }
 .r-people li { display: flex; align-items: center; gap: 8px; }
 .r-live-note { flex: 1; color: var(--ink-soft); }
+/* What the meeting records (dictado-s1a): a row per source, device, live level, state */
+.r-src-row { display: grid; grid-template-columns: 20px minmax(0, 1fr) 96px 92px; align-items: center; gap: 10px; }
+.r-src-ico { width: 20px; height: 20px; fill: none; stroke: var(--ink-soft); stroke-width: var(--icon-stroke); stroke-linecap: round; stroke-linejoin: round; }
+.r-src-text { display: flex; flex-direction: column; min-width: 0; }
+.r-src-text strong { font-size: var(--fs-body); }
+.r-src-dev { font-size: var(--fs-sm); color: var(--ink-soft); overflow-wrap: anywhere; }
+.r-src-bar { height: 8px; border-radius: var(--radius-pill); background: var(--well); overflow: hidden; }
+.r-src-bar span { display: block; height: 100%; width: var(--lvl, 0%); border-radius: inherit; background: var(--aegean); transition: width .25s ease-out; }
+.r-src-state { font-size: var(--fs-sm); color: var(--ink-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.r-src-row.bad .r-src-ico { stroke: var(--tile); }
+.r-src-row.bad .r-src-state { color: var(--tile-ink); font-weight: 700; }
+.r-src-row.bad .r-src-bar { background: var(--tile-soft); }
+/* look A: a strip under the Stop row, the two sources side by side */
+.r-src-a { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 22px; padding: 12px 16px; margin-bottom: 14px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-note); }
+.r-src-a .r-src-head { display: none; }
+/* look B: a card beside the transcript, above the notes */
+.r-src-b { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+.r-src-b .r-src-row { grid-template-columns: 20px minmax(0, 1fr) 72px; grid-template-rows: auto auto; row-gap: 6px; }
+.r-src-b .r-src-bar { grid-column: 2 / span 2; grid-row: 2; }
+.r-src-b .r-src-state { grid-column: 3; grid-row: 1; text-align: right; }
+.r-src-b .r-src-ico { grid-row: 1 / span 2; align-self: start; margin-top: 2px; }
+/* look C: two small meters in the Stop row; the device names on hover */
+.r-src-c { display: flex; gap: 14px; align-items: center; }
+.r-src-c .r-src-head, .r-src-c .r-src-text, .r-src-c .r-src-state { display: none; }
+.r-src-c .r-src-row { display: flex; gap: 6px; }
+.r-src-c .r-src-ico { width: 18px; height: 18px; }
+.r-src-c .r-src-bar { width: 54px; height: 6px; }
+.r-d-actions:has(.r-src-c) .r-live-note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.r-src-warn { display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; margin-bottom: 14px; background: var(--tile-soft); border: 1px solid var(--tile-line); border-radius: var(--radius-sm); color: var(--tile-ink); }
+.r-src-warn-ico { width: 22px; height: 22px; flex: none; fill: none; stroke: var(--tile); stroke-width: var(--icon-stroke); stroke-linecap: round; stroke-linejoin: round; }
+.r-src-warn-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.btn.r-src-fix { align-self: flex-start; margin-top: 8px; background: var(--tile); border-color: var(--tile); color: var(--on-accent); }
+.btn.r-src-fix:hover { background: var(--tile-ink); border-color: var(--tile-ink); }
 .r-progress { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .r-progress .meter { flex: 1; max-width: 420px; }
 

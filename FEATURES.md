@@ -104,3 +104,4 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Installer | done (.exe, Inno Setup) | done (Ecoscribe.app + .dmg, com.erikbros.ecoscribe, self-signed: this Mac only; a public build needs a Developer ID) |
 | Claude Code from the app (summaries, self-corrections) | done (wsl.exe, a login shell: Claude Code lives in WSL) | ticket dictado-1xg (a zsh login shell; not yet tried on the Mac) |
 | Move the pill: drag the meeting chip, it stays there; double-click puts it back | done (dictado-06i: click-through except while the mouse is on the chip; the spot in pill.json) | ticket dictado-8dy |
+| Which mic and output a call app uses (the meeting follows the call, the page shows it) | done (dictado-s1a: audio sessions per device; a silent source switches to the call's device) | ticket dictado-7bw |

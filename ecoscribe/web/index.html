@@ -155,6 +155,18 @@
             <select id="r-d-lang" aria-label="Meeting language"></select></label>
           <button class="btn r-stop" id="r-d-stop">Stop</button>
         </div>
+        <!-- what the meeting records, live (dictado-s1a); app.js puts it where SRC_LOOK says -->
+        <div class="r-src" id="r-src" hidden aria-label="What Ecoscribe is recording">
+          <div class="r-src-head"><span class="row-label">What it's recording</span></div>
+          <div class="r-src-row" data-src="mic"><svg class="r-src-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+            <div class="r-src-text"><strong>You</strong><span class="r-src-dev"></span></div>
+            <div class="r-src-bar" role="meter" aria-label="Your mic's level" aria-valuemin="0" aria-valuemax="100"><span></span></div>
+            <span class="r-src-state"></span></div>
+          <div class="r-src-row" data-src="system"><svg class="r-src-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5v5h3.5L12 19V5L7.5 9.5z"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></svg>
+            <div class="r-src-text"><strong>The others</strong><span class="r-src-dev"></span></div>
+            <div class="r-src-bar" role="meter" aria-label="The call's level" aria-valuemin="0" aria-valuemax="100"><span></span></div>
+            <span class="r-src-state"></span></div>
+        </div>
         <div class="r-d-actions" id="r-d-done-actions" hidden>  <!-- eight buttons became three (dictado-6oe.4) -->
           <details class="menu"><summary class="btn btn-primary btn-sm">Copy ▾</summary>
             <div class="menu-pop">
@@ -176,6 +188,11 @@
         <div class="r-progress" id="r-d-progress" hidden><div class="meter"><div class="meter-fill" id="r-d-progress-fill"></div></div><span class="muted small" id="r-d-progress-text"></span></div>
         <div class="r-body">
           <div class="r-main">
+          <div class="r-src-warn" id="r-src-warn" hidden role="alert">  <!-- dictado-s1a: a source that hears nothing -->
+            <svg class="r-src-warn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 2.5 20h19z"/><path d="M12 10v4.5M12 17.2v.3"/></svg>
+            <div class="r-src-warn-text"><strong id="r-src-warn-title"></strong><span class="small" id="r-src-warn-detail"></span>
+              <button class="btn btn-sm r-src-fix" id="r-src-fix"></button></div>
+          </div>
           <div class="r-replace" id="r-replace" hidden role="status">  <!-- dictado-9lo: the Replace list on this saved transcript -->
             <svg class="r-replace-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h15M15 4l4 4-4 4M20 16H5M9 12l-4 4 4 4"/></svg>
             <div class="r-replace-text"><strong id="r-replace-title"></strong><span class="muted small" id="r-replace-detail"></span></div>

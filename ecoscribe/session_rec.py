@@ -70,6 +70,13 @@ class MicSource:
             except Exception:
                 log.debug("mic close failed", exc_info=True)
 
+    def switch(self, name: str) -> None:
+        """Record `name` from now on (dictado-s1a): the meeting goes on, the pump pads the short gap."""
+        import dataclasses
+        self.stop()
+        self.cfg = dataclasses.replace(self.cfg, device=name)
+        self.start()
+
     def read(self) -> np.ndarray:
         with self._lock:
             buf, self._buf = self._buf, []
@@ -178,6 +185,25 @@ class SessionRecorder:
 
     def levels(self) -> tuple[float, float]:
         return (self.mic.level() if self.mic else 0.0, self.loop.level() if self.loop else 0.0)
+
+    def names(self) -> tuple[str, str]:
+        """The devices recorded now: (mic, output), as Windows names them."""
+        loop = getattr(self.loop, "device_name", "") or ""
+        return getattr(self.mic, "device_name", "") or "", loop.removesuffix(" [Loopback]")
+
+    def switch(self, kind: str, name: str) -> bool:
+        """Record `name` for `kind` ("mic" or "system") from now on, in the same meeting (dictado-s1a)."""
+        src = self.mic if kind == "mic" else self.loop
+        fn = getattr(src, "switch", None)
+        if fn is None or not name:
+            return False
+        try:
+            fn(name)
+            log.info("meeting %s switched to %s", kind, name)
+            return True
+        except Exception:
+            log.exception("meeting %s couldn't switch to %s", kind, name)
+            return False
 
     def stop(self) -> dict:
         if self._stopped:
