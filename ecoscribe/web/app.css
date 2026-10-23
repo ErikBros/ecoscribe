@@ -764,13 +764,6 @@ kbd { font: inherit; font-size: var(--fs-xs); padding: 1px 6px; border: 1px soli
 .i-suggest-word { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; min-width: 0; }
 .i-suggest-word b { font-weight: 600; }
 .i-suggest-word .muted { font-size: var(--fs-sm); }
-/* a wide window: the page widens and the cards below the four small ones flow in two columns (dictado-9bl) */
-@media (min-width: 1400px) {
-  #page-insights { max-width: 1180px; }
-  .i-flow { columns: 2; column-gap: 16px; }
-  .i-flow > .card { break-inside: avoid; display: inline-block; width: 100%; vertical-align: top; }
-}
-
 /* ---------- Settings > Speech models (dictado-z4q) ---------- */
 .m-row .row-text { gap: 2px; }
 .m-row .s-progress { max-width: 360px; }
