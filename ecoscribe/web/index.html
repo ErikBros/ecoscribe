@@ -240,10 +240,12 @@
           <div class="card i-card"><div class="card-title">Languages</div><div id="i-langs"></div></div>
           <div class="card i-card"><div class="card-title">Where you dictate</div><div id="i-apps"></div></div>
         </div>
+        <div class="i-flow">  <!-- two columns on a wide window (dictado-9bl) -->
         <div class="card i-card">
           <div class="card-title">How you talk</div>
+          <p class="muted small i-explain">In all your dictations. Filler words fill a pause without adding anything: "like", "basically", "you know".</p>
           <div id="i-habits"></div>
-          <div class="i-sub">Phrases you repeat</div>
+          <div class="i-sub">Phrases you repeat, and how many times</div>
           <div class="i-chips" id="i-phrases"></div>
         </div>
         <div class="card i-card" id="i-markers-card">
@@ -251,11 +253,13 @@
           <p class="muted small" id="i-markers-empty">Fills as you dictate messages and emails to people (not prompts to AI apps).</p>
           <div id="i-markers-body">
             <div class="i-habit"><span class="i-habit-num" id="i-hedges">0</span><span class="muted">hedges per 100 words</span>
-              <span class="i-habit-num" id="i-fillers">0</span><span class="muted">filler words per 100</span></div>
-            <div class="i-chart" id="i-markers-weeks" data-label="Hedges and filler words per 100 words, per week"></div>
-            <div class="i-sub">Hedges you use most</div>
+              <span class="i-habit-num" id="i-fillers">0</span><span class="muted">filler words per 100 words</span></div>
+            <p class="muted small i-explain" id="i-markers-how">Hedges soften what you say: "maybe", "I think", "kind of". Filler words fill a pause: "like", "basically".</p>
+            <div class="i-sub">Hedges per 100 words, week by week</div>
+            <div class="i-chart" id="i-markers-weeks" data-label="Hedges per 100 words, week by week"></div>
+            <div class="i-sub">Hedges you use most, and how many times</div>
             <div class="i-chips" id="i-top-hedges"></div>
-            <p class="muted small">Filler words are normal in speech. In a message, hedges ("maybe", "I think", "kind of") can read as unsure: say it straight when you mean it.</p>
+            <p class="muted small">Filler words are normal in speech. In a message, hedges can read as unsure: say it straight when you mean it.</p>
           </div>
         </div>
         <div class="card i-card" id="i-pace-card">
@@ -263,24 +267,27 @@
           <p class="muted small" id="i-pace-empty">Fills from your next dictations on.</p>
           <div id="i-pace-body">
             <div id="i-pace-rows"></div>
-            <div class="i-sub">Messages to people, by words a minute</div>
-            <div class="i-chart" id="i-pace-hist" data-label="Messages to people by pace"></div>
+            <div class="i-sub">Your messages to people, by words a minute</div>
+            <div class="i-chart" id="i-pace-hist" data-label="Your messages to people, by words a minute"></div>
             <p class="muted small" id="i-pace-note">Listeners follow most easily at about 130-160 words a minute (the highlighted bars). That's information, not a goal: slower is fine when it's clear.</p>
           </div>
         </div>
         <div class="card i-card" id="i-meet-card">
           <div class="card-title">In your meetings</div>
-          <p class="muted small" id="i-meet-empty">Record a meeting (Meetings tab) and how you talk in it shows up here: your share of the talking, long turns, the questions you ask.</p>
+          <p class="muted small" id="i-meet-empty">Record a meeting (Meetings tab) and how you talk in it shows up here: your share of the talking, long stretches of talking, the questions you ask.</p>
           <div id="i-meet-body">
-            <div class="i-tiles i-meet-tiles">
-              <div class="i-tile"><span class="i-tile-label">Your share of the talking</span><span class="i-tile-value" id="i-meet-share">0%</span></div>
-              <div class="i-tile"><span class="i-tile-label">Turns over 90 s</span><span class="i-tile-value" id="i-meet-mono">0</span></div>
-              <div class="i-tile"><span class="i-tile-label">Questions you asked</span><span class="i-tile-value" id="i-meet-q">0</span></div>
-              <div class="i-tile"><span class="i-tile-label">Hedges per 100 words</span><span class="i-tile-value" id="i-meet-hedges">0</span></div>
+            <p class="muted small i-explain" id="i-meet-how"></p>
+            <div class="i-meet-tiles">
+              <div class="i-stat"><span class="i-stat-label">Your share of the talking</span><span class="i-stat-value" id="i-meet-share">0%</span></div>
+              <div class="i-stat"><span class="i-stat-label">Times you talked over 90&nbsp;s</span><span class="i-stat-value" id="i-meet-mono">0</span></div>
+              <div class="i-stat"><span class="i-stat-label">Questions you asked</span><span class="i-stat-value" id="i-meet-q">0</span></div>
+              <div class="i-stat"><span class="i-stat-label">Hedges per 100 words</span><span class="i-stat-value" id="i-meet-hedges">0</span></div>
             </div>
-            <div class="i-sub">Your share, meeting by meeting</div>
-            <div id="i-meet-list"></div>
-            <p class="muted small">Your mic is you, the call's sound is everyone else.</p>
+            <div class="i-sub">Meeting by meeting</div>
+            <table class="i-table" id="i-meet-list">
+              <thead><tr><th>Meeting</th><th>Your share of the talking</th><th class="num">Over 90&nbsp;s</th><th class="num">Questions</th><th class="num">Hedges per 100 words</th></tr></thead>
+              <tbody></tbody>
+            </table>
           </div>
         </div>
         <div class="card i-card" id="i-clarity-card">
@@ -288,20 +295,22 @@
           <p class="muted small" id="i-clarity-empty">Fills from your next dictations on: after each one, Ecoscribe takes a second look at how sure it was of every word.</p>
           <div id="i-clarity-body">
             <div class="i-habit"><span class="i-habit-num" id="i-clarity">0%</span><span class="muted" id="i-clarity-how"></span></div>
-            <div class="i-chart" id="i-clarity-weeks" data-label="Words heard clearly, per week"></div>
-            <div class="i-sub">Words Ecoscribe wasn't sure of</div>
+            <div class="i-sub">Words heard clearly, week by week</div>
+            <div class="i-chart" id="i-clarity-weeks" data-label="Words heard clearly, week by week"></div>
+            <div class="i-sub">Words Ecoscribe wasn't sure of, and how many times</div>
             <div id="i-unsure"></div>
           </div>
         </div>
         <div class="card i-card" id="i-suggest-card">
           <div class="card-title">Words to add</div>
-          <p class="muted small">Names Ecoscribe keeps writing its own way. Add one to Your words and it's spelled right from the next dictation.</p>
+          <p class="muted small i-explain">Names you said at least twice that aren't in Your words yet. Add one and Ecoscribe leans toward that spelling whenever it hears something close, in dictations and meetings. Fix the spelling in the box first if it's not right.</p>
           <ul class="i-suggest" id="i-suggest"></ul>
         </div>
         <div class="card i-card i-claude">
           <div><div class="card-title">Your week for Claude</div>
             <p class="muted small">Everything you dictated in the last 7 days as one prompt: Claude sums up your themes, decisions and loose ends.</p></div>
           <button type="button" class="btn btn-ghost btn-sm" id="i-claude">Copy for Claude</button>
+        </div>
         </div>
         <p class="muted small i-foot" id="i-foot">Worked out on this computer from your dictation history; nothing is sent anywhere.</p>
       </div>

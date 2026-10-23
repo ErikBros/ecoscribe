@@ -35,6 +35,7 @@ from shoot import APP, SHOTS, TALL, shot  # noqa: E402
 
 PAGES = {**SHOTS, **TALL}  # a tall page shows what's below the fold (only when named in --pages)
 TALL_H = 2300
+TALL_HEIGHT = {"insights-largo": 3700, "insights-largo-oscuro": 3700}  # the whole Insights page (dictado-9bl)
 
 SIZES = {980: 690, 1470: 920, 1920: 1080}
 NOISE = 16  # a channel difference below this is font smoothing, not a change
@@ -85,7 +86,7 @@ def shoot_all(sources: dict[str, Path], out: Path, pages: list[str], widths: lis
     def one(job):
         name, src, page, w = job
         png = out / f"{name}-{page}-{w}.png"
-        shot(src, PAGES[page], png, size=(w, TALL_H if page in TALL else SIZES.get(w, 900)))
+        shot(src, PAGES[page], png, size=(w, TALL_HEIGHT.get(page, TALL_H) if page in TALL else SIZES.get(w, 900)))
         return job, png
     res: dict = {}
     with ThreadPoolExecutor(4) as ex:
