@@ -670,10 +670,13 @@ select:hover { border-color: var(--line-strong); }
 .st-wrap.off { opacity: .5; }
 .st-row .row-text { flex: 1; max-width: none; }
 .st-ctl { display: flex; align-items: center; gap: 18px; }
-.st-ctl select { min-width: 230px; }
+.st-pick { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; flex: none; }
+.st-looks .seg { padding: 6px 12px; font-size: var(--fs-ui); }
+.st-looks .seg:disabled { cursor: default; color: var(--ink-faint); }
+.st-out { font-size: var(--fs-ui); color: var(--ink-soft); padding-left: 12px; }
+.st-out::before { content: "→ "; color: var(--ink-faint); }
 .st-vc { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .st-vc span { white-space: nowrap; }
-.st-note { margin: 8px 0 0; }
 
 /* dictation-languages: tick any mix */
 .lang-checks { display: flex; flex-wrap: wrap; gap: 8px; }
