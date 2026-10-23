@@ -72,6 +72,9 @@ class TextCfg:
     strip_fillers: bool = True
     vocabulary: list = field(default_factory=list)  # names/terms Whisper should spell your way (prompt)
     voice_commands: bool = False  # "new line", "new paragraph", a closing "send it" (presses Enter)
+    # dictado-67v: the user's own phrases per command and language, over the built-in ones (text.VOICE_COMMANDS):
+    # {"line": {"en": ["new line", "next line"]}}; a language left out keeps its built-in phrases
+    voice_phrases: dict = field(default_factory=dict)
     # names on the window you dictate into go in that dictation's prompt (t0u.27: names right
     # 77 % -> 87 % on real speech, no time cost; read locally through UI Automation)
     screen_names: bool = True

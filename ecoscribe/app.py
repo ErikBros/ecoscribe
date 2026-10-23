@@ -386,7 +386,7 @@ class App:
         style = self._style()  # dictado-h0m: None unless per-app styles are on
         if res.text and getattr(self.cfg.text, "voice_commands", False) and (style is None or style["commands"]):
             from .text import voice_commands
-            text, enter = voice_commands(res.text)
+            text, enter = voice_commands(res.text, getattr(self.cfg.text, "voice_phrases", None))  # dictado-67v
             res = replace(res, text=text)
             if enter and not text:  # only "send it": submit what is already in the box
                 self.press_enter()

@@ -649,6 +649,16 @@ select:hover { border-color: var(--line-strong); }
 .vc-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: var(--fs-ui); }
 .vc-table th { text-align: left; font-weight: 600; color: var(--ink-soft); padding: 6px 8px; border-bottom: 1px solid var(--line); }
 .vc-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+/* dictado-67v: the phrases as chips the user removes, adds to and resets */
+.vc-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.vc-chip { display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px 2px 10px; border: 1px solid var(--line); border-radius: var(--radius-pill);
+  background: var(--well); color: var(--ink); white-space: nowrap; }
+.vc-x { border: 0; background: none; color: var(--ink-soft); cursor: pointer; font-size: var(--fs-ui); line-height: 1; padding: 0 4px; }
+.vc-x:hover { color: var(--tile); }
+.vc-add { width: 96px; font: inherit; padding: 2px 8px; border: 1px dashed var(--line-strong); border-radius: var(--radius-pill); background: transparent; color: var(--ink); }
+.vc-add:focus { outline: none; border-style: solid; border-color: var(--aegean); width: 140px; }
+.vc-reset { border: 0; background: none; padding: 0; font: inherit; font-size: var(--fs-xs); color: var(--aegean); cursor: pointer; text-decoration: underline; }
+.vc-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
 
 /* dictado-h0m: Style per app */
 .st-wrap { padding: 4px 0 14px; transition: opacity .15s; }

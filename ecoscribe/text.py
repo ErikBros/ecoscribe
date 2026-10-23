@@ -1,6 +1,8 @@
 """Rule-based transcript cleanup. No LLM: speed is the product."""
 from __future__ import annotations
 
+import functools
+import json
 import re
 
 _FILLERS = r"(?:um+|uh+|erm|er|hmm+|mm+|eh|em|ehm)"
@@ -82,20 +84,76 @@ VOICE_COMMANDS = [
      {"en": ["send it", "press enter"], "es": ["envíalo", "enviar"], "sv": ["skicka"]}),
 ]
 _ACCENTS = {"á": "[aá]", "é": "[eé]", "í": "[ií]", "ó": "[oó]", "ú": "[uú]"}
+PHRASE_MAX, PHRASES_MAX = 40, 8  # dictado-67v: per phrase (characters), per command and language
 
 
-def _phrases(key: str) -> str:
-    """Alternation for one command, accent-tolerant ("envialo" = "envíalo")."""
-    words = [p for k, _, langs in VOICE_COMMANDS if k == key for ps in langs.values() for p in ps]
+def clean_phrase(p) -> str:
+    """'  Next Line! ' -> 'next line': lower case, single spaces, no punctuation at the ends."""
+    return " ".join(str(p or "").lower().split()).strip(" .,;:!?\"'\u201c\u201d")[:PHRASE_MAX].strip()
+
+
+def phrase_table(custom=None) -> dict[str, dict[str, list[str]]]:
+    """{command: {lang: [phrases]}}: the built-in phrases with the user's own lists over them (dictado-67v).
+    A list the user saved replaces that language's built-in one; an empty list switches it off."""
+    out = {k: {lang: list(ps) for lang, ps in langs.items()} for k, _, langs in VOICE_COMMANDS}
+    for k, langs in (custom or {}).items():
+        if k in out and isinstance(langs, dict):
+            for lang, ps in langs.items():
+                out[k][str(lang)] = list(dict.fromkeys(p for p in map(clean_phrase, ps if isinstance(ps, list) else []) if p))[:PHRASES_MAX]
+    return out
+
+
+def clean_custom(value) -> dict[str, dict[str, list[str]]]:
+    """What Settings saves (dictado-67v): only the lists that differ from the built-in ones. Raises ValueError
+    (in words for the user) for a phrase two commands share."""
+    from .languages import ALL
+    builtin = phrase_table()
+    out: dict[str, dict[str, list[str]]] = {}
+    for k, langs in (value or {}).items():
+        if k not in builtin or not isinstance(langs, dict):
+            raise ValueError(f"unknown voice command: {k}")
+        for lang, ps in langs.items():
+            if lang not in ALL:
+                raise ValueError(f"unknown language: {lang}")
+            got = phrase_table({k: {lang: ps if isinstance(ps, list) else []}})[k][lang]
+            if got != builtin[k].get(lang, []):
+                out.setdefault(k, {})[lang] = got
+    seen: dict[str, str] = {}
+    names = {k: what.split(" (")[0] for k, what, _ in VOICE_COMMANDS}
+    for k, langs in phrase_table(out).items():
+        for p in {p for ps in langs.values() for p in ps}:
+            if p in seen and seen[p] != k:
+                raise ValueError(f"\u201c{p}\u201d can't be both {names[seen[p]]} and {names[k]}: keep it in one")
+            seen[p] = k
+    return out
+
+
+def _alternation(words) -> str:
+    """One regex alternation, accent-tolerant ("envialo" = "envíalo"), longest first."""
     rx = lambda p: r"\s+".join("".join(_ACCENTS.get(c, re.escape(c)) for c in w) for w in p.split())  # noqa: E731
-    return "|".join(rx(p) for p in sorted(words, key=len, reverse=True))
+    return "|".join(rx(p) for p in sorted(set(words), key=len, reverse=True))
+
+
+def _phrases(key: str, table=None) -> str:
+    """Alternation for one command, over every language's phrases."""
+    return _alternation([p for ps in (table or phrase_table())[key].values() for p in ps])
 
 
 _B = r"(^|[.,;:!?])\s*"
 _E = r"\s*([.,;:!?]|$)\s*"
-_PARAGRAPH = re.compile(_B + f"(?:{_phrases('paragraph')})" + _E, re.IGNORECASE)
-_LINE = re.compile(_B + f"(?:{_phrases('line')})" + _E, re.IGNORECASE)
-_ENTER = re.compile(_B + f"(?:{_phrases('enter')})" + r"\s*[.!]?\s*$", re.IGNORECASE)
+
+
+@functools.lru_cache(maxsize=8)
+def _matchers(custom_json: str = "{}"):
+    """(paragraph, line, enter) regexes for a phrase table; None for a command with no phrase left."""
+    table = phrase_table(json.loads(custom_json))
+    def rx(key, tail):
+        alt = _phrases(key, table)
+        return re.compile(_B + f"(?:{alt})" + tail, re.IGNORECASE) if alt else None
+    return rx("paragraph", _E), rx("line", _E), rx("enter", r"\s*[.!]?\s*$")
+
+
+_PARAGRAPH, _LINE, _ENTER = _matchers()
 
 
 # Spoken quotes (dictado-y52): "called, quote, weekly review, end quote." -> called "weekly review".
@@ -128,14 +186,17 @@ def _end(punct: str) -> str:
     return punct if punct in ".!?" else ("." if punct else "")
 
 
-def voice_commands(s: str) -> tuple[str, bool]:
-    """"new line" -> line break, "new paragraph" -> blank line, a closing "send it" -> (text, press Enter)."""
+def voice_commands(s: str, custom=None) -> tuple[str, bool]:
+    """"new line" -> line break, "new paragraph" -> blank line, a closing "send it" -> (text, press Enter).
+    custom: the user's own phrases ([text] voice_phrases, dictado-67v) over the built-in ones."""
     enter = False
-    m = _ENTER.search(s)
+    para, line, enter_rx = _matchers(json.dumps(custom or {}, sort_keys=True, ensure_ascii=False))
+    m = enter_rx.search(s) if enter_rx else None
     if m:
         s, enter = s[:m.start()] + _end(m.group(1)), True
-    for rx, brk in ((_PARAGRAPH, "\n\n"), (_LINE, "\n")):
-        s = rx.sub(lambda m: _end(m.group(1)) + brk, s)
+    for rx, brk in ((para, "\n\n"), (line, "\n")):
+        if rx is not None:
+            s = rx.sub(lambda m: _end(m.group(1)) + brk, s)
     s = re.sub(r"\n([a-zà-ÿ])", lambda m: "\n" + m.group(1).upper(), s)
     s = s.lstrip("\n")
     return (s.rstrip() if enter else s), enter
