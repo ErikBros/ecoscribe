@@ -616,6 +616,38 @@ async function load(query) {
   check(!doc.querySelector("#row-voice-commands").closest(".group").hidden && doc.querySelector('#set-tabs .seg.active').dataset.sec === "dictation",
     "Voice commands link opens Dictation");
 }
+{ // dictado-67v: the voice command phrases are the user's to change, per language, with Reset
+  const { window, doc } = await load("page=ajustes");
+  await sleep(200);
+  const heads = () => [...doc.querySelectorAll("#vc-list thead th")].map((t) => t.textContent).join(",");
+  const chips = (key) => [...doc.querySelectorAll(`.vc-add[data-key="${key}"][data-lang="en"]`)].flatMap((i) =>
+    [...i.parentElement.querySelectorAll(".vc-chip")].map((c) => c.firstChild.textContent));
+  check(heads() === "What it does,English", "columns: English and the user's languages: " + heads());
+  check(chips("line").join(",") === "new line" && doc.querySelector("#vc-reset-all").hidden, "built-in phrases, nothing to reset");
+  const add = (key, text) => { const i = doc.querySelector(`.vc-add[data-key="${key}"][data-lang="en"]`); i.value = text;
+    i.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })); };
+  add("line", "  Next Line! ");
+  check(chips("line").join(",") === "new line,next line" && !doc.querySelector("#vc-reset-all").hidden
+    && doc.querySelector('.vc-add[data-key="line"]').parentElement.querySelector(".vc-reset"), "a phrase added, cleaned; Reset offered");
+  check(!doc.querySelector("#savebar").hidden, "an added phrase offers Save");
+  add("line", "send it");
+  check(chips("line").join(",") === "new line,next line" && doc.querySelector("#toast").textContent.includes("already Press Enter"),
+    "a phrase of another command is refused with the reason");
+  doc.querySelector('.vc-add[data-key="enter"]').parentElement.querySelector(".vc-x").click(); await sleep(20);
+  check(chips("enter").join(",") === "press enter", "× removes a phrase");
+  let sent = null;
+  const api = window.__ecoscribe.api, orig = api.save_settings;
+  api.save_settings = async (v) => { sent = v; return orig(v); };
+  doc.querySelector("#save").click(); await sleep(100);
+  check(sent && JSON.stringify(sent.voice_phrases) === '{"line":{"en":["new line","next line"]},"enter":{"en":["press enter"]}}'
+    && Object.keys(sent).length === 1, "saves only what differs: " + JSON.stringify(sent));
+  doc.querySelector("#vc-reset-all").click(); await sleep(20);
+  check(chips("line").join(",") === "new line" && chips("enter").join(",") === "send it,press enter" && doc.querySelector("#vc-reset-all").hidden,
+    "Back to the built-in phrases resets every cell");
+  const sv = await load("page=ajustes&vp=1");
+  await sleep(200);
+  check([...sv.doc.querySelectorAll('.vc-add[data-key="enter"][data-lang="en"]')][0].parentElement.textContent.includes("ship it"), "saved phrases show on load");
+}
 { // Settings > the two switches that use Claude (dictado-bd6)
   const { doc } = await load("page=ajustes");
   await sleep(200);

@@ -33,11 +33,14 @@ MEET_MODES = [("prompt", "Ask"), ("auto", "Start by itself"), ("off", "Don't det
 MEET_ENDS = [(5, "5 seconds"), (10, "10 seconds"), (15, "15 seconds"), (30, "30 seconds"), (60, "1 minute"), (120, "2 minutes")]
 
 
-def _voice_command_list() -> list[dict]:
-    """Settings > Voice commands > See all commands (t0u.38): from the table the matcher uses."""
-    from .text import VOICE_COMMANDS
-    return [{"key": key, "what": what, **{lang: ", ".join(f'"{p}"' for p in ps) for lang, ps in langs.items()}}
-            for key, what, langs in VOICE_COMMANDS]
+def _voice_command_list(custom=None) -> list[dict]:
+    """Settings > Voice commands > See all commands (t0u.38): from the table the matcher uses, with the
+    user's own phrases over the built-in ones (dictado-67v: `phrases` to edit, `builtin` to reset to)."""
+    from .text import VOICE_COMMANDS, phrase_table
+    table, builtin = phrase_table(custom), phrase_table()
+    return [{"key": key, "what": what, **{lang: ", ".join(f'"{p}"' for p in ps) for lang, ps in table[key].items() if ps},
+             "phrases": table[key], "builtin": builtin[key]}
+            for key, what, _ in VOICE_COMMANDS]
 
 
 def _app_style_rows(saved) -> list[dict]:
@@ -239,7 +242,7 @@ class Api:
                 "startup": self._startup.is_enabled(),
                 "meet_mode": c.meetings.mode, "meet_end": str(int(c.meetings.grace_s)), "meet_lang": c.meetings.default_lang, "on_demand": c.whisper.on_demand,
                 "speakers": c.meetings.speakers, "vocabulary": "\n".join(c.text.vocabulary),
-                "voice_commands": c.text.voice_commands,
+                "voice_commands": c.text.voice_commands, "voice_phrases": c.text.voice_phrases,  # dictado-67v
                 "self_corrections": c.text.self_corrections, "command_mode": c.text.command_mode,  # dictado-bd6
                 "screen_names": c.text.screen_names,
                 "hold_to_talk": c.hotkey.hold_to_talk, "numpad_enter": c.hotkey.numpad_enter, "voice_memory": c.meetings.voice_memory,
@@ -254,7 +257,7 @@ class Api:
             },
             "speakers_addon": diarize.addon_exe().is_file(),
             "auto_update_supported": sys.platform == "win32",  # dictado-nmo: the Inno Setup installer
-            "voice_command_list": _voice_command_list(),
+            "voice_command_list": _voice_command_list(c.text.voice_phrases),
             "correction_list": _correction_list(),
             "options": {
                 "hotkeys": [{"value": v, "label": l} for v, l in HOTKEYS],
@@ -330,6 +333,12 @@ class Api:
                     if k and v and k not in table:
                         table[k] = v
                 c.text.replacements = dict(list(table.items())[:200])
+            if "voice_phrases" in values:  # dictado-67v: {command: {lang: [phrases]}}, only what differs is kept
+                from .text import clean_custom
+                try:
+                    c.text.voice_phrases = clean_custom(values["voice_phrases"])
+                except ValueError as e:
+                    return {"ok": False, "error": str(e)}
             if "app_styles" in values:  # dictado-h0m: [{kind, capital, full_stop, commands}]
                 from .app_styles import clean_table
                 c.text.app_styles = clean_table(values["app_styles"])

@@ -2,6 +2,8 @@
 
 Off by default ([text] voice_commands = false): today's text is unchanged unless the user turns it on.
 """
+import pytest
+
 from ecoscribe.text import voice_commands
 
 
@@ -24,7 +26,7 @@ def test_words_inside_a_sentence_are_left_alone():
     assert voice_commands("We need a new line of products. ") == ("We need a new line of products. ", False)
 
 
-def _app(tmp_path, said, on):
+def _app(tmp_path, said, on, phrases=None):
     from ecoscribe.app import App
     from ecoscribe.config import Config
     from ecoscribe.deliver import DeliveryResult
@@ -32,6 +34,7 @@ def _app(tmp_path, said, on):
     from tests.test_app import FakeGate, FakeRecorder, FakeUi, wait
     cfg = Config()
     cfg.text.voice_commands = on
+    cfg.text.voice_phrases = phrases or {}
     delivered, enters = [], []
 
     class Eng:
@@ -67,6 +70,46 @@ def test_settings_list_comes_from_the_matcher_table(tmp_path):
             for p in phrases:
                 out, enter = voice_commands(f"Hola. {p}.")
                 assert (enter if key == "enter" else "\n" in out), p
+
+
+# -- the user's own phrases (dictado-67v) ------------------------------------------------------------
+def test_own_phrases_replace_that_languages_built_in_ones():
+    mine = {"line": {"en": ["next line"]}, "enter": {"en": ["ship it"]}}
+    assert voice_commands("Hello. Next line. Bye. ", mine) == ("Hello.\nBye. ", False)
+    assert voice_commands("Hello. New line. Bye. ", mine) == ("Hello. New line. Bye. ", False)  # replaced, not added
+    assert voice_commands("Hej. Ny rad. Vi ses. ", mine) == ("Hej.\nVi ses. ", False)  # Swedish keeps its own
+    assert voice_commands("Run the tests, ship it. ", mine) == ("Run the tests.", True)
+    assert voice_commands("Hello. New line. Bye. ", {"line": {"en": [], "es": [], "sv": []}}) == ("Hello. New line. Bye. ", False)
+    assert voice_commands("Hello. New line. Bye. ") == ("Hello.\nBye. ", False)  # the built-in table is untouched
+
+
+def test_saved_phrases_are_cleaned_and_only_what_differs_is_kept():
+    from ecoscribe.text import clean_custom, phrase_table
+    got = clean_custom({"line": {"en": ["New line", "  Next   Line! ", "next line"], "sv": ["ny rad"]}, "enter": {"de": ["schick es"]}})
+    assert got == {"line": {"en": ["new line", "next line"]}, "enter": {"de": ["schick es"]}}  # Swedish = built in: dropped
+    assert phrase_table(got)["enter"]["de"] == ["schick es"] and phrase_table(got)["enter"]["en"] == ["send it", "press enter"]
+    for bad in ({"line": {"en": ["send it"]}}, {"nope": {"en": ["x"]}}, {"line": {"xx": ["x"]}}):
+        with pytest.raises(ValueError):
+            clean_custom(bad)
+
+
+def test_app_uses_the_users_phrases(tmp_path):
+    assert _app(tmp_path, "Run the tests again, ship it. ", True, {"enter": {"en": ["ship it"]}}) == (["Run the tests again."], [1])
+
+
+def test_settings_edit_the_phrases_and_reset_them(tmp_path):
+    from ecoscribe import config
+    from ecoscribe.window import Api
+    api = Api(data_dir=tmp_path, config_path=tmp_path / "c.toml", signal_reload=lambda: True)
+    assert api.save_settings({"voice_phrases": {"line": {"en": ["new line", "next line"]}}})["ok"]
+    assert config.load(tmp_path / "c.toml").text.voice_phrases == {"line": {"en": ["new line", "next line"]}}
+    row = api.get_settings()["voice_command_list"][1]
+    assert row["key"] == "line" and row["phrases"]["en"] == ["new line", "next line"] and row["builtin"]["en"] == ["new line"]
+    assert row["en"] == '"new line", "next line"'
+    bad = api.save_settings({"voice_phrases": {"line": {"en": ["send it"]}}})
+    assert not bad["ok"] and "Line break" in bad["error"] and "Press Enter" in bad["error"]
+    assert api.save_settings({"voice_phrases": {}})["ok"]  # Back to the built-in phrases
+    assert config.load(tmp_path / "c.toml").text.voice_phrases == {}
 
 
 # -- spoken quotes (dictado-y52): always on, needs the opening and the closing words -------------

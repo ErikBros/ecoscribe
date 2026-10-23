@@ -62,7 +62,7 @@ function demoApi() {
   const dl = { running: false, error: null, models: {} };  // the demo model download
   let settings = {
     values: { hotkey: "rctrl", mic: "Anker PowerConf", languages: demoLangs.join(","), extra_languages: demoLangs.filter((c) => !["en", "sv"].includes(c)), sounds: true, overlay: true, live_text: true, insights: params.get("insights") === "1", speech_feedback: false, unmute: true, startup: true,
-      meet_mode: "prompt", meet_end: "10", meet_lang: demoLangs[0], on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: params.get("styles") === "1", self_corrections: false, command_mode: false, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, update_check: true, auto_update: params.get("auto") === "1", theme: params.get("theme") || "system",
+      meet_mode: "prompt", meet_end: "10", meet_lang: demoLangs[0], on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: params.get("styles") === "1", self_corrections: false, command_mode: false, voice_phrases: params.get("vp") === "1" ? { line: { en: ["new line", "next line"] }, enter: { en: ["send it", "press enter", "ship it"] } } : {}, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, update_check: true, auto_update: params.get("auto") === "1", theme: params.get("theme") || "system",
       export_dir: "C:/x/Downloads", export_default: true,
       snippets: [{ trigger: "my email", text: "alex@example.com" }], replacements: [{ heard: "poll request", write: "pull request" }],
       per_app_styles: params.get("styles") === "1",
@@ -86,9 +86,10 @@ function demoApi() {
     can_startup: true,
     speakers_addon: params.get("addon") !== "0",
     auto_update_supported: !MAC,
-    voice_command_list: [{ key: "paragraph", what: "Paragraph break", en: '"new paragraph"', es: '"nuevo párrafo", "punto y aparte"', sv: '"nytt stycke"' },
-      { key: "line", what: "Line break", en: '"new line"', es: '"nueva línea"', sv: '"ny rad"' },
-      { key: "enter", what: "Press Enter after the text (at the very end only)", en: '"send it", "press enter"', es: '"envíalo", "enviar"', sv: '"skicka"' }],
+    voice_command_list: [  // like window._voice_command_list: `builtin` per language; get_settings adds `phrases` (dictado-67v)
+      { key: "paragraph", what: "Paragraph break", builtin: { en: ["new paragraph"], es: ["nuevo párrafo", "punto y aparte"], sv: ["nytt stycke"] } },
+      { key: "line", what: "Line break", builtin: { en: ["new line"], es: ["nueva línea"], sv: ["ny rad"] } },
+      { key: "enter", what: "Press Enter after the text (at the very end only)", builtin: { en: ["send it", "press enter"], es: ["envíalo", "enviar"], sv: ["skicka"] } }],
     correction_list: [{ what: "Drops the sentence before it", en: '"scratch that", "delete that", "strike that"', es: '"borra eso", "tacha eso"', sv: '"stryk det", "sudda det"', el: '"σβήσε το", "σβήσ\' το"' },
       { what: "Claude applies the correction", en: '"no wait", "sorry I mean", "sorry I meant", "correction"', es: '"no perdón", "no espera", "perdón quise decir", "corrijo"', sv: '"nej förlåt", "nej vänta", "förlåt jag menar", "rättelse"', el: '"όχι συγγνώμη", "όχι περίμενε", "συγγνώμη εννοώ"' }],
   };
@@ -254,7 +255,14 @@ function demoApi() {
             : params.get("gpurt") === "failed" ? { device: "cpu", gpu_runtime: { state: "failed", version: 1, error: "no connection", retry_s: 300 } } : {}) }),
     start_app: async () => ({ ok: true }),
     restart_app: async () => ({ ok: true }),
-    get_settings: async () => JSON.parse(JSON.stringify(settings)),
+    get_settings: async () => {
+      const out = JSON.parse(JSON.stringify(settings));
+      for (const r of out.voice_command_list) {  // the user's phrases over the built-in ones, as the window gets them
+        r.phrases = { ...r.builtin, ...((out.values.voice_phrases || {})[r.key] || {}) };
+        for (const [l, ps] of Object.entries(r.phrases)) if (ps.length) r[l] = ps.map((p) => `"${p}"`).join(", ");
+      }
+      return out;
+    },
     check_hotkey: async (v) => (/^(ctrl\+[cvxzyasfpwnt]|alt\+tab|[a-z0-9])$/.test(v) ? { ok: false, error: `${v} is not allowed` }
       : { ok: true, value: v, label: hotkeyLabel(v) }),
     save_settings: async (v) => { Object.assign(settings.values, v); return { ok: true, restarting: true }; },
@@ -1582,6 +1590,7 @@ function formValues() {
     sounds: $("#f-sounds").checked, overlay: $("#f-overlay").checked, live_text: $("#f-live-text").checked, insights: $("#f-insights").checked, speech_feedback: $("#f-speech-feedback").checked, unmute: $("#f-unmute").checked, startup: $("#f-startup").checked,
     meet_mode: $("#f-meet-mode").value, meet_end: $("#f-meet-end").value, meet_lang: $("#f-meet-lang").value, on_demand: $("#f-on-demand").checked,
     speakers: $("#f-speakers").checked, voice_commands: $("#f-voice-commands").checked,
+    voice_phrases: vcSaved(),  // dictado-67v
     self_corrections: $("#f-self-corrections").checked, command_mode: $("#f-command-mode").checked,
     screen_names: $("#f-screen-names").checked, hold_to_talk: $("#f-hold").checked, numpad_enter: $("#f-numpad-enter").checked,
     theme: $("#f-theme").value || "system",
@@ -1696,13 +1705,82 @@ function phraseTables() {
       body.append(tr);
     }
   };
-  table($("#vc-head"), $("#vc-rows"), vcList);
+  vcEditor();  // the voice commands: the user's own phrases, per language (dictado-67v)
   table($("#sc-head"), $("#sc-rows"), scList);
-  const first = (key, c) => ((vcList.find((r) => r.key === key) || {})[c] || "").match(/"[^"]+"/)?.[0];
-  const more = cols.filter((c) => c !== "en" && vcList.some((r) => r[c]));
+  const first = (key, c) => { const p = vcPhrases(vcList.find((r) => r.key === key) || {}, c)[0]; return p && `"${p}"`; };
+  const more = cols.filter((c) => c !== "en" && vcList.some((r) => vcPhrases(r, c).length));
   const eg = more.flatMap((c) => [first("line", c), first("enter", c)]).filter(Boolean);
   $("#vc-help").textContent = 'Say "new line" or "new paragraph" for a break, and end with "send it" to press Enter after the text (handy in Claude Code).'
     + (more.length ? ` ${andList(more.map(label))} work${more.length === 1 ? "s" : ""} too: ${eg.join(", ")}.` : "");
+}
+// Voice commands > See all commands (dictado-67v): the phrases are the user's to change, per action and
+// language: English (built in for everyone) and the user's other languages. × removes one, typing and
+// Enter adds one, Reset puts a cell back to the built-in phrases. Saved as [text] voice_phrases (only
+// what differs), and the real matcher uses it.
+let vcCustom = {};
+function vcCols() { return ["en", ...myLangs().filter((c) => c !== "en")]; }
+const vcLabel = (c) => langNames[c] || DICT_LANGS[c] || c;
+const vcSame = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
+function vcPhrases(row, lang) { return (vcCustom[row.key] || {})[lang] ?? (row.builtin || {})[lang] ?? []; }
+function vcSet(row, lang, list) {
+  const cell = { ...(vcCustom[row.key] || {}) };
+  if (vcSame(list, row.builtin[lang] || [])) delete cell[lang]; else cell[lang] = list;
+  if (Object.keys(cell).length) vcCustom[row.key] = cell; else delete vcCustom[row.key];
+  phraseTables(); dirty();  // the help line names the first phrases too
+}
+function vcSaved() {  // what formValues() saves: commands in table order, languages sorted
+  const out = {};
+  for (const r of vcList) {
+    const c = vcCustom[r.key];
+    if (c) out[r.key] = Object.fromEntries(Object.keys(c).sort().map((l) => [l, c[l]]));
+  }
+  return out;
+}
+function vcAdd(row, lang, input) {
+  const p = input.value.toLowerCase().replace(/\s+/g, " ").replace(/^[\s.,;:!?"“”']+|[\s.,;:!?"“”']+$/g, "").slice(0, 40);
+  if (!p) return;
+  const other = vcList.find((r) => r.key !== row.key && vcCols().concat(Object.keys(r.builtin || {})).some((l) => vcPhrases(r, l).includes(p)));
+  if (other) { toast(`“${p}” is already ${other.what.split(" (")[0]}: keep it in one.`); input.select(); return; }
+  const list = vcPhrases(row, lang);
+  if (list.includes(p)) { input.value = ""; return; }
+  if (list.length >= 8) { toast("Up to 8 phrases each."); return; }
+  vcSet(row, lang, [...list, p]);
+  $(`.vc-add[data-key="${row.key}"][data-lang="${lang}"]`)?.focus();
+}
+function vcEditor() {
+  const cols = vcCols(), head = $("#vc-list thead tr"), body = $("#vc-rows");
+  head.replaceChildren(...["What it does", ...cols.map(vcLabel)].map((t) => { const th = document.createElement("th"); th.textContent = t; return th; }));
+  body.replaceChildren();
+  for (const r of vcList) {
+    const tr = document.createElement("tr"), what = document.createElement("td");
+    what.textContent = r.what; tr.append(what);
+    for (const lang of cols) {
+      const td = document.createElement("td"), box = document.createElement("div"); box.className = "vc-cell";
+      for (const p of vcPhrases(r, lang)) {
+        const chip = document.createElement("span"); chip.className = "vc-chip"; chip.textContent = p;
+        const x = document.createElement("button"); x.type = "button"; x.className = "vc-x"; x.textContent = "×";
+        x.title = `Remove “${p}”`; x.setAttribute("aria-label", x.title);
+        x.onclick = () => vcSet(r, lang, vcPhrases(r, lang).filter((q) => q !== p));
+        chip.append(x); box.append(chip);
+      }
+      const add = document.createElement("input"); add.className = "vc-add"; add.maxLength = 40; add.spellcheck = false;
+      add.placeholder = "Add…"; add.dataset.key = r.key; add.dataset.lang = lang;
+      add.setAttribute("aria-label", `Add a ${vcLabel(lang)} phrase for ${r.what.split(" (")[0].toLowerCase()}`);
+      add.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); vcAdd(r, lang, add); } };
+      add.onchange = (e) => e.stopPropagation();  // typing isn't a change until it's added
+      add.oninput = (e) => e.stopPropagation();
+      box.append(add);
+      if (!vcSame(vcPhrases(r, lang), r.builtin[lang] || [])) {
+        const back = document.createElement("button"); back.type = "button"; back.className = "vc-reset";
+        back.textContent = "Reset"; back.title = (r.builtin[lang] || []).length ? `Back to ${r.builtin[lang].map((q) => `“${q}”`).join(", ")}` : "Back to none";
+        back.onclick = () => vcSet(r, lang, r.builtin[lang] || []);
+        box.append(back);
+      }
+      td.append(box); tr.append(td);
+    }
+    body.append(tr);
+  }
+  $("#vc-reset-all").hidden = !Object.keys(vcCustom).length;
 }
 function currentChecks(fallback) {
   const boxes = $$("#f-languages input");
@@ -1813,6 +1891,8 @@ async function renderSettings() {
   applyTheme(s.values.theme || "system");  // back to the saved one (Discard, or a preview left unsaved)
   $("#f-theme").onchange = () => { applyTheme($("#f-theme").value, false); dirty(); };  // a preview until Save
   if (params.get("vc") === "1") $("#vc-list").open = true;  // screenshot
+  vcCustom = JSON.parse(JSON.stringify(s.values.voice_phrases || {}));  // dictado-67v
+  $("#vc-reset-all").onclick = () => { vcCustom = {}; phraseTables(); dirty(); };
   if (params.get("sc") === "1") $("#sc-list").open = true;  // screenshot
   vcList = s.voice_command_list || []; scList = s.correction_list || [];  // drawn after the language card (phraseTables)
   $("#dbg-copy").onclick = async () => { await api.copy_debug_info(); toast("Copied. Paste it to Claude."); };
