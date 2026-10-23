@@ -911,7 +911,7 @@ function renameSpeaker(el) {
 async function openSession(name) {
   r.open = name; r.next = 0; r.status = null; r.segs = 0; r.speakers = null; r.names = {};
   r.notesLoaded = false; clearTimeout(r.notesTimer);
-  r.repAsked = false; paintReplace(null); paintGuests(null);
+  r.repAsked = false; paintReplace(null);
   $("#r-notes-text").value = "";
   $("#r-segs").innerHTML = "";
   $("#r-jump").hidden = true;
@@ -1082,22 +1082,6 @@ function paintReplace(st) {
   $("#r-replace-go").hidden = !o; $("#r-replace-undo").hidden = !!o;
   $("#r-replace-later").textContent = o ? "Not now" : "Hide";
 }
-async function emailParticipants(how = "") {
-  const res = await api.email_participants(r.open, how);
-  if (!res.ok) { toast(res.error || "Couldn't open a draft."); return; }
-  paintGuests(res.via === "calendar" ? res : null);
-  if (res.via === "calendar") return;
-  const who = res.to.length ? `to ${res.to.length} ${res.to.length === 1 ? "person" : "people"}` : "with an empty To (no calendar invite)";
-  toast(res.inline ? `Draft opened ${who}. Check it and press Send.` : `Draft opened ${who}. The transcript is copied: paste it in, then Send.`, 5000);
-}
-/* dictado-qxr: no guest list and no calendar to ask: Google Calendar opened on the call's day, the steps stay here */
-function paintGuests(res) {
-  $("#r-guests").hidden = !res;
-  if (!res) return;
-  const day = new Date(res.day + "T12:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
-  $("#r-guests-title").textContent = `Google Calendar is open on ${day}, and the transcript is copied`;
-  $("#r-guests-detail").textContent = "There, click this call, then Email guests (the envelope), and paste it into the message.";
-}
 async function reloadSegs(name) {  // the same lines with their new text, where the reader was
   const list = $("#r-segs"), top = list.scrollTop;
   list.innerHTML = "";
@@ -1213,10 +1197,17 @@ function rWire() {
   });
   $("#r-copy").onclick = async () => { await api.copy_transcript(r.open, "text"); toast("Copied."); };
   $("#r-copy-claude").onclick = async () => { await api.copy_transcript(r.open, "claude"); toast("Copied with date, app and language, ready to paste into Claude."); };
-  $("#r-email").onclick = () => emailParticipants();  // dictado-fnw: the user's mail program sends, never Ecoscribe
-  $("#r-guests-again").onclick = () => emailParticipants("calendar");
-  $("#r-guests-draft").onclick = () => emailParticipants("draft");
-  $("#r-guests-x").onclick = () => paintGuests(null);
+  $("#r-email").onclick = async () => {  // dictado-fnw: the user's mail program sends, never Ecoscribe
+    const res = await api.email_participants(r.open);
+    if (!res.ok) { toast(res.error || "Couldn't open a draft."); return; }
+    if (res.via === "calendar") {  // dictado-qxr: no guest list and no calendar to ask: Google Calendar on the call's day
+      const day = new Date(res.day + "T12:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+      toast(`Transcript copied. Google Calendar is open on ${day}: click this call, then Email guests (the envelope), and paste.`, 9000);
+      return;
+    }
+    const who = res.to.length ? `to ${res.to.length} ${res.to.length === 1 ? "person" : "people"}` : "with an empty To (no calendar invite)";
+    toast(res.inline ? `Draft opened ${who}. Check it and press Send.` : `Draft opened ${who}. The transcript is copied: paste it in, then Send.`, 5000);
+  };
   $("#r-copy-summary").onclick = async () => { await api.copy_transcript(r.open, "summary"); toast("Summary prompt copied: paste it into Claude."); };
   for (const b of $$("[data-fmt]")) b.onclick = () => download(r.open, b.dataset.fmt);
   $("#r-folder").onclick = () => api.open_folder(r.open);

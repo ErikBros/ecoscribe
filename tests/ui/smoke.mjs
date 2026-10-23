@@ -506,19 +506,12 @@ async function load(query) {
   b.click(); await sleep(150);
   check(window.__emailed === "2026-10-05_0915_planering" && doc.querySelector("#toast").textContent.includes("to 2 people")
     && doc.querySelector("#toast").textContent.includes("paste it in"), "opens a draft to the participants, says to paste");
-  check(doc.querySelector("#r-guests").hidden, "with guests: no Google Calendar steps");
   const ng = await load("page=reuniones/2026-10-05_0915_planering&noguests=1");
   await sleep(300);
   ng.doc.querySelector("#r-email").click(); await sleep(150);
-  const steps = ng.doc.querySelector("#r-guests");
-  check(!steps.hidden && ng.doc.querySelector("#r-guests-title").textContent.startsWith("Google Calendar is open on")
-    && ng.doc.querySelector("#r-guests-detail").textContent.includes("Email guests"), "no invite: Google Calendar on that day, the steps stay on the page");
-  ng.doc.querySelector("#r-guests-draft").click(); await sleep(150);
-  check(ng.window.__emailHow === "draft" && steps.hidden && ng.doc.querySelector("#toast").textContent.includes("empty To"), "Empty email instead opens the draft");
-  ng.doc.querySelector("#r-guests-again").click(); await sleep(150);
-  check(ng.window.__emailHow === "calendar" && !steps.hidden, "Open again opens the calendar again");
-  ng.doc.querySelector("#r-guests-x").click();
-  check(steps.hidden, "Done hides the steps");
+  const t = ng.doc.querySelector("#toast").textContent;
+  check(ng.window.__emailHow === "" && t.startsWith("Transcript copied. Google Calendar is open on") && t.includes("Email guests"),
+    "no invite: Google Calendar on that day, the steps in the toast");
 }
 { // Settings > the two switches that use Claude (dictado-bd6)
   const { doc } = await load("page=ajustes");
