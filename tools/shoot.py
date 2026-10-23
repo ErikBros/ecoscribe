@@ -42,7 +42,8 @@ SHOTS = {
        ("ajustes-cambios", "page=ajustes&dirty=1"), ("ajustes-comandos", "page=ajustes&vc=1"),
        ("ajustes-idiomas", "page=ajustes&sec=words"))},
 }
-TALL = {"inicio-largo": "page=inicio", "ajustes-largo": "page=ajustes&dirty=1", "ajustes-frases": "page=ajustes&sc=1", "insights-largo": "page=insights&insights=1"}
+TALL = {"inicio-largo": "page=inicio", "ajustes-largo": "page=ajustes&dirty=1", "ajustes-frases": "page=ajustes&sc=1", "insights-largo": "page=insights&insights=1",
+        "insights-largo-oscuro": "page=insights&insights=1&theme=dark"}
 
 
 def shot(web: Path, query: str, out: Path, size=(980, 690), scale=1.0) -> Path:
