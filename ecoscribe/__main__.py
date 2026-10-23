@@ -235,6 +235,8 @@ def _start_meetings(cfg, data, ui, root, log, app=None):
             ipc.open_ui("ajustes")
         elif choice == "claude":  # "Command mode is off": Settings at the With Claude card
             ipc.open_ui("ajustes/claude")
+        elif choice == "todos":  # dictado-xuu: the week's to-dos, on Home
+            ipc.open_ui("inicio/todos")
         else:
             watch.answer(choice, lang)
     ui.prompts = PromptWindow(root, on_answer)
@@ -247,6 +249,8 @@ def _start_meetings(cfg, data, ui, root, log, app=None):
     sweeper = Sweeper(cfg, ctl.root, ipc.spawn)
     from . import meaning
     meaning_sweeper = meaning.Sweeper(cfg, ctl.root, ipc.spawn)
+    from . import todos
+    collector = todos.Collector(cfg, ctl.root, data / todos.DIR)
 
     def poll():
         try:
@@ -257,6 +261,9 @@ def _start_meetings(cfg, data, ui, root, log, app=None):
                 log.info("summary ready %s", Path(d).name)
                 ui.prompt("summary", str(d), None)  # dictado-nl5: Open goes to the meeting, summary on top
             meaning_sweeper.tick(busy | ({str(sweeper.dir)} if sweeper.proc is not None else set()))
+            week = collector.tick()
+            if week:  # dictado-xuu: Sunday evening, once
+                ui.prompt("todos", todos.count_line(week), None)
             line = meetui.last_live_line(st["meeting"]["dir"]) if st["meeting"] else None
             ui.set_meeting(st, meetui.meeting_view(st, time.time(), line))
             for kind, d in tracker.update(st):

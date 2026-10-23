@@ -178,7 +178,7 @@ def _which(d: str | None) -> str:
 
 class Prompt:
     """kind: start (a call began) | end? (long silence) | done | failed (a transcript ended) |
-    summary (its summary is written) | nomic (dictation heard nothing twice) |
+    summary (its summary is written) | todos (the week's to-dos are collected; app = how many) | nomic (dictation heard nothing twice) |
     cmdoff (the command-mode keys were pressed while it is off)."""
 
     def __init__(self, kind: str, app: str | None, lang: str | None, opened_at: float):
@@ -202,6 +202,9 @@ class Prompt:
         elif kind == "summary":  # dictado-nl5: a personal call's summary is written (summary.Sweeper)
             self.title, self.question = "Summary ready", _which(app)
             self.buttons = [("Open", "abrir"), ("Close", "hide")]
+        elif kind == "todos":  # dictado-xuu: Sunday evening, the week's own to-dos (todos.Collector)
+            self.title, self.question = "Your to-dos for the week", app or ""
+            self.buttons = [("Open", "todos"), ("Close", "hide")]
         else:
             self.title, self.question = "Transcription failed", _which(app)
             self.buttons = [("Open", "abrir"), ("Close", "hide")]

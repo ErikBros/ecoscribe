@@ -118,6 +118,30 @@ function demoApi() {
     todos: [{ text: "Skriv in åtgärden i nästa sprint", at: "00:00:22", quote: "då skriver vi in det som en åtgärd", checked: true },
             { text: "Boka en genomgång med plattformsteamet", at: "00:00:25", quote: "vi bokar en genomgång med plattformsteamet", checked: false }],
     open_questions: [] };
+  // dictado-xuu: the week's own to-dos by person, invented. ?todos=0: a week with none yet
+  const day = (k) => { const d = new Date(now); d.setDate(now.getDate() - k); return d.toISOString().slice(0, 10); };
+  const T = (text, k, session, title, extra = {}) => ({ text, at: "00:12:40", checked: true, session, title, day: day(k), key: `${session}/${text.toLowerCase()}`, done: false, ...extra });
+  const weeks = [[
+    { person: "Ana", items: [T("Send Ana the photos from the trip", 3, "2026-10-04_1600_kund", "Catch-up with Ana", { done: true }),
+      T("Book the table for Friday at eight", 3, "2026-10-04_1600_kund", "Catch-up with Ana"),
+      T("Ask the landlord about the bike room", 1, "2026-10-05_0915_planering", "Ana, weekend plans", { checked: false })] },
+    { person: "Mia and Leo", items: [T("Buy the museum tickets for Saturday", 2, "2026-10-05_0915_planering", "Saturday plans"),
+      T("Bring the board game", 2, "2026-10-05_0915_planering", "Saturday plans")] },
+    { person: "Tom", items: [T("Read chapter 4 before the next lesson", 0, "2026-10-05_0915_planering", "Lesson 12"),
+      T("Practise the past tense, ten sentences", 0, "2026-10-05_0915_planering", "Lesson 12")] },
+  ], [
+    { person: "Tom", items: [T("Write five sentences with the new words", 8, "2026-10-05_0915_planering", "Lesson 11", { done: true })] },
+  ]];
+  const todoDone = {};
+  const weekOf = (back) => {
+    const people = params.get("todos") === "0" ? [] : weeks[back] || [];
+    const groups = people.map((g) => ({ ...g, items: g.items.map((i) => ({ ...i, done: todoDone[i.key] ?? i.done })) }));
+    const all = groups.flatMap((g) => g.items);
+    const mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay() + 6) % 7) - 7 * back);
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+    return { start: mon.toISOString().slice(0, 10), end: sun.toISOString().slice(0, 10), people: groups, count: all.length,
+      open: all.filter((i) => !i.done).length, calls: new Set(all.map((i) => i.title)).size, enabled: true, back };
+  };
   let liveN = 2;
   const notes = { "2026-10-05_1400_retro": "- Is the export date firm?\n- Ask legal about the format" };
   const find = (n) => sess.find((s) => s.name === n);
@@ -197,6 +221,8 @@ function demoApi() {
       return { ok: true };
     },
     copy_transcript: async () => ({ ok: true }),
+    week_todos: async (back) => weekOf(back || 0),
+    todo_done: async (key, done) => { todoDone[key] = !!done; window.__todoDone = [key, !!done]; return { ok: true }; },
     email_participants: async (name, how) => {  // ?noguests=1: a call with no invite and no calendar (dictado-qxr)
       window.__emailed = name; window.__emailHow = how || "";
       if (how === "calendar" || (how !== "draft" && params.get("noguests") === "1"))
@@ -357,6 +383,7 @@ let current = null;
 async function show(page) {
   let card = null;  // "ajustes/claude": Settings, scrolled to that card, which lights up (dictado-1b7)
   if (page && page.startsWith("ajustes/")) { card = page.slice("ajustes/".length); page = "ajustes"; }
+  if (page && page.startsWith("inicio/")) { card = page.slice("inicio/".length); page = "inicio"; }  // "inicio/todos" (dictado-xuu)
   if (page && page.startsWith("reuniones/")) { r.open = page.slice("reuniones/".length); r.next = 0; r.status = null; $("#r-segs").innerHTML = ""; page = "reuniones"; }
   if (!PAGES.includes(page)) page = "inicio";
   if (current === "ajustes" && page !== "ajustes") await stopMicTest();
@@ -793,6 +820,70 @@ async function renderInicio() {  // the dictate banner, today's numbers, recent 
     list.append(li);
   }
   if (!h.items.length) list.innerHTML = '<li class="recent-item"><p class="last-text" id="last-text"><span class="muted">You haven\'t dictated anything yet. Tap the key and talk.</span></p></li>';
+  await renderTodos();
+}
+
+/* Home > your own to-dos from the week's call summaries, one column per person (dictado-xuu) */
+let todoBack = 0;
+const shortDay = (iso) => new Date(iso + "T12:00").toLocaleDateString("en-GB", { weekday: "short" });
+const shortDate = (iso) => new Date(iso + "T12:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+async function renderTodos() {
+  const box = $("#todos");
+  let w;
+  try { w = await api.week_todos(todoBack); } catch { box.hidden = true; return; }
+  box.hidden = !w.enabled && !w.count && !todoBack;  // summaries off and nothing to show: no card
+  if (box.hidden) return;
+  for (const b of $$("#todos-weeks .seg")) b.setAttribute("aria-checked", String(Number(b.dataset.back) === todoBack));
+  $("#todos-title").textContent = todoBack ? "Your to-dos last week" : "Your to-dos this week";
+  const range = `${shortDate(w.start)} to ${shortDate(w.end)}`;
+  $("#todos-sub").textContent = w.count
+    ? `${w.open} of ${w.count} still to do · from ${w.calls} ${w.calls === 1 ? "call" : "calls"}, ${range}` : range;
+  const people = $("#todos-people");
+  people.textContent = "";
+  const empty = $("#todos-empty");
+  empty.hidden = !!w.count;
+  empty.textContent = !w.enabled ? "Call summaries are off, so no to-dos are collected. Turn them on in Settings."
+    : todoBack ? "No to-dos came out of last week's personal calls."
+    : "None yet this week. When a personal call's summary is written, the things you said you'd do show up here, by person.";
+  for (const g of w.people) {
+    const col = document.createElement("div"); col.className = "todo-person";
+    const who = document.createElement("div"); who.className = "todo-who";
+    const ini = document.createElement("span"); ini.className = "todo-initial"; ini.setAttribute("aria-hidden", "true");
+    ini.textContent = (g.person.trim()[0] || "?").toUpperCase();
+    const name = document.createElement("strong"); name.textContent = g.person; name.title = g.person;
+    const n = document.createElement("span"); n.className = "muted small";
+    const left = g.items.filter((i) => !i.done).length;
+    n.textContent = left ? `${left} to do` : "all done";
+    who.append(ini, name, n);
+    const ul = document.createElement("ul"); ul.className = "todo-list";
+    for (const it of g.items) {
+      const li = document.createElement("li"); li.className = "todo";
+      li.classList.toggle("done", !!it.done);
+      li.classList.toggle("unchecked", !it.checked);
+      const lab = document.createElement("label"); lab.className = "todo-tick";
+      const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!it.done;
+      const txt = document.createElement("span"); txt.className = "todo-text"; txt.textContent = it.text;
+      cb.onchange = async () => {
+        li.classList.toggle("done", cb.checked);
+        const out = await api.todo_done(it.key, cb.checked);
+        if (!out.ok) { toast(out.error || "Couldn't save that."); cb.checked = !cb.checked; }
+        renderTodos();
+      };
+      lab.append(cb, txt);
+      const from = document.createElement("button"); from.type = "button"; from.className = "todo-from";
+      from.textContent = `${shortDay(it.day)} · ${it.title}`; from.title = "Open this call";
+      from.onclick = () => show("reuniones/" + it.session);
+      li.append(lab, from);
+      if (!it.checked) {
+        const miss = document.createElement("span"); miss.className = "r-sum-miss"; miss.textContent = "Not found in the call";
+        miss.title = "The words this to-do came from aren't in the transcript near that moment: check it before you rely on it.";
+        li.append(miss);
+      }
+      ul.append(li);
+    }
+    col.append(who, ul);
+    people.append(col);
+  }
 }
 
 /* ---------------------------------------------------------------- reuniones */
@@ -2082,6 +2173,7 @@ async function boot() {
   for (const b of $$(".nav-item")) b.onclick = () => { if (b.dataset.page === "reuniones") r.open = null; show(b.dataset.page); };
   try { $("#nav-insights").hidden = !(await api.get_settings()).values.insights; } catch {}
   for (const b of $$("#i-range .seg")) b.onclick = () => { iDays = b.dataset.days || null; renderInsights(); };
+  for (const b of $$("#todos-weeks .seg")) b.onclick = () => { todoBack = Number(b.dataset.back) || 0; renderTodos(); };
   $("#i-claude").onclick = async () => {
     const r = await api.insights_for_claude();
     if (r.ok) toast("Copied: paste it into Claude.");
