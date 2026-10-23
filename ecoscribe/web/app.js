@@ -1169,15 +1169,11 @@ function segLi(s, editable) {
 // What the meeting records (dictado-s1a): the mic and the computer's audio, each with its device, a live
 // level and how long it has heard nothing. A source silent while the call app uses another device (or
 // silent for long) gets a warning with a one-click switch, so a silent recording is seen during the call.
-const SRC_LOOK = params.get("srclook") || "b";  // a: a strip under Stop, b: a card beside the transcript, c: small meters in the Stop row
 const SRC_SILENT_S = 30, SRC_LONG_S = 120;  // silent this long with the call on another device / with no better guess
-const SRC_WORD = { mic: ["hearing you", "your mic"], system: ["hearing them", "the call"] };
+const SRC_WORD = { mic: "hearing you", system: "hearing them" };
 let srcPlaced = false, srcFix = null;
 function srcPlace() {
-  const box = $("#r-src");
-  box.classList.add(`r-src-${SRC_LOOK}`);
-  if (SRC_LOOK === "b") $(".r-aside").prepend(box);
-  else if (SRC_LOOK === "c") $("#r-d-live-actions").insertBefore(box, $("#r-d-live-actions .r-lang"));
+  $("#r-d-live-actions").insertBefore($("#r-src"), $("#r-d-live-actions .r-lang"));  // small meters in the Stop row (look C, picked)
   $("#r-src-fix").onclick = async () => {
     if (!srcFix) return;
     if (!srcFix.device) { await show("ajustes"); window.__secShow?.("dictation"); $("#f-mic")?.scrollIntoView?.({ block: "center" }); return; }
@@ -1210,11 +1206,9 @@ async function renderSources(recording) {
     const pct = Math.round(Math.min(1, Math.sqrt(s.level || 0) * 4) * 100);  // the same scale as the pill's waveform
     const w = srcWarning(k, s, out.call);
     row.classList.toggle("bad", !!w);
-    $(".r-src-dev", row).textContent = s.name || "the default device";
-    const bar = $(".r-src-bar", row);
+    const bar = $(".r-src-bar", row), state = w ? `silent ${fmtT(s.quiet_s)}` : pct >= 8 ? SRC_WORD[k] : "quiet";
     bar.style.setProperty("--lvl", `${pct}%`); bar.setAttribute("aria-valuenow", pct);
-    $(".r-src-state", row).textContent = w ? `silent ${fmtT(s.quiet_s)}` : pct >= 8 ? SRC_WORD[k][0] : "quiet";
-    row.title = `${k === "mic" ? "Your voice" : "The others"}: ${s.name || "the default device"}`;
+    row.title = `${k === "mic" ? "You" : "The others"}: ${s.name || "the default device"} · ${state}`;  // the device on hover
     bad = bad || w;
   }
   srcFix = bad;
