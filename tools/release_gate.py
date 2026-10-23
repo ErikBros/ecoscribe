@@ -295,7 +295,7 @@ def run(setup: Path, do_install: bool) -> int:
             failed.append(name)
     old = old_installers(setup)
     if old:
-        print(f"\nOld installers ({sum(p.stat().st_size for p in old) / 1e9:.1f} GB), delete with Erik's OK:")
+        print(f"\nOld installers ({sum(p.stat().st_size for p in old) / 1e9:.1f} GB), delete them (the owner's standing yes):")
         for p in old:
             print(f"  {p}")
     version = setup_version(setup) or "?"
