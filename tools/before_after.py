@@ -177,6 +177,32 @@ img { display:block; width:100%; height:auto; border-radius:8px; border:1px soli
 .btn.send { background:var(--accent); border-color:var(--accent); color:#fff; margin-left:auto }
 .note { flex:1; min-width:200px; border:1px solid var(--line); background:var(--bg); color:var(--ink); border-radius:8px; padding:8px 10px; font:14px "IBM Plex Sans", sans-serif }
 .status { font-size:13px; color:var(--mute) }
+/* the viewer: a picture full size; arrows swap the looks of the same screen in place */
+.card h2 .open { margin-left:auto; border:1px solid var(--line); background:var(--panel); color:var(--ink); font:500 12.5px "IBM Plex Sans", sans-serif;
+  padding:4px 11px; border-radius:7px; cursor:pointer }
+.card h2 .pct + .open { margin-left:12px }
+figure img { cursor:zoom-in }
+.lb { position:fixed; inset:0; z-index:20; background:#0e0f11; color:#ecebe8; display:flex; flex-direction:column }
+.lb[hidden] { display:none }
+.lb-top { display:flex; align-items:center; gap:18px; padding:10px 18px; border-bottom:1px solid #2a2c31; flex-wrap:wrap }
+.lb-where { font:500 13px "IBM Plex Mono", monospace; color:#9a978f }
+.lb-tabs { display:inline-flex; gap:6px }
+.lb-tabs button { border:1px solid #3a3d44; background:none; color:#c9c6bf; font:500 14px "IBM Plex Sans", sans-serif; padding:7px 14px; border-radius:8px; cursor:pointer }
+.lb-tabs button .k { font:500 11.5px "IBM Plex Mono", monospace; color:#7d7a73; margin-right:7px }
+.lb-tabs button.on { background:#ecebe8; border-color:#ecebe8; color:#16171a }
+.lb-tabs button.on .k { color:#6b675f }
+.lb-tools { margin-left:auto; display:flex; gap:8px; align-items:center }
+.lb-tools button { border:1px solid #3a3d44; background:none; color:#c9c6bf; font:500 13px "IBM Plex Sans", sans-serif; padding:6px 11px; border-radius:8px; cursor:pointer }
+.lb-tools button:hover, .lb-tabs button:not(.on):hover { border-color:#6b6e76; color:#fff }
+.lb-hint { color:#7d7a73; font-size:12.5px; padding:0 18px 8px }
+.lb-hint kbd { font:500 11.5px "IBM Plex Mono", monospace; border:1px solid #3a3d44; border-radius:4px; padding:0 5px; color:#c9c6bf }
+.lb-stage { flex:1; overflow:auto }
+.lb-stage img { display:block; margin:0 auto; width:auto; max-width:100%; height:auto; border:0; border-radius:0; background:#fff; cursor:zoom-in }
+.lb-stage.actual img { max-width:none; cursor:zoom-out }
+.lb-side { position:fixed; top:50%; transform:translateY(-50%); width:52px; height:92px; border:0; border-radius:12px; background:rgba(14,15,17,.62);
+  color:#fff; font-size:30px; cursor:pointer; z-index:21; box-shadow:0 2px 10px rgba(0,0,0,.25) }
+.lb-side:hover { background:rgba(14,15,17,.88) }
+.lb-prev { left:14px } .lb-next { right:14px }
 </style>
 </head>
 <body>
@@ -198,6 +224,13 @@ const D = __DATA__;
 </header>
 <main id="main"></main>
 <div class="decide" id="decide"></div>
+<div class="lb" id="lb" hidden>
+  <div class="lb-top"><span class="lb-where" id="lb-where"></span><div class="lb-tabs" id="lb-tabs"></div>
+    <div class="lb-tools"><button id="lb-up">Previous screen</button><button id="lb-down">Next screen</button><button id="lb-size">Actual size</button><button id="lb-x">Close (Esc)</button></div></div>
+  <div class="lb-hint"><kbd>←</kbd> <kbd>→</kbd> or <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> swap the look in the same spot, so what changed jumps out · <kbd>Shift</kbd>+<kbd>←</kbd> <kbd>→</kbd> another screen · click the picture for actual size · <kbd>Esc</kbd> closes</div>
+  <div class="lb-stage" id="lb-stage"><img id="lb-img" alt=""></div>
+  <button class="lb-side lb-prev" id="lb-prev" title="Previous look (←)">‹</button><button class="lb-side lb-next" id="lb-next" title="Next look (→)">›</button>
+</div>
 <script>
 const $ = (s) => document.querySelector(s);
 const served = location.protocol.startsWith("http");
@@ -236,7 +269,11 @@ function draw() {
     else if (mode === "after") body = `<div class="view">${fig("After · " + b, s.imgs[b])}</div>`;
     else if (mode === "diff") body = `<div class="view">${fig("What changed (red)", s.diff)}</div>`;
     else body = `<div class="view">${slider(s.imgs[a], s.imgs[b])}</div>`;
-    c.innerHTML = `<h2>${s.page}<span class="m">${s.w} px</span>${s.pct != null ? `<span class="pct">${s.pct}% of pixels changed</span>` : ""}</h2>${body}`;
+    c.innerHTML = `<h2>${s.page}<span class="m">${s.w} px</span>${s.pct != null ? `<span class="pct">${s.pct}% of pixels changed</span>` : ""}<button class="open">Open large</button></h2>${body}`;
+    c.querySelector(".open").onclick = () => openLb(s, 0);
+    // a figure's place in lbItems(s): the looks in order; Before 0, After 1, Difference 2
+    const at = D.variants || mode === "side" ? null : { before: 0, after: 1, diff: 2 }[mode];
+    c.querySelectorAll("figure img").forEach((im, j) => { im.onclick = () => openLb(s, at ?? j); });
     main.append(c);
   }
   if (D.same.length && !D.variants) {
@@ -290,6 +327,52 @@ function decide() {
 }
 if (served) fetch(`/api/picks/${ROUND}`, { cache: "no-store" }).then(r => r.json()).then(p => { picks = p; decide(); }).catch(() => {});
 draw(); decide();
+// the viewer (Erik 2026-10-23: "too small to see anything... cycle through pictures to compare")
+const lb = { list: [], k: 0, i: 0 };
+function lbItems(s) {
+  if (D.variants) return D.sources.map(v => [v, s.imgs[v]]);
+  const [a, b] = D.sources;
+  return [["Before · " + a, s.imgs[a]], ["After · " + b, s.imgs[b]], ...(s.diff ? [["What changed (red)", s.diff]] : [])];
+}
+function openLb(s, i) {
+  lb.list = D.screens.filter(x => x.w === s.w); lb.k = Math.max(0, lb.list.indexOf(s)); lb.i = i;
+  $("#lb").hidden = false; document.body.style.overflow = "hidden"; showLb(true);
+}
+function closeLb() { $("#lb").hidden = true; document.body.style.overflow = ""; }
+function showLb(top) {
+  const s = lb.list[lb.k], items = lbItems(s), stage = $("#lb-stage"), img = $("#lb-img");
+  lb.i = (lb.i + items.length) % items.length;
+  const y = top ? 0 : stage.scrollTop, x = top ? 0 : stage.scrollLeft;
+  img.onload = () => { stage.scrollTop = y; stage.scrollLeft = x; };
+  img.src = items[lb.i][1]; img.alt = items[lb.i][0];
+  $("#lb-where").textContent = `${s.page} · ${s.w} px · screen ${lb.k + 1} of ${lb.list.length}`;
+  const tabs = $("#lb-tabs"); tabs.innerHTML = "";
+  items.forEach(([label], j) => {
+    const b = document.createElement("button"); b.className = j === lb.i ? "on" : "";
+    b.innerHTML = `<span class="k">${j + 1}</span>`; b.append(label);
+    b.onclick = () => { lb.i = j; showLb(); }; tabs.append(b);
+  });
+  $("#lb-up").disabled = lb.k === 0; $("#lb-down").disabled = lb.k === lb.list.length - 1;
+}
+function lbScreen(d) { const k = lb.k + d; if (k < 0 || k >= lb.list.length) return; lb.k = k; showLb(true); }
+$("#lb-x").onclick = closeLb;
+$("#lb-prev").onclick = () => { lb.i--; showLb(); };
+$("#lb-next").onclick = () => { lb.i++; showLb(); };
+$("#lb-up").onclick = () => lbScreen(-1);
+$("#lb-down").onclick = () => lbScreen(1);
+$("#lb-size").onclick = $("#lb-img").onclick = () => {
+  const st = $("#lb-stage"), on = st.classList.toggle("actual"); $("#lb-size").textContent = on ? "Fit to window" : "Actual size";
+};
+addEventListener("keydown", (e) => {
+  if ($("#lb").hidden) return;
+  if (e.key === "Escape") closeLb();
+  else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+    const d = e.key === "ArrowLeft" ? -1 : 1;
+    if (e.shiftKey) lbScreen(d); else { lb.i += d; showLb(); }
+  } else if (/^[1-9]$/.test(e.key) && +e.key <= lbItems(lb.list[lb.k]).length) { lb.i = +e.key - 1; showLb(); }
+  else return;
+  e.preventDefault(); e.stopImmediatePropagation();
+}, true);
 addEventListener("keydown", (e) => {
   if (e.target.tagName === "INPUT") return;
   const i = D.widths.indexOf(width);
