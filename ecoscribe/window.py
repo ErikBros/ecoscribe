@@ -172,7 +172,7 @@ class Api:
         self._list_mic_names = list_mic_names or _mme_input_names
         self._copy = copy or _copy
         self._commands = send_command or commands.send
-        self._downloads = Path(downloads) if downloads else Path(os.environ.get("USERPROFILE", Path.home())) / "Downloads"
+        self._downloads = Path(downloads) if downloads else paths.downloads_dir()
         self._mic = None  # (recorder, gate) during the mic check
         self._open_url = open_url or _open_url
         import threading
