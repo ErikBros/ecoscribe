@@ -81,13 +81,29 @@ if sys.platform == "darwin":  # ecoscribe/platform/macos/desktop.py + procs.py
     from .platform.macos.desktop import input_names as _mme_input_names
     from .platform.macos.desktop import reveal as _reveal
     from .platform.macos.desktop import startfile as _startfile
+    from .platform.macos.desktop import system_dark as _system_dark
     from .platform.macos.procs import alive as _pid_alive
+    _dark_title_bar = None  # the title bar follows macOS; a forced theme there: dictado-zkh
 else:  # ecoscribe/platform/windows/desktop.py + procs.py
     from .platform.windows.desktop import DEFAULT_MIC_LABEL, WEBVIEW_GUI
     from .platform.windows.desktop import input_names as _mme_input_names
     from .platform.windows.desktop import reveal as _reveal
+    from .platform.windows.desktop import dark_title_bar as _dark_title_bar
     from .platform.windows.desktop import startfile as _startfile
+    from .platform.windows.desktop import system_dark as _system_dark
     from .platform.windows.procs import alive as _pid_alive
+
+THEMES = [("system", "Match Windows" if sys.platform != "darwin" else "Match macOS"), ("light", "Light"), ("dark", "Dark")]
+
+
+def theme_is_dark(theme: str) -> bool:
+    """dictado-u9h: Settings > Appearance; "system" follows the OS (read once, at the window's start)."""
+    if theme in ("light", "dark"):
+        return theme == "dark"
+    try:
+        return bool(_system_dark())
+    except Exception:
+        return False
 
 
 def _gpu() -> str:
@@ -221,7 +237,7 @@ class Api:
                 "screen_names": c.text.screen_names,
                 "hold_to_talk": c.hotkey.hold_to_talk, "numpad_enter": c.hotkey.numpad_enter, "voice_memory": c.meetings.voice_memory,
                 "calendar_url": c.meetings.calendar_url, "my_name": c.meetings.my_name, "debug_log": c.ui.debug_log,
-                "update_check": c.ui.update_check, "auto_update": c.ui.auto_update,
+                "update_check": c.ui.update_check, "auto_update": c.ui.auto_update, "theme": c.ui.theme,
                 "export_dir": str(self._export_dir()), "export_default": not c.ui.export_dir,
                 "extra_languages": list(c.whisper.extra_languages),
                 "snippets": [{"trigger": k, "text": v} for k, v in c.text.snippets.items()],
@@ -239,6 +255,7 @@ class Api:
                                          if v not in available(c.whisper.extra_languages)), key=lambda o: o["label"]),
                 "base_languages": list(BASE_LANGS),
                 "meet_modes": [{"value": v, "label": l} for v, l in MEET_MODES],
+                "themes": [{"value": v, "label": l} for v, l in THEMES],
                 "meet_ends": [{"value": str(v), "label": l} for v, l in MEET_ENDS]
                 + ([] if int(c.meetings.grace_s) in dict(MEET_ENDS)  # a value typed into config.toml stays selectable
                    else [{"value": str(int(c.meetings.grace_s)), "label": f"{int(c.meetings.grace_s)} seconds"}]),
@@ -246,6 +263,20 @@ class Api:
             },
             "can_startup": self._startup.app_command() is not None,
         }
+
+    def get_theme(self) -> dict:
+        """dictado-u9h: the Appearance choice, read when the window opens."""
+        return {"theme": self._load().ui.theme}
+
+    def window_theme(self, dark: bool) -> dict:
+        """dictado-u9h: the page went dark or light; the title bar follows (Windows 11). macOS: its own."""
+        if _dark_title_bar is None:
+            return {"ok": False}
+        try:
+            return {"ok": bool(_dark_title_bar(ipc.UI_TITLE, bool(dark)))}
+        except Exception:
+            log.debug("title bar colour not set", exc_info=True)
+            return {"ok": False}
 
     def check_hotkey(self, value: str) -> dict:
         """The Settings recorder asks before saving: is this shortcut allowed, and how to show it."""
@@ -297,6 +328,10 @@ class Api:
                     c.meetings.default_lang = "sv"
             if "languages" in values:
                 c.whisper.languages = parse_languages(values["languages"], c.whisper.extra_languages)
+            if "theme" in values:  # dictado-u9h
+                if values["theme"] not in dict(THEMES):
+                    raise ValueError("theme")
+                c.ui.theme = values["theme"]
             if "meet_mode" in values:
                 if values["meet_mode"] not in dict(MEET_MODES):
                     raise ValueError("meet_mode")
@@ -341,6 +376,8 @@ class Api:
                 self._startup.enable(cmd)
             elif not values["startup"]:
                 self._startup.disable()
+        if set(values) <= {"theme"}:  # the window applies it by itself: no restart (dictado-u9h)
+            return {"ok": True, "restarting": False}
         restarting = bool(self._signal())
         return {"ok": True, "restarting": restarting}
 
@@ -1268,8 +1305,9 @@ def main(page: str | None = None) -> int:
     if quiet:
         webview.settings["REMOTE_DEBUGGING_PORT"] = int(quiet)
         kw = {"x": OFF_SCREEN, "y": OFF_SCREEN, "focus": False, "hidden": True}
+    dark = theme_is_dark(api._load().ui.theme)  # the window's colour before the page paints (dictado-u9h)
     win = webview.create_window(ipc.UI_TITLE, url, js_api=api, width=980, height=720, min_size=(820, 560),
-                                background_color=P.PAPER, text_select=True, **kw)
+                                background_color=P.PAPER_DARK if dark else P.PAPER, text_select=True, **kw)
     win.events.closed += lambda: api.mic_test_stop()
 
     def on_drop(e):  # pywebview fills pywebviewFullPath only for drops handled from Python

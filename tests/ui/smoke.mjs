@@ -81,6 +81,19 @@ async function load(query) {
   check(sent && JSON.stringify(sent.replacements) === JSON.stringify([{ heard: "poll request", write: "pull request" }, { heard: "eco scribe", write: "Ecoscribe" }])
     && Object.keys(sent).length === 1, "saves the replacements: " + JSON.stringify(sent));
 }
+{ // dark mode and Settings > Appearance (dictado-u9h)
+  const { window, doc, errors } = await load("page=ajustes&theme=dark");
+  const root = doc.documentElement, sel = doc.querySelector("#f-theme");
+  check(root.dataset.theme === "dark" && sel?.value === "dark" && sel.options.length === 3, "theme=dark: the page is dark and Appearance says Dark");
+  sel.value = "light"; sel.dispatchEvent(new window.Event("change", { bubbles: true }));
+  check(root.dataset.theme === "light" && !doc.querySelector("#savebar").hidden, "picking Light previews it at once, with the save bar");
+  let sent = null;
+  const api = window.__ecoscribe.api, orig = api.save_settings;
+  api.save_settings = async (x) => { sent = x; return orig(x); };
+  doc.querySelector("#save").click(); await sleep(100);
+  check(sent && sent.theme === "light" && Object.keys(sent).length === 1 && doc.querySelector("#toast").textContent === "Saved." && !errors.length,
+        "saves only the theme, no restart: " + JSON.stringify(sent) + " / " + doc.querySelector("#toast").textContent);
+}
 { // ajustes: voice memory (t0u.32)
   const { window, doc } = await load("page=ajustes");
   await sleep(50);
@@ -171,7 +184,7 @@ async function load(query) {
   check(window.__wpm === 80 && doc.querySelector("#i-wpm").value === "80" && doc.querySelector("#i-saved-how").textContent.includes("type at 80"), "a new typing speed is saved and used");
   check(/ words · \d+%$/.test(doc.querySelector("#i-langs .i-hbar-val").textContent)
     && / dictations?$/.test(doc.querySelector("#i-apps .i-hbar-val").textContent), "languages count words, apps dictations (dictado-7qo)");
-  check(/^The dark bar is your busiest hour, \d\d:00-\d\d:00\.$/.test(doc.querySelector("#i-hours-note").textContent), "the dark hour is explained (dictado-7qo)");
+  check(/^The highlighted bar is your busiest hour, \d\d:00-\d\d:00\.$/.test(doc.querySelector("#i-hours-note").textContent), "the dark hour is explained (dictado-7qo)");
   check(doc.querySelector("#i-habits").textContent.includes("3.1"), "filler words per 100");
   check(doc.querySelector("#i-clarity").textContent === "91%" && doc.querySelector("#i-clarity-empty").hidden
     && doc.querySelectorAll("#i-clarity-weeks path.bar").length === 4, "clarity: score and the weeks that have one (9jc.1)");

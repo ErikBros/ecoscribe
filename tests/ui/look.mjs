@@ -80,8 +80,8 @@ const STATE = {
     return s.length > 1 ? [`status shown ${s.length} times: ${s.map((e) => `"${own(e)}"`).join(", ")}`] : []; } },
 };
 
-// 5. one colour set: colours written outside :root may only go down (a ratchet towards one token file, dictado-u9h)
-const STRAY_COLOURS_MAX = 85;
+// 5. one colour set: every colour is a :root token (dictado-u9h); tests/test_look_tokens.py also checks corners and sizes
+const STRAY_COLOURS_MAX = 0;
 // found on 2026-10-22, each a look change waiting for Erik's OK (dictado-9jf); delete a line once it's fixed
 const KNOWN = [];
 
@@ -95,7 +95,7 @@ for (const [name, q] of Object.entries(PAGES)) {
   window.close();
 }
 const css = fs.readFileSync(path.join(web, "app.css"), "utf8");
-const outsideRoot = css.replace(/:root\s*\{[^}]*\}/g, "");
+const outsideRoot = css.replace(/:root[^{]*\{[^}]*\}/g, "");  // the light tokens and the dark ones
 const stray = (outsideRoot.match(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g) || []).length;
 let failed = 0;
 for (const f of found) {
