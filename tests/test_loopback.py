@@ -126,3 +126,19 @@ def test_gapfiller_small_jitter_is_not_a_gap():
     g.push(np.ones(1600, np.float32), 0.205)  # 5 ms late
     out = g.pull(0.21)
     assert len(out) == 3200 and out.all()
+
+
+def test_switch_records_the_named_output_and_back_to_the_default():
+    """dictado-c7v: the meeting records the output the call plays to, by name."""
+    pa, clock = FakePA(), Clock()
+    others = [{"name": "Headphones (Headset) [Loopback]", "index": 9, "defaultSampleRate": 48000.0, "maxInputChannels": 2}]
+    orig = pa.PyAudio
+    pa.PyAudio = type("PyAudio", (orig,), {"get_loopback_device_info_generator": lambda self: iter(others)})
+    lb = Loopback(pa_module=pa, clock=clock, check_s=None)
+    lb.start()
+    assert lb.device_name == "Headphones [Loopback]"
+    lb.switch("Headphones (Headset)")
+    assert lb.device_name == "Headphones (Headset) [Loopback]" and pa.streams[0].closed
+    lb.switch("Not here")  # an output that's gone: the default one
+    assert lb.device_name == "Headphones [Loopback]"
+    lb.stop()

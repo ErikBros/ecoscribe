@@ -796,5 +796,26 @@ async function load(query) {
   check(!none.doc.querySelector("#todos").hidden && !none.doc.querySelector("#todos-empty").hidden
     && none.doc.querySelector("#todos-empty").textContent.startsWith("None yet this week"), "no to-dos yet: the card says what will show up");
 }
+{ // dictado-s1a: what the meeting records, live, and a warning with a switch when a source hears nothing
+  const ok = await load("page=reuniones/2026-10-05_1400_retro");
+  await sleep(300);
+  const box = ok.doc.querySelector("#r-src");
+  check(!box.hidden && ok.doc.querySelector("#r-src-warn").hidden, "both sources shown, no warning while they hear something");
+  check(box.querySelector('[data-src="mic"]').title === "You: Microphone (Jabra Evolve2 65) · hearing you", "the mic's device and state on hover");
+  check(box.parentElement.id === "r-d-live-actions", "look C: small meters in the Stop row");
+  const bad = await load("page=reuniones/2026-10-05_1400_retro&src=mic");
+  await sleep(300);
+  const warn = bad.doc.querySelector("#r-src-warn");
+  check(!warn.hidden && warn.textContent.includes("hears nothing from your mic") && warn.textContent.includes("Teams uses Microphone (Jabra Evolve2 65)"),
+    "a silent mic with the call on another one: the warning says both");
+  check(bad.doc.querySelector('[data-src="mic"]').classList.contains("bad") && bad.doc.querySelector('[data-src="mic"]').title.endsWith("silent 1:35"),
+    "the silent row says for how long");
+  bad.doc.querySelector("#r-src-fix").click(); await sleep(50);
+  check(JSON.stringify(bad.window.__srcSwitched) === '["mic","Microphone (Jabra Evolve2 65)"]' && bad.doc.querySelector("#toast").textContent.includes("from now on"),
+    "the button records the call's mic from now on");
+  const done = await load("page=reuniones/2026-10-05_0915_planering");
+  await sleep(300);
+  check(done.doc.querySelector("#r-src").hidden && done.doc.querySelector("#r-src-warn").hidden, "a finished meeting shows neither");
+}
 console.log(failed ? `\n${failed} FAILED` : "\nall ok");
 process.exit(failed ? 1 : 0);

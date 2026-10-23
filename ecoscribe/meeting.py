@@ -79,15 +79,6 @@ def _append_live(d: Path, line: dict) -> None:
         f.write(json.dumps(line, ensure_ascii=False) + "\n")
 
 
-def _write_levels(d: Path, rec) -> None:
-    try:
-        mic, system = rec.levels()
-        transcribe._write_json(Path(d) / "levels.json", {"mic": round(float(mic), 5), "system": round(float(system), 5),
-                                                          "t": round(time.time(), 1)})
-    except Exception as e:  # best effort: never stop a recording over a level file
-        log.debug("levels not written (%s)", e)
-
-
 def _label(d: Path) -> None:
     from faster_whisper import decode_audio
     audio = Path(d) / "audio"
@@ -104,7 +95,7 @@ def _label(d: Path) -> None:
 def run(session_dir: Path, cfg: TranscribeCfg, recorder_factory=_default_recorder, stop_check=None,
         poll_s: float = 0.25, factory=transcribe._default_factory, resolve=None,
         clock=time.monotonic, prompt: str | None = None, speech=transcribe._speech,
-        replacements: dict | None = None) -> int:
+        replacements: dict | None = None, call_devices=None) -> int:
     d = Path(session_dir)
     stop_check = stop_check or stop_checker(d)
     cache: dict = {}
@@ -156,11 +147,13 @@ def run(session_dir: Path, cfg: TranscribeCfg, recorder_factory=_default_recorde
         try:
             rec.start()
             log.info("meeting recording lang=%s model=%s", lang, name)
+            from .meet_sources import Sources
+            sources = Sources(d, rec, app=meta.get("app"), call_devices=call_devices, clock=clock)
             last_lv = None
             while not stop_check() and clock() - t_start < MAX_S:
-                if last_lv is None or clock() - last_lv >= 1.0:  # the background app's silence backup reads it
+                if last_lv is None or clock() - last_lv >= 1.0:  # the page and the background app's silence backup read it
                     last_lv = clock()
-                    _write_levels(d, rec)
+                    sources.tick()
                 time.sleep(poll_s)
             log.info("meeting stop after %.0f s", clock() - t_start)
         finally:  # whatever happened: finish the FLACs and give the mic back
@@ -199,5 +192,8 @@ def main(session_dir: str) -> int:
     full = config.load(paths.config_path())
     from .calendar_ics import session_words
     from .text import vocab_prompt
+    call_devices = None
+    if sys.platform != "darwin":  # the Mac: dictado-7bw (which mic and output a call app uses)
+        from .platform.windows.audio_route import call_devices
     return run(d, full.transcribe, prompt=vocab_prompt(session_words(d, full.text.vocabulary)),
-               replacements=dict(full.text.replacements))
+               replacements=dict(full.text.replacements), call_devices=call_devices)

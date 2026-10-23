@@ -71,6 +71,7 @@ class Loopback:
             import pyaudiowpatch as pa_module
         self.pa_mod, self.clock, self.check_s = pa_module, clock, check_s
         self.device_name = ""
+        self.want = ""  # an output to record instead of the default one (dictado-c7v), by its Windows name
         self._pa = self._stream = None
         self._rate = self._ch = 0
         self._q: collections.deque = collections.deque()
@@ -84,7 +85,7 @@ class Loopback:
     # ---------- stream ----------
     def _open(self) -> None:
         pa = self.pa_mod.PyAudio()
-        dev = pa.get_default_wasapi_loopback()
+        dev = self._device(pa)
         self._rate, self._ch = int(dev["defaultSampleRate"]), int(dev["maxInputChannels"])
         gen = self._gen
 
@@ -127,10 +128,23 @@ class Loopback:
             except Exception:
                 log.exception("loopback device check failed")
 
+    def _device(self, pa) -> dict:
+        """The loopback of the output asked for (`want`), else of the default output."""
+        if self.want:
+            for dev in pa.get_loopback_device_info_generator():
+                if dev["name"].removesuffix(" [Loopback]") == self.want:
+                    return dev
+        return pa.get_default_wasapi_loopback()
+
+    def switch(self, name: str) -> None:
+        """Record the output `name` from now on (dictado-c7v); "" goes back to the default output."""
+        self.want = name
+        self.check_device()
+
     def check_device(self) -> None:
         pa = self.pa_mod.PyAudio()
         try:
-            name = pa.get_default_wasapi_loopback()["name"]
+            name = self._device(pa)["name"]
         finally:
             try:
                 pa.terminate()

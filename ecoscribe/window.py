@@ -816,6 +816,31 @@ class Api:
             out["job"] = {**st["job"], "name": Path(st["job"]["dir"]).name}
         return out
 
+    def _live_meeting(self, name: str = "") -> dict | None:
+        m = meetings.read_state(self._data_dir).get("meeting")
+        if not m or m.get("status") != "recording" or (name and Path(m["dir"]).name != name):
+            return None
+        return m
+
+    def meeting_sources(self, name: str = "") -> dict:
+        """The recording meeting's sources (dictado-s1a): each device, its level and silence, and the
+        devices the call app uses; {"ok": False} when it isn't recording."""
+        from . import meet_sources, meetui
+        m = self._live_meeting(name)
+        if m is None:
+            return {"ok": False}
+        app = m.get("app") or ""
+        return meet_sources.view(Path(m["dir"]), meetui.APP_NAMES.get(app, app.capitalize()))
+
+    def use_meeting_source(self, kind: str, device: str) -> dict:
+        """The meeting page's button: record `device` as the mic or the computer audio from now on."""
+        from . import meet_sources
+        m = self._live_meeting()
+        if m is None or kind not in ("mic", "system") or not device:
+            return {"ok": False, "error": "No meeting is recording."}
+        meet_sources.ask(Path(m["dir"]), kind, device)
+        return {"ok": True}
+
     def start_meeting(self, lang: str = "") -> dict:
         return self._send("start_meeting", {"lang": lang} if lang else {})
 

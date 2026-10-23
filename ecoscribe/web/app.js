@@ -215,6 +215,13 @@ function demoApi() {
     },
     meetings_state: async () => mstate(),
     start_meeting: async () => ({ ok: true, dir: "C:/x/2026-10-05_1400_retro" }),
+    meeting_sources: async () => {  // dictado-s1a; &src=mic or &src=system: that one silent, the call on another device
+      const bad = params.get("src") || "";
+      return { ok: true, call: { app: "Teams", mic: "Microphone (Jabra Evolve2 65)", out: "Headphones (Jabra Evolve2 65)" },
+        mic: bad === "mic" ? { name: "Microphone (Realtek Audio)", level: 0, quiet_s: 95 } : { name: "Microphone (Jabra Evolve2 65)", level: 0.021, quiet_s: 0 },
+        system: bad === "system" ? { name: "Speakers (Realtek Audio)", level: 0, quiet_s: 140 } : { name: "Headphones (Jabra Evolve2 65)", level: 0.0009, quiet_s: 4 } };
+    },
+    use_meeting_source: async (kind, device) => { window.__srcSwitched = [kind, device]; return { ok: true }; },
     set_meeting_lang: async (lang) => { const s = find("2026-10-05_1400_retro"); if (s) s.lang = lang; window.__lang = lang; return { ok: true }; },
     stop_meeting: async () => { const s = find("2026-10-05_1400_retro"); if (s) s.status = "finalizing"; return { ok: true }; },
     import_files: async (paths) => { window.__imported = paths; return { ok: true, queued: paths.length }; },
@@ -1159,6 +1166,60 @@ function segLi(s, editable) {
   li.append(av, head, p);
   return li;
 }
+// What the meeting records (dictado-s1a): the mic and the computer's audio, each with its device, a live
+// level and how long it has heard nothing. A source silent while the call app uses another device (or
+// silent for long) gets a warning with a one-click switch, so a silent recording is seen during the call.
+const SRC_SILENT_S = 30, SRC_LONG_S = 120;  // silent this long with the call on another device / with no better guess
+const SRC_WORD = { mic: "hearing you", system: "hearing them" };
+let srcPlaced = false, srcFix = null;
+function srcPlace() {
+  $("#r-d-live-actions").insertBefore($("#r-src"), $("#r-d-live-actions .r-lang"));  // small meters in the Stop row (look C, picked)
+  $("#r-src-fix").onclick = async () => {
+    if (!srcFix) return;
+    if (!srcFix.device) { await show("ajustes"); window.__secShow?.("dictation"); $("#f-mic")?.scrollIntoView?.({ block: "center" }); return; }
+    const out = await api.use_meeting_source(srcFix.kind, srcFix.device).catch(() => ({ ok: false }));
+    toast(out.ok ? `Recording ${srcFix.device} from now on.` : out.error || "Couldn't switch.");
+  };
+  srcPlaced = true;
+}
+function srcWarning(k, s, call) {
+  const other = k === "mic" ? call?.mic : call?.out;
+  if (!s.quiet_s || s.quiet_s < SRC_SILENT_S || !(other && other !== s.name) && s.quiet_s < SRC_LONG_S) return null;
+  const app = call?.app || "The call";
+  return {
+    kind: k, device: other && other !== s.name ? other : "",
+    title: k === "mic" ? "Ecoscribe hears nothing from your mic" : "Ecoscribe hears nothing from the call",
+    detail: other && other !== s.name
+      ? `It records ${s.name}, but ${app} ${k === "mic" ? "uses" : "plays to"} ${other}.`
+      : `It records ${s.name || "the default device"}, silent for ${fmtT(s.quiet_s)}. ${k === "mic" ? "Is it muted, or is the call on another mic?" : "Is the call playing somewhere else?"}`,
+  };
+}
+async function renderSources(recording) {
+  const box = $("#r-src"), warn = $("#r-src-warn");
+  const out = recording ? await api.meeting_sources(r.open).catch(() => null) : null;
+  if (!out || !out.ok) { box.hidden = warn.hidden = true; return; }
+  if (!srcPlaced) srcPlace();
+  box.hidden = false;
+  let bad = null;
+  for (const k of ["mic", "system"]) {
+    const s = out[k] || {}, row = $(`.r-src-row[data-src="${k}"]`, box);
+    const pct = Math.round(Math.min(1, Math.sqrt(s.level || 0) * 4) * 100);  // the same scale as the pill's waveform
+    const w = srcWarning(k, s, out.call);
+    row.classList.toggle("bad", !!w);
+    const bar = $(".r-src-bar", row), state = w ? `silent ${fmtT(s.quiet_s)}` : pct >= 8 ? SRC_WORD[k] : "quiet";
+    $("span", bar).style.width = `${pct}%`; bar.setAttribute("aria-valuenow", pct);
+    row.title = `${k === "mic" ? "You" : "The others"}: ${s.name || "the default device"} · ${state}`;  // the device on hover
+    bad = bad || w;
+  }
+  srcFix = bad;
+  warn.hidden = !bad;
+  if (bad) {
+    $("#r-src-warn-title").textContent = bad.title;
+    $("#r-src-warn-detail").textContent = bad.detail;
+    $("#r-src-fix").textContent = bad.device ? `Record ${bad.device}` : "Pick a mic in Settings";
+    $("#r-src-fix").hidden = !bad.device && bad.kind !== "mic";
+  }
+}
 async function renderDetail(name) {
   $("#r-list-view").hidden = true; $("#r-detail-view").hidden = false;
   const live = r.status === null || r.status === "recording" || r.status === "stopping" || r.status === "finalizing";
@@ -1205,6 +1266,7 @@ async function renderDetail(name) {
     dl.value = s.lang || R_LANGS[0][0];
   }
   $("#r-d-live-actions").hidden = !recording;
+  renderSources(recording);
   if (!recording) $("#r-jump").hidden = true;
   $("#r-d-done-actions").hidden = s.status !== "done";
   const working = s.status === "running" || s.status === "queued" || s.status === "new" || s.status === "downloading";
