@@ -603,6 +603,19 @@ async function load(query) {
   doc.querySelector("#save").click(); await sleep(100);
   check(sent && sent.languages === "en,es" && !("extra_languages" in sent), "saves the ticks without Swedish: " + JSON.stringify(sent));
 }
+{ // dictado-pcz: Snippets and Voice commands say how they differ and point at each other
+  const { doc } = await load("page=ajustes");
+  await sleep(200);
+  const snipHead = doc.querySelector("#snips-card .group-head").textContent;
+  const vcRow = doc.querySelector("#row-voice-commands").textContent;
+  check(snipHead.includes("A phrase that types saved text.") && vcRow.includes("A phrase that does an action."), "one line on each says what it is");
+  doc.querySelector('#row-voice-commands .go-link').click(); await sleep(20);
+  check(!doc.querySelector("#snips-card").hidden && doc.querySelector('#set-tabs .seg.active').dataset.sec === "words"
+    && !doc.querySelector("#f-voice-commands").checked, "Snippets link opens Languages and words, the switch untouched");
+  doc.querySelector('#snips-card .go-link').click(); await sleep(20);
+  check(!doc.querySelector("#row-voice-commands").closest(".group").hidden && doc.querySelector('#set-tabs .seg.active').dataset.sec === "dictation",
+    "Voice commands link opens Dictation");
+}
 { // Settings > the two switches that use Claude (dictado-bd6)
   const { doc } = await load("page=ajustes");
   await sleep(200);

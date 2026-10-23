@@ -2333,6 +2333,10 @@ async function boot() {
     store("ecoscribe.set-sec", k);
   };
   for (const b of $$("#set-tabs .seg")) b.onclick = () => secShow(b.dataset.sec);
+  for (const b of $$(".go-link")) b.onclick = (e) => {  // Snippets <-> Voice commands (dictado-pcz)
+    e.preventDefault(); e.stopPropagation();
+    secShow(b.dataset.go); $(b.dataset.to)?.scrollIntoView?.({ block: "center" });
+  };
   secShow(params.get("sec") || store("ecoscribe.set-sec") || "dictation");  // ?sec=words: a screenshot of that section
   window.__secShow = secShow;
   $("#settings").addEventListener("change", dirty);
