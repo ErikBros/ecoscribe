@@ -58,3 +58,25 @@ def test_cancel_hint_on_the_pill():
     assert cancel_hint("rctrl") == "Right Ctrl + Esc to cancel"
     assert cancel_hint("f13") == "F13 + Esc to cancel"
     assert cancel_hint("ctrl+l") == "Cancel from the tray icon"
+
+
+@win_rules
+def test_command_mode_keys():
+    """dictado-a1d: the dictation key + a letter (as the picker records it, or bare), or a combo of its own."""
+    nc = hotkeys.normalize_command
+    assert nc("rctrl+e", "rctrl") == "e" and nc("K", "rctrl") == "k" and nc("f13+7", "f13") == "7"
+    assert nc("Shift + Ctrl + E", "rctrl") == "ctrl+shift+e" and nc("ctrl+shift+e", "ctrl+l") == "ctrl+shift+e"
+    assert hotkeys.command_label("e", "rctrl") == "Right Ctrl + E" and hotkeys.command_label("ctrl+shift+e", "rctrl") == "Ctrl+Shift+E"
+    assert hotkeys.command_parts("e")[0] == 0x45 and hotkeys.command_parts("e")[1] is None
+    vk, combo = hotkeys.command_parts("ctrl+shift+e")
+    assert vk == 0 and combo.spec == "ctrl+shift+e"
+
+
+@win_rules
+@pytest.mark.parametrize("value,dictation,why", [
+    ("l", "rctrl", "next dictation's language"), ("rctrl+r", "rctrl", "pasting the last dictation"),
+    ("e", "ctrl+l", "is a combo"), ("ctrl+l", "ctrl+l", "is the dictation key"), ("ctrl+c", "rctrl", "taken"),
+    ("f14", "rctrl", "lone key"), ("ctrl+f13", "f13", "is the dictation key"), ("enter", "rctrl", "letter or a digit")])
+def test_command_mode_keys_refused(value, dictation, why):
+    with pytest.raises(ValueError, match=why):
+        hotkeys.normalize_command(value, dictation)

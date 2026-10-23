@@ -122,6 +122,50 @@ class ComboMatcher:
         return False, False
 
 
+# Command mode's keys (dictado-a1d): the dictation key + a letter or digit, or a combo of their own.
+# L and R are taken with the dictation key (next language, paste again).
+COMMAND_TAKEN = {"l": "picking the next dictation's language", "r": "pasting the last dictation again"}
+
+
+def normalize_command(value: str, dictation: str) -> str:
+    """'rctrl+e' (as the Settings picker records it) or 'e' -> 'e'; 'Ctrl + Shift + E' -> 'ctrl+shift+e'.
+    Raises ValueError with a reason the user can read."""
+    v = str(value or "").replace(" ", "").lower()
+    lone = "+" not in dictation and dictation in KEYS
+    if lone and v.startswith(dictation + "+"):
+        v = v[len(dictation) + 1:]
+    if "+" not in v:
+        if v in KEYS:
+            raise ValueError(f"A lone key ({label(v)}) can't start Command mode: hold {label(dictation) if lone else 'the dictation key'} "
+                             "and press a letter, or press a combo like Ctrl+Shift+E")
+        if not (len(v) == 1 and v in MAIN):
+            raise ValueError(f"Hold {label(dictation) if lone else 'the dictation key'} and press a letter or a digit, "
+                             "or press a combo like Ctrl+Shift+E")
+        if not lone:
+            raise ValueError(f"The dictation key is a combo ({label(dictation)}): pick a combo for Command mode too, like Ctrl+Shift+E")
+        if v in COMMAND_TAKEN:
+            raise ValueError(f"{label(dictation)} + {v.upper()} is for {COMMAND_TAKEN[v]}: pick another key")
+        return v
+    k = normalize(v)
+    if "+" not in k:
+        raise ValueError("A lone key can't start Command mode: use the dictation key + a letter, or a combo like Ctrl+Shift+E")
+    if k == dictation or (lone and k.split("+")[-1] == dictation):
+        raise ValueError(f"{label(dictation)} is the dictation key: pick another combo")
+    return k
+
+
+def command_label(command: str, dictation: str) -> str:
+    """'Right Ctrl + E' for the dictation key + a letter, 'Ctrl+Shift+E' for a combo of its own."""
+    return label(command) if "+" in command else f"{label(dictation)} + {command.upper()}"
+
+
+def command_parts(command: str):
+    """(vk of the letter pressed with the dictation key, or 0; ComboMatcher for a combo of its own, or None)."""
+    if "+" in command:
+        return 0, ComboMatcher(command)
+    return MAIN.get(command, 0), None
+
+
 def how(s: str) -> str:
     """'tap Right Ctrl' for a lone key, 'press Ctrl+L' for a combo (pill and tray texts)."""
     return f"press {label(s)}" if "+" in s else f"tap {label(s)}"

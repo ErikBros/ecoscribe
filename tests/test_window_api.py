@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import time
 
 import pytest
@@ -464,6 +465,21 @@ def test_claude_switches_round_trip_with_their_phrase_list(api):  # dictado-bd6
     assert api.save_settings({"self_corrections": True, "command_mode": True})["ok"]
     c = config.load(api._config_path)
     assert c.text.self_corrections is True and c.text.command_mode is True
+
+
+@pytest.mark.skipif(sys.platform == "darwin", reason="Windows key names")
+def test_command_mode_keys_are_picked_and_saved(api):  # dictado-a1d
+    v = api.get_settings()["values"]
+    assert v["command_key"] == "e" and v["command_key_label"] == "Right Ctrl + E"
+    assert api.check_command_key("rctrl+k", "rctrl") == {"ok": True, "value": "k", "label": "Right Ctrl + K"}
+    assert api.check_command_key("ctrl+shift+e", "f13")["label"] == "Ctrl+Shift+E"
+    assert not api.check_command_key("rctrl+l", "rctrl")["ok"] and not api.check_command_key("e", "ctrl+l")["ok"]
+    assert api.save_settings({"command_key": "ctrl+shift+e"})["ok"]
+    assert config.load(api._config_path).text.command_key == "ctrl+shift+e"
+    assert api.get_settings()["values"]["command_key_label"] == "Ctrl+Shift+E"
+    assert api.save_settings({"hotkey": "f13", "command_key": "f13+k"})["ok"]  # checked against the new dictation key
+    assert config.load(api._config_path).text.command_key == "k"
+    assert not api.save_settings({"command_key": "r"})["ok"]
 
 
 def test_an_open_window_takes_the_page_it_was_asked_for_once(tmp_path, monkeypatch):  # dictado-1b7

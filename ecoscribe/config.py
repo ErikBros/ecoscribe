@@ -92,6 +92,9 @@ class TextCfg:
     # dictado-ua2 (command_mode.py): dictation key + E with text selected, say what to change; the selection
     # goes to Claude, so off by default
     command_mode: bool = False
+    # dictado-a1d: its keys. A letter or digit = the dictation key + it ("e": Right Ctrl + E); a combo
+    # like "ctrl+shift+e" = its own shortcut, which also works when the dictation key is a combo
+    command_key: str = "e"
     command_model: str = "haiku"
     command_timeout_s: float = 20.0  # an edit the user asked for can wait longer than a dictation
 

@@ -244,6 +244,7 @@ class Api:
                 "speakers": c.meetings.speakers, "vocabulary": "\n".join(c.text.vocabulary),
                 "voice_commands": c.text.voice_commands, "voice_phrases": c.text.voice_phrases,  # dictado-67v
                 "self_corrections": c.text.self_corrections, "command_mode": c.text.command_mode,  # dictado-bd6
+                "command_key": c.text.command_key, "command_key_label": self._command_label(c),  # dictado-a1d
                 "screen_names": c.text.screen_names,
                 "hold_to_talk": c.hotkey.hold_to_talk, "numpad_enter": c.hotkey.numpad_enter, "voice_memory": c.meetings.voice_memory,
                 "calendar_url": c.meetings.calendar_url, "my_name": c.meetings.my_name, "debug_log": c.ui.debug_log,
@@ -300,12 +301,34 @@ class Api:
             return {"ok": False, "error": str(e)}
         return {"ok": True, "value": k, "label": hotkeys.label(k)}
 
+    @staticmethod
+    def _command_label(c) -> str:
+        """Command mode's keys as words; the default ones when the saved value no longer fits the dictation key."""
+        try:
+            return hotkeys.command_label(hotkeys.normalize_command(c.text.command_key, c.hotkey.key), c.hotkey.key)
+        except ValueError:
+            return hotkeys.command_label("e", c.hotkey.key) if "+" not in c.hotkey.key else ""
+
+    def check_command_key(self, value: str, hotkey: str | None = None) -> dict:
+        """dictado-a1d: the Settings picker for Command mode asks before saving (hotkey: the dictation key in the form)."""
+        try:
+            dict_key = hotkeys.normalize(hotkey) if hotkey else self._load().hotkey.key
+            k = hotkeys.normalize_command(value, dict_key)
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+        return {"ok": True, "value": k, "label": hotkeys.command_label(k, dict_key)}
+
     def save_settings(self, values: dict) -> dict:
         c = self._load()
         try:
             if "hotkey" in values:
                 try:
                     c.hotkey.key = hotkeys.normalize(values["hotkey"])
+                except ValueError as e:
+                    return {"ok": False, "error": str(e)}
+            if "command_key" in values:  # dictado-a1d, checked against the (new) dictation key
+                try:
+                    c.text.command_key = hotkeys.normalize_command(values["command_key"], c.hotkey.key)
                 except ValueError as e:
                     return {"ok": False, "error": str(e)}
             if "mic" in values:
