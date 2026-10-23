@@ -648,17 +648,51 @@ async function load(query) {
   await sleep(200);
   check([...sv.doc.querySelectorAll('.vc-add[data-key="enter"][data-lang="en"]')][0].parentElement.textContent.includes("ship it"), "saved phrases show on load");
 }
+{ // dictado-a1d: Command mode by that name, with keys the user picks (the dictation key's picker)
+  const { window, doc } = await load("page=ajustes");
+  await sleep(200);
+  const key = (type, code, mods = {}) => doc.dispatchEvent(new window.KeyboardEvent(type, { code, bubbles: true, cancelable: true, ...mods }));
+  check(doc.querySelector("#row-command-mode .row-label").textContent === "Command mode", "the row is called Command mode");
+  check(doc.querySelector("#row-command-mode #cm-change")?.textContent === "change" && !doc.querySelector("#row-command-keys")
+    && doc.querySelector("#cm-hint").hidden, "look B: the keys and a change link inside the sentence, no extra row, no hint at rest");
+  check(doc.querySelector("#cm-press").textContent === "Right Ctrl + E"
+    && doc.querySelector("#cm-stop").textContent === "tap Right Ctrl", "default keys: Right Ctrl + E, then tap Right Ctrl");
+  doc.querySelector("#cm-change").click();
+  check(doc.querySelector("#cm-press").textContent === "Press it now…" && doc.querySelector("#cm-change").textContent === "cancel"
+    && !doc.querySelector("#cm-hint").hidden && doc.querySelector("#cm-hint").textContent.startsWith("Hold Right Ctrl and press a letter")
+    && !doc.querySelector("#f-command-mode").checked, "the picker listens in the sentence, says how, and leaves the switch alone");
+  key("keydown", "ControlRight", { ctrlKey: true }); key("keydown", "KeyK", { ctrlKey: true }); await sleep(50);
+  key("keyup", "KeyK", { ctrlKey: true }); key("keyup", "ControlRight"); await sleep(20);
+  check(doc.querySelector("#f-command-key").value === "k" && doc.querySelector("#cm-press").textContent === "Right Ctrl + K"
+    && doc.querySelector("#cm-change").textContent === "change", "holding Right Ctrl and pressing K picks Right Ctrl + K");
+  check(!doc.querySelector("#savebar").hidden, "a new pick offers Save");
+  doc.querySelector("#cm-change").click();
+  key("keydown", "ControlRight", { ctrlKey: true }); key("keydown", "KeyL", { ctrlKey: true }); await sleep(50);
+  key("keyup", "KeyL", { ctrlKey: true }); key("keyup", "ControlRight"); await sleep(20);
+  check(doc.querySelector("#f-command-key").value === "k" && doc.querySelector("#cm-hint").classList.contains("hk-bad")
+    && !doc.querySelector("#cm-hint").hidden && doc.querySelector("#cm-press").textContent === "Right Ctrl + K", "Right Ctrl + L (next language) is refused with the reason");
+  doc.querySelector("#cm-change").click();
+  key("keydown", "ControlLeft", { ctrlKey: true }); key("keydown", "ShiftLeft", { ctrlKey: true, shiftKey: true });
+  key("keydown", "KeyE", { ctrlKey: true, shiftKey: true }); await sleep(50);
+  check(doc.querySelector("#f-command-key").value === "ctrl+shift+e" && doc.querySelector("#cm-stop").textContent === "press Ctrl+Shift+E again",
+    "a combo of its own: Ctrl+Shift+E, pressed again to stop");
+  let sent = null;
+  const api = window.__ecoscribe.api, orig = api.save_settings;
+  api.save_settings = async (v) => { sent = v; return orig(v); };
+  doc.querySelector("#save").click(); await sleep(100);
+  check(sent && sent.command_key === "ctrl+shift+e" && Object.keys(sent).length === 1, "saves only the keys: " + JSON.stringify(sent));
+}
 { // Settings > the two switches that use Claude (dictado-bd6)
   const { doc } = await load("page=ajustes");
   await sleep(200);
   check(doc.querySelector("#f-self-corrections") && doc.querySelector("#f-command-mode") && !doc.querySelector("#row-command-mode").hidden, "self-corrections and command mode have switches");
   check(doc.querySelectorAll("#sc-rows tr").length === 2 && doc.querySelector("#sc-rows").textContent.includes("scratch that"), "the phrases are listed");
-  check([...doc.querySelectorAll(".cm-key")].every((k) => k.textContent === "Right Ctrl"), "command mode names the dictation key");
+  check(doc.querySelector("#cm-press").textContent === "Right Ctrl + E", "command mode names its keys (the dictation key + E)");
   doc.querySelector("#f-command-mode").click(); await sleep(50);
   check(!doc.querySelector("#savebar").hidden, "turning one on offers Save");
   const mac = await load("page=ajustes&mac=1");
   await sleep(200);
-  check(mac.doc.querySelector("#row-command-mode").hidden, "no command mode switch on the Mac yet");
+  check(mac.doc.querySelector("#cm-block").hidden, "no command mode switch or keys on the Mac yet");
 }
 { // History > Edit, and learn the fixed name (dictado-1ph)
   const { window, doc } = await load("page=historial");

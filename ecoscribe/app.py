@@ -100,6 +100,8 @@ class App:
                 self.cycle_language()
             elif action == "repaste":  # off the key thread: the paste waits for the dictation key to be let go
                 threading.Thread(target=self.paste_again, name="ecoscribe-repaste", daemon=True).start()
+            elif action == "edit" and self.state == "recording" and self._edit is not None:
+                self._stop()  # the Command mode keys again: done saying what to change (dictado-a1d)
             elif action == "edit":  # same: copying the selection waits for the key to be let go
                 threading.Thread(target=self.begin_edit, name="ecoscribe-edit", daemon=True).start()
 
@@ -453,8 +455,9 @@ class App:
         return ok
 
     def begin_edit(self) -> None:
-        """Dictation key + E (command mode, dictado-ua2): copy the selection, then record what to change.
-        The tap that stops the recording sends both to Claude; the answer replaces the selection."""
+        """Command mode's keys (dictation key + E by default, dictado-ua2; the user's own since dictado-a1d): copy
+        the selection, then record what to change. The tap that stops the recording (or the same keys again)
+        sends both to Claude; the answer replaces the selection."""
         if self.copy_selection is None:
             self.ui.flash("Command mode isn't on this computer yet", 2.5)
             return
@@ -477,7 +480,18 @@ class App:
                 self._edit = None
                 return
         log.info("command mode: recording the instruction for %d selected chars", len(selection))
-        self.ui.flash("Say what to change, then tap the key", 2.5)
+        self.ui.flash(f"Say what to change, then {self._edit_stop_hint()}", 2.5)
+
+    def _edit_stop_hint(self) -> str:
+        """'tap Right Ctrl', or 'press Ctrl+Shift+E again' when Command mode has a combo of its own (dictado-a1d)."""
+        from . import hotkeys
+        cmd = str(getattr(self.cfg.text, "command_key", "e") or "e")
+        if "+" in cmd:
+            return f"press {hotkeys.label(cmd)} again"
+        try:
+            return hotkeys.how(self.cfg.hotkey.key)
+        except Exception:
+            return "tap the key"
 
     def _process_edit(self, audio, selection: str) -> None:
         from .command_mode import EditError, edit

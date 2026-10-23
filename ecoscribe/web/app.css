@@ -623,6 +623,11 @@ select:hover { border-color: var(--line-strong); }
 .hk-key.listening { border-color: var(--aegean); color: var(--aegean); }
 .hk-hint { margin: -4px 0 12px; }
 .hk-hint.hk-bad { color: var(--tile); }
+/* dictado-a1d, look B: Command mode's keys in its sentence, "change" as a link; the hint only while picking */
+.cm-change { background: none; border: 0; padding: 0; font: inherit; color: var(--aegean); cursor: pointer; text-decoration: underline; text-underline-offset: 0.15em; }
+.cm-change:hover { color: var(--aegean-hover); }
+.cm-key.listening { border-color: var(--aegean); color: var(--aegean); }
+.cm-hint { margin: 0 0 12px; }
 
 /* t0u.35: the calendar link */
 .cal-row .row-text { width: 100%; }

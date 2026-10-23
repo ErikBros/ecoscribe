@@ -490,8 +490,12 @@
               <tbody id="sc-rows"></tbody></table>
             <p class="muted small">A phrase only counts on its own, after a pause or punctuation: "scratch that itch" stays text. Only dictations with one of these phrases go to Claude.</p>
           </details>
-          <label class="row toggle-row" id="row-command-mode"><span class="row-text"><span class="row-label">Change selected text by voice</span><span class="muted small">Select text anywhere, press <kbd class="cm-key">Right Ctrl</kbd> + <kbd>E</kbd>, say what to change ("make it shorter", "translate to Swedish") and tap <kbd class="cm-key">Right Ctrl</kbd>. Claude rewrites it in place; Ctrl+Z brings the old text back.</span></span>
+          <div id="cm-block">  <!-- dictado-a1d: Command mode by its name; its keys in the sentence, with "change" (look B, picked) -->
+          <label class="row toggle-row" id="row-command-mode"><span class="row-text"><span class="row-label">Command mode</span><span class="muted small">Change selected text by voice. Select text anywhere, press <kbd class="cm-key" id="cm-press">Right Ctrl + E</kbd> <button type="button" class="cm-change" id="cm-change">change</button>, say what to change ("make it shorter", "translate to Swedish") and <span id="cm-stop">tap <kbd class="cm-key">Right Ctrl</kbd></span>. Claude rewrites it in place; Ctrl+Z brings the old text back.</span></span>
             <input type="checkbox" class="switch" name="command_mode" id="f-command-mode"></label>
+          <input type="hidden" name="command_key" id="f-command-key">
+          <p class="muted small hk-hint cm-hint" id="cm-hint" hidden></p>
+          </div>
         </div>
 
         <div class="card group" data-sec="models">

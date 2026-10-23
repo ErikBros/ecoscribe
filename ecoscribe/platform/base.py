@@ -33,6 +33,10 @@ CAPABILITIES: dict[str, dict] = {
         "windows": "ecoscribe.platform.windows.deliver:copy_selection",  # + hook.VK_EDIT
         "macos": ("ticket", "dictado-waw"),
     },
+    "Command mode keys picked in Settings (the dictation key + a letter, or a combo)": {  # dictado-a1d
+        "windows": "ecoscribe.platform.windows.hook:HookThread",  # HookThread.action_keys / edit_combo, --hook-edit
+        "macos": ("ticket", "dictado-waw"),  # the Mac has no command mode yet; it takes [text] command_key with it
+    },
     "Numpad Enter as a second dictation key": {
         "windows": "ecoscribe.platform.windows.hook:HookThread",  # HookThread.numpad_alias
         "macos": "ecoscribe.platform.macos.keyhook:HookThread",  # HookThread.numpad_alias (keycode 76)

@@ -113,3 +113,23 @@ def test_hook_swallows_r_only_with_the_dictation_key_held():
     h._toggle_down = False
     assert h.action_key(VK_REPASTE, False) and h.action_key(VK_EDIT, False) and not h._action_held
     assert not h.action_key(0x43, True)  # Right Ctrl + C is untouched
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows hook")
+def test_hook_uses_the_command_mode_keys_the_user_picked():
+    """dictado-a1d: Right Ctrl + K instead of E; or a combo of its own, which swallows itself and still
+    tells the tap rule another key was pressed (so Right Ctrl doesn't toggle)."""
+    from ecoscribe.platform.windows.hook import VK_EDIT, HookClient, HookThread
+    events = []
+    h = HookThread(lambda a: None, RCTRL, 0.3, emit=events.append, consume=False, command_key="k")
+    h._toggle_down = True
+    assert h.action_key(0x4B, True) and not h.action_key(VK_EDIT, True)
+    assert [e[0] for e in events] == ["edit"]
+    h = HookThread(lambda a: None, RCTRL, 0.3, emit=events.append, consume=False, command_key="ctrl+shift+e")
+    h._toggle_down = True
+    assert not h.action_key(VK_EDIT, True)  # Right Ctrl + E is free again
+    assert h.edit_combo.key(0xA2, True) == (False, False) and h.edit_combo.key(0xA0, True) == (False, False)
+    assert h.edit_combo.key(VK_EDIT, True) == (True, True)
+    c = HookClient(lambda a: None, RCTRL, 1.0, spawn=lambda a: None, command_key="ctrl+shift+e")
+    assert c._hook_args()[-2:] == ["--hook-edit", "ctrl+shift+e"]
+    assert "--hook-edit" not in HookClient(lambda a: None, RCTRL, 1.0, spawn=lambda a: None)._hook_args()

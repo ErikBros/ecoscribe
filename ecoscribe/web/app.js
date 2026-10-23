@@ -62,7 +62,7 @@ function demoApi() {
   const dl = { running: false, error: null, models: {} };  // the demo model download
   let settings = {
     values: { hotkey: "rctrl", mic: "Anker PowerConf", languages: demoLangs.join(","), extra_languages: demoLangs.filter((c) => !["en", "sv"].includes(c)), sounds: true, overlay: true, live_text: true, insights: params.get("insights") === "1", speech_feedback: false, unmute: true, startup: true,
-      meet_mode: "prompt", meet_end: "10", meet_lang: demoLangs[0], on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: params.get("styles") === "1", self_corrections: false, command_mode: false, voice_phrases: params.get("vp") === "1" ? { line: { en: ["new line", "next line"] }, enter: { en: ["send it", "press enter", "ship it"] } } : {}, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, update_check: true, auto_update: params.get("auto") === "1", theme: params.get("theme") || "system",
+      meet_mode: "prompt", meet_end: "10", meet_lang: demoLangs[0], on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: params.get("styles") === "1", self_corrections: false, command_mode: false, command_key: params.get("cmkey") || "e", voice_phrases: params.get("vp") === "1" ? { line: { en: ["new line", "next line"] }, enter: { en: ["send it", "press enter", "ship it"] } } : {}, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, update_check: true, auto_update: params.get("auto") === "1", theme: params.get("theme") || "system",
       export_dir: "C:/x/Downloads", export_default: true,
       snippets: [{ trigger: "my email", text: "alex@example.com" }], replacements: [{ heard: "poll request", write: "pull request" }],
       per_app_styles: params.get("styles") === "1",
@@ -262,6 +262,12 @@ function demoApi() {
         for (const [l, ps] of Object.entries(r.phrases)) if (ps.length) r[l] = ps.map((p) => `"${p}"`).join(", ");
       }
       return out;
+    },
+    check_command_key: async (v, hk) => {  // dictado-a1d, like window.check_command_key
+      const k = String(v).toLowerCase().replace(`${hk}+`, "");
+      if (/^[a-z0-9]$/.test(k) && !hk.includes("+") && !"lr".includes(k)) return { ok: true, value: k, label: `${hotkeyLabel(hk)} + ${k.toUpperCase()}` };
+      if (/^(ctrl|alt|shift|win)\+/.test(k) && k !== hk && !/^ctrl\+[cvxzyasfpwnt]$/.test(k)) return { ok: true, value: k, label: hotkeyLabel(k) };
+      return { ok: false, error: `${hotkeyLabel(k)} can't start Command mode: hold ${hotkeyLabel(hk)} and press a letter, or press a combo like Ctrl+Shift+E` };
     },
     check_hotkey: async (v) => (/^(ctrl\+[cvxzyasfpwnt]|alt\+tab|[a-z0-9])$/.test(v) ? { ok: false, error: `${v} is not allowed` }
       : { ok: true, value: v, label: hotkeyLabel(v) }),
@@ -1591,7 +1597,7 @@ function formValues() {
     meet_mode: $("#f-meet-mode").value, meet_end: $("#f-meet-end").value, meet_lang: $("#f-meet-lang").value, on_demand: $("#f-on-demand").checked,
     speakers: $("#f-speakers").checked, voice_commands: $("#f-voice-commands").checked,
     voice_phrases: vcSaved(),  // dictado-67v
-    self_corrections: $("#f-self-corrections").checked, command_mode: $("#f-command-mode").checked,
+    self_corrections: $("#f-self-corrections").checked, command_mode: $("#f-command-mode").checked, command_key: $("#f-command-key").value,
     screen_names: $("#f-screen-names").checked, hold_to_talk: $("#f-hold").checked, numpad_enter: $("#f-numpad-enter").checked,
     theme: $("#f-theme").value || "system",
     voice_memory: $("#f-voice-memory").checked, debug_log: $("#f-debug-log").checked, update_check: $("#f-update-check").checked, auto_update: $("#f-auto-update").checked, calendar_url: $("#f-calendar").value.trim(), my_name: $("#f-my-name").value.trim(),
@@ -1872,8 +1878,9 @@ async function renderSettings() {
   $("#f-voice-commands").checked = !!s.values.voice_commands;
   $("#f-self-corrections").checked = !!s.values.self_corrections;  // dictado-bd6
   $("#f-command-mode").checked = !!s.values.command_mode;
-  $("#row-command-mode").hidden = MAC;  // the Mac has no command mode yet (dictado-waw)
-  for (const k of $$(".cm-key")) k.textContent = s.values.hotkey_label || hotkeyLabel(s.values.hotkey);
+  $("#cm-block").hidden = MAC;  // the Mac has no command mode yet (dictado-waw)
+  $("#f-command-key").value = s.values.command_key || "e";  // dictado-a1d
+  cmPaint();
   $("#f-screen-names").checked = s.values.screen_names !== false;
   $("#f-hold").checked = !!s.values.hold_to_talk; $("#f-numpad-enter").checked = !!s.values.numpad_enter;
   holdFits();
@@ -2004,30 +2011,6 @@ const HK_CODE = MAC ? { MetaRight: "rcmd", ControlRight: "rctrl", Fn: "fn" } : {
 const HK_HINT = MAC ? "Tap a lone key (Right Command, Fn, F13-F19) or press a combo like Shift+Cmd+D."
   : "Tap a lone key (Right Ctrl, F13-F24, Pause) or press a combo like Ctrl+L.";
 const HK_MODS = new Set(["ControlLeft", "ControlRight", "ShiftLeft", "ShiftRight", "AltLeft", "AltRight", "MetaLeft", "MetaRight"]);
-const hk = { on: false, other: false };
-function hkName(e) {
-  const c = e.code;
-  if (/^Key[A-Z]$/.test(c)) return c.slice(3).toLowerCase();
-  if (/^Digit\d$/.test(c)) return c.slice(5);
-  if (/^F\d{1,2}$/.test(c)) return c.toLowerCase();
-  return HK_CODE[c] || c.toLowerCase();
-}
-function hkStop(msg) {
-  hk.on = false;
-  $("#hk-change").textContent = "Change";
-  $("#hk-label").classList.remove("listening");
-  $("#hk-hint").textContent = msg || HK_HINT;
-}
-async function hkTry(value) {
-  const r = await api.check_hotkey(value);
-  if (!r.ok) { hkStop(r.error); $("#hk-hint").classList.add("hk-bad"); return; }
-  $("#hk-hint").classList.remove("hk-bad");
-  $("#f-hotkey").value = r.value;
-  $("#hk-label").textContent = r.label;
-  hkStop(r.value.includes("+") ? `${r.label}: press it to start and again to stop. Save to apply.` : `${r.label}: tap it on its own. Save to apply.`);
-  holdFits();
-  dirty();
-}
 async function voicesRow() {
   const v = await api.voices_info().catch(() => ({ count: 0, names: [] }));
   $("#voices-row").hidden = !v.count;
@@ -2089,29 +2072,100 @@ function holdFits() {  // hold-to-talk needs a lone key: a combo fires on its pr
   $("#f-hold-help").textContent = combo ? `Needs a lone key like ${MAC ? "Right Command" : "Right Ctrl"}: a combo can't be held.`
     : "Hold the key while you speak and let go to stop. A quick tap still starts hands-free dictation.";
 }
-function hkWire() {
-  $("#hk-change").onclick = () => {
-    if (hk.on) { hkStop(); return; }
-    hk.on = true; hk.other = false;
-    $("#hk-change").textContent = "Cancel";
-    $("#hk-label").textContent = "Press it now…";
-    $("#hk-label").classList.add("listening");
-    $("#hk-hint").textContent = "Esc cancels.";
+const hk = { other: false };  // the setup's key step (sKeyRecord)
+function hkName(e) {
+  const c = e.code;
+  if (/^Key[A-Z]$/.test(c)) return c.slice(3).toLowerCase();
+  if (/^Digit\d$/.test(c)) return c.slice(5);
+  if (/^F\d{1,2}$/.test(c)) return c.toLowerCase();
+  return HK_CODE[c] || c.toLowerCase();
+}
+// A key picker: click Change, press the keys (dictado-a1d: the dictation key's, reused for Command mode).
+// o: label, input, button, hint (elements); idle() the hint at rest; shown() the label at rest;
+// check(value) -> {ok, value, label, error}; done(r) the hint after a pick; lone: a lone modifier tap
+// counts; chord(): the browser code of a held key that makes "<key>+<letter>" (Command mode's
+// dictation key + E), or null; listening() the hint while it listens; words: the button's two texts.
+// An empty hint is hidden.
+function keyPicker(o) {
+  const st = { on: false, other: false, held: new Set() };
+  const [rest, busy] = o.words || ["Change", "Cancel"];
+  const stop = (msg, bad = false) => {
+    st.on = false;
+    o.button.textContent = rest;
+    o.label.classList.remove("listening");
+    o.hint.textContent = msg || o.idle();
+    o.hint.classList.toggle("hk-bad", bad);
+    o.hint.hidden = !o.hint.textContent;
+  };
+  const tryIt = async (value) => {
+    const r = await o.check(value);
+    if (!r.ok) { stop(r.error, true); o.label.textContent = o.shown(); return; }
+    o.input.value = r.value;
+    o.label.textContent = r.label;
+    stop(o.done(r));
+    o.after?.();
+    dirty();
+  };
+  o.button.onclick = () => {
+    if (st.on) { stop(); o.label.textContent = o.shown(); return; }
+    st.on = true; st.other = false; st.held.clear();
+    o.button.textContent = busy;
+    o.label.textContent = "Press it now…";
+    o.label.classList.add("listening");
+    o.hint.textContent = o.listening?.() || "Esc cancels.";
+    o.hint.classList.remove("hk-bad");
+    o.hint.hidden = false;
   };
   document.addEventListener("keydown", (e) => {
-    if (!hk.on) return;
+    if (!st.on) return;
     e.preventDefault(); e.stopPropagation();
-    if (e.code === "Escape" && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) { hkStop(); $("#hk-label").textContent = hotkeyLabel($("#f-hotkey").value); return; }
-    if (HK_MODS.has(e.code)) return;  // wait: a combo or a lone modifier tap
-    hk.other = true;
+    if (e.code === "Escape" && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) { stop(); o.label.textContent = o.shown(); return; }
+    const chord = o.chord?.();
+    if (HK_MODS.has(e.code) || (chord && e.code === chord)) { st.held.add(e.code); return; }  // wait: a combo or a lone modifier tap
+    st.other = true;
+    if (chord && st.held.has(chord) && [...st.held].every((c) => c === chord)) { tryIt(`${HK_CODE[chord] || chord.toLowerCase()}+${hkName(e)}`); return; }
     const mods = [e.ctrlKey && "ctrl", e.altKey && "alt", e.shiftKey && "shift", e.metaKey && (MAC ? "cmd" : "win")].filter(Boolean);
-    hkTry([...mods, hkName(e)].join("+"));
+    tryIt([...mods, hkName(e)].join("+"));
   }, true);
   document.addEventListener("keyup", (e) => {
-    if (!hk.on) return;
+    if (!st.on) return;
     e.preventDefault();
-    if (HK_MODS.has(e.code) && !hk.other) hkTry(hkName(e));  // a lone modifier tap, e.g. Right Ctrl
+    st.held.delete(e.code);
+    if (o.lone && HK_MODS.has(e.code) && !st.other) tryIt(hkName(e));  // a lone modifier tap, e.g. Right Ctrl
   }, true);
+  return { stop };
+}
+// Command mode's keys (dictado-a1d): the dictation key + a letter (E), or a combo of its own. Look B
+// (picked): the keys sit in the row's sentence with a "change" link; the hint shows only while picking.
+const CM_HOW = () => ($("#f-hotkey").value || "").includes("+")
+  ? "Press a combo like Ctrl+Shift+E. Esc cancels."
+  : `Hold ${hotkeyLabel($("#f-hotkey").value)} and press a letter, or press a combo like Ctrl+Shift+E. Esc cancels.`;
+const CM_BAD = "The dictation key is a combo now: change Command mode's keys to a combo too, like Ctrl+Shift+E.";
+function cmText() {  // the keys as words, from the form (the dictation key may have changed, unsaved)
+  const key = $("#f-command-key").value || "e", dict = $("#f-hotkey").value;
+  if (key.includes("+")) return hotkeyLabel(key);
+  return dict.includes("+") ? "" : `${hotkeyLabel(dict)} + ${key.toUpperCase()}`;
+}
+function cmPaint() {
+  const t = cmText(), key = $("#f-command-key").value || "e";
+  $("#cm-press").textContent = t || "its keys";
+  const stop = $("#cm-stop"), k = document.createElement("kbd"); k.className = "cm-key";
+  k.textContent = key.includes("+") ? t : hotkeyLabel($("#f-hotkey").value);
+  stop.replaceChildren(key.includes("+") ? "press " : "tap ", k, key.includes("+") ? " again" : "");
+  const bad = !t;
+  $("#cm-hint").textContent = bad ? CM_BAD : "";
+  $("#cm-hint").classList.toggle("hk-bad", bad);
+  $("#cm-hint").hidden = !bad;
+}
+function hkWire() {
+  keyPicker({ label: $("#hk-label"), input: $("#f-hotkey"), button: $("#hk-change"), hint: $("#hk-hint"), lone: true,
+    idle: () => HK_HINT, shown: () => hotkeyLabel($("#f-hotkey").value), check: (v) => api.check_hotkey(v),
+    done: (r) => r.value.includes("+") ? `${r.label}: press it to start and again to stop. Save to apply.` : `${r.label}: tap it on its own. Save to apply.`,
+    after: () => { holdFits(); cmPaint(); } });
+  keyPicker({ label: $("#cm-press"), input: $("#f-command-key"), button: $("#cm-change"), hint: $("#cm-hint"),
+    words: ["change", "cancel"], listening: CM_HOW, idle: () => (cmText() ? "" : CM_BAD), shown: () => cmText() || "its keys", check: (v) => api.check_command_key(v, $("#f-hotkey").value),
+    chord: () => { const k = $("#f-hotkey").value || ""; return k.includes("+") ? null : Object.keys(HK_CODE).find((c) => HK_CODE[c] === k) || (k.startsWith("f") ? k.toUpperCase() : null); },
+    done: (r) => `${r.label} starts Command mode. Save to apply.`, after: cmPaint });
 }
 
 /* ---------------------------------------------------------------- setup (dictado-zpz) */

@@ -195,7 +195,7 @@ class Prompt:
             self.buttons = [("Check the mic", "mic"), ("Close", "hide")]
         elif kind == "cmdoff":  # dictado-1b7: the keys say the user wants it; say where it is
             self.title = "Command mode is off"
-            self.question = "Turn on \u201cChange selected text by voice\u201d in Settings to use it."
+            self.question = "Turn on Command mode in Settings to use it."
             self.buttons = [("Open Settings", "claude"), ("Close", "hide")]
         elif kind == "done":
             self.title, self.question = "Transcript ready", _which(app)

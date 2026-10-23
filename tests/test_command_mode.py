@@ -1,4 +1,6 @@
 """Command mode (dictado-ua2): select text, dictation key + E, say what to change. Invented text only."""
+import sys
+
 import pytest
 
 from ecoscribe import claude_cli, command_mode
@@ -107,3 +109,23 @@ def test_a_cancelled_edit_leaves_the_next_dictation_a_dictation(tmp_path):
     app.on_action("cancel")
     app.on_action("toggle"); app.on_action("toggle")
     assert wait(lambda: pasted) and pasted == ["Plain words. "]
+
+
+def test_the_command_mode_keys_again_stop_the_instruction(tmp_path, monkeypatch):
+    """dictado-a1d: with a combo of its own, pressing it again is the stop; the pill says so."""
+    monkeypatch.setattr(claude_cli, "ask", lambda *a, **k: "The shop opens at nine.")
+    app, pasted = _app(tmp_path, "fix the spelling")
+    app.cfg.text.command_key = "ctrl+shift+e"
+    app.on_action("edit")
+    assert wait(lambda: app.state == "recording")
+    assert "Say what to change, then press Ctrl+Shift+E again" in flashes(app)
+    app.on_action("edit")
+    assert wait(lambda: pasted == ["The shop opens at nine."])
+
+
+def test_the_default_keys_say_tap_the_dictation_key(tmp_path):
+    app, _ = _app(tmp_path, "fix the spelling")
+    app.on_action("edit")
+    assert wait(lambda: app.state == "recording")
+    assert "Say what to change, then tap Right Ctrl" in flashes(app) or sys.platform == "darwin"
+    app.on_action("cancel")

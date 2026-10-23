@@ -26,7 +26,7 @@ log = logging.getLogger(__name__)
 VK_LANG = 0x4C  # L: dictation key + L picks the next dictation's language (dictation-languages)
 VK_REPASTE = 0x52  # R: dictation key + R pastes the last dictation again (dictado-ost)
 VK_EDIT = 0x45  # E: dictation key + E edits the selected text by voice (command mode, dictado-ua2)
-ACTION_KEYS = {VK_REPASTE: "repaste", VK_EDIT: "edit"}
+ACTION_KEYS = {VK_REPASTE: "repaste", VK_EDIT: "edit"}  # the defaults; HookThread.action_keys has the chosen E (dictado-a1d)
 _DOWN = {WM_KEYDOWN, WM_SYSKEYDOWN}
 _UP = {WM_KEYUP, WM_SYSKEYUP}
 
@@ -36,7 +36,7 @@ class HookThread(threading.Thread):
                  accept_injected: bool = False, reinstall_s: float = 30.0,
                  swallow_cancel: Callable[[], bool] = lambda: False, combo=None,
                  hold: bool = False, hold_s: float = 0.5, emit=None, consume: bool = True,
-                 numpad_enter: bool = False):
+                 numpad_enter: bool = False, command_key: str = "e"):
         super().__init__(name="ecoscribe-hook", daemon=True)
         self.on_action = on_action
         self.keys = KeyState(toggle_vk, max_tap_s, hold=hold, hold_s=hold_s)
@@ -50,6 +50,11 @@ class HookThread(threading.Thread):
         self._eat_esc_up = False
         self._lang_held = False  # L went down with the dictation key held: swallowed until it's up
         self._action_held: set[int] = set()  # same for R and E
+        # Command mode's keys (dictado-a1d): the dictation key + a letter (E by default), or a combo of its own
+        from ...hotkeys import command_parts
+        self.command_key = command_key
+        edit_vk, self.edit_combo = command_parts(command_key)
+        self.action_keys = {VK_REPASTE: "repaste", **({edit_vk: "edit"} if edit_vk else {})}
         self.numpad_enter = numpad_enter  # the numpad's Enter is a second dictation key (swallowed)
         self._alias_down = False  # the numpad's Enter is down as the dictation key
         self._q: queue.SimpleQueue = queue.SimpleQueue()
@@ -75,11 +80,11 @@ class HookThread(threading.Thread):
     def action_key(self, vk: int, down: bool) -> bool:
         """Dictation key + R (paste again) or + E (edit the selection): emit the action once per press and
         swallow the key (down and up), like L."""
-        if self.combo is not None or vk not in ACTION_KEYS or not (self._toggle_down or vk in self._action_held):
+        if self.combo is not None or vk not in self.action_keys or not (self._toggle_down or vk in self._action_held):
             return False
         if down and vk not in self._action_held:
             self._action_held.add(vk)
-            self._emit((ACTION_KEYS[vk], vk, time.monotonic()))
+            self._emit((self.action_keys[vk], vk, time.monotonic()))
         elif not down:
             self._action_held.discard(vk)
         return True
@@ -118,6 +123,13 @@ class HookThread(threading.Thread):
                         if down:
                             self._emit(("combo", vk, time.monotonic()))
                         return 1
+                    if self.edit_combo is not None:  # Command mode on a combo of its own (dictado-a1d)
+                        fire, eat = self.edit_combo.key(vk, down)
+                        if fire:
+                            self._emit(("edit", vk, time.monotonic()))
+                        if eat:  # the app never sees it; the tap rule still hears "another key" (no toggle)
+                            self._emit(("down" if down else "up", vk, time.monotonic()))
+                            return 1
                     if self.combo is not None:
                         fire, eat = self.combo.key(vk, down)
                         if fire:
@@ -243,6 +255,8 @@ class HookClient(HookThread):
             a += ["--hook-combo", self.combo.spec]
         if self.numpad_enter:
             a.append("--hook-numenter")
+        if self.command_key != "e":
+            a += ["--hook-edit", self.command_key]
         return a
 
     def _push_state(self) -> None:
@@ -325,7 +339,8 @@ def spawn_hook_process(args: list[str]):
 
 
 def hook_process_main(argv: list[str]) -> int:
-    """`Ecoscribe.exe --hook <vk> <max_tap_s> <reinstall_s> [--hook-injected] [--hook-combo SPEC] [--hook-numenter]`:
+    """`Ecoscribe.exe --hook <vk> <max_tap_s> <reinstall_s> [--hook-injected] [--hook-combo SPEC] [--hook-numenter]
+    [--hook-edit KEY]`:
     hooks only; events as lines "down 163 1234.5678" on stdout; "rec 1|0" on stdin."""
     import sys
     vk, max_tap, reinstall = int(argv[0]), float(argv[1]), float(argv[2])
@@ -357,7 +372,8 @@ def hook_process_main(argv: list[str]) -> int:
         os._exit(code)
     h = HookThread(None, vk, max_tap, accept_injected="--hook-injected" in argv, reinstall_s=reinstall,
                    swallow_cancel=lambda: state["rec"], combo=combo, emit=out_q.put, consume=False,
-                   numpad_enter="--hook-numenter" in argv)
+                   numpad_enter="--hook-numenter" in argv,
+                   command_key=argv[argv.index("--hook-edit") + 1] if "--hook-edit" in argv else "e")
     threading.Thread(target=writer, name="hook-writer", daemon=True).start()
     threading.Thread(target=reader, name="hook-reader", daemon=True).start()
     out.write(b"ready\n")
