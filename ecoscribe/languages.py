@@ -55,6 +55,17 @@ def available(extra) -> list[str]:
     return out
 
 
+def user_langs(dictation, extra, meeting: str = "") -> list[str]:
+    """The user's own languages (dictado-607): the ticked dictation languages, the added ones and the
+    saved meeting language, in available() order. A built-in language nobody ticked (Swedish for an
+    English speaker) isn't one of them. English when nothing is set."""
+    mine = {str(c) for c in dictation or []} | {str(c) for c in extra or []}
+    mine |= {c for c in str(meeting or "").split(",") if c and c != "auto"}
+    out = [c for c in available(extra) if c in mine]
+    out += [c for c in sorted(mine) if c in ALL and c not in out]  # a built-in or saved code outside the list
+    return out or ["en"]
+
+
 def valid_extra(extra) -> list[str]:
     """Added languages as saved: known codes, not built-in, no repeats."""
     out: list[str] = []

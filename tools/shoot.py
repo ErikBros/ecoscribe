@@ -22,6 +22,9 @@ SHOTS = {
     "gpu-descarga": "page=inicio&gpurt=downloading", "gpu-fallo": "page=inicio&gpurt=failed",  # dictado-7e1
     "ajustes-cambios": "page=ajustes&dirty=1",
     "ajustes-estilos": "page=ajustes&styles=1",  # Style per app, switched on (dictado-h0m)
+    # Voice commands and the language card, for an English-only user and one with Spanish added (dictado-607)
+    "ajustes-comandos": "page=ajustes&vc=1", "ajustes-comandos-es": "page=ajustes&vc=1&langs=en,es",
+    "ajustes-idiomas": "page=ajustes&sec=words", "ajustes-idiomas-es": "page=ajustes&sec=words&langs=en,sv,es",
     "reuniones": "page=reuniones", "reuniones-vacia": "page=reuniones&rec=0",
     "reunion-directo": "page=reuniones/2026-10-05_1400_retro",
     "reunion-lista": "page=reuniones/2026-10-05_0915_planering",
@@ -36,7 +39,8 @@ SHOTS = {
     **{f"{k}-oscuro": f"{q}&theme=dark" for k, q in (("inicio", "page=inicio"), ("historial", "page=historial"),
        ("ajustes", "page=ajustes"), ("reunion-lista", "page=reuniones/2026-10-05_0915_planering"),
        ("reuniones", "page=reuniones"), ("insights", "page=insights&insights=1"), ("bienvenida", "page=bienvenida&welcome=1"),
-       ("ajustes-cambios", "page=ajustes&dirty=1"))},
+       ("ajustes-cambios", "page=ajustes&dirty=1"), ("ajustes-comandos", "page=ajustes&vc=1"),
+       ("ajustes-idiomas", "page=ajustes&sec=words"))},
 }
 TALL = {"inicio-largo": "page=inicio", "ajustes-largo": "page=ajustes&dirty=1", "ajustes-frases": "page=ajustes&sc=1", "insights-largo": "page=insights&insights=1"}
 

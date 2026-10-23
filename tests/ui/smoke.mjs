@@ -349,14 +349,21 @@ async function load(query) {
   check(!doc.querySelector("#savebar").hidden, "savebar appears on change");
   sounds.checked = true; sounds.dispatchEvent(new window.Event("change", { bubbles: true }));
   check(doc.querySelector("#savebar").hidden, "savebar hides when change undone");
-  // languages as add-ons (dictado-ehs): English + Swedish built in, Spanish added from the picker
-  check([...doc.querySelectorAll("#f-languages input")].map((i) => i.value).join(",") === "en,sv", "built in: English + Swedish");
-  check(!doc.querySelector("#f-languages .lang-x"), "built-in languages can't be removed");
+  // languages as add-ons (dictado-ehs): only English shows by default (dictado-607), Spanish added from the picker
+  check([...doc.querySelectorAll("#f-languages input")].map((i) => i.value).join(",") === "en", "only English by default, no Swedish");
+  check(!doc.querySelector("#f-languages .lang-x"), "English can't be removed");
+  const vcCols = () => [...doc.querySelectorAll("#vc-head th")].map((t) => t.textContent).join(",");
+  check(vcCols() === "What it does,English" && !doc.querySelector("#vc-help").textContent.includes("Spanish")
+    && !doc.querySelector("#vc-rows").textContent.includes("ny rad"), "voice commands: English only: " + vcCols());
+  check([...doc.querySelectorAll("#sc-head th")].map((t) => t.textContent).join(",") === "What it does,English", "self-correction phrases: English only");
+  check([...doc.querySelectorAll("#f-meet-lang option")].map((o) => o.value).join(",") === "en,auto", "meeting language: English or Detect");
   const add = doc.querySelector("#lang-add");
-  check([...add.options].some((o) => o.value === "es") && ![...add.options].some((o) => o.value === "sv"), "the picker offers the rest, not the built-in ones");
+  check([...add.options].some((o) => o.value === "es") && [...add.options].some((o) => o.value === "sv"), "the picker offers Spanish and Swedish alike");
   add.value = "es"; add.dispatchEvent(new window.Event("change", { bubbles: true }));
   const es = doc.querySelector('#f-languages input[value="es"]');
   check(es && es.checked && doc.querySelector("#f-languages .lang-x"), "Spanish added, ticked, removable");
+  check(vcCols() === "What it does,English,Spanish" && doc.querySelector("#vc-help").textContent.includes('Spanish works too: "nueva línea", "envíalo".'),
+    "voice commands follow: Spanish column and example");
   check(!doc.querySelector("#savebar").hidden, "language change marks dirty");
   let sent = null;
   const api = window.__ecoscribe.api;
@@ -391,7 +398,7 @@ async function load(query) {
   check(doc.querySelector(".r-row .r-chip").textContent === "Recording", "first row is the recording one");
   check([...doc.querySelectorAll(".r-chip")].some((c) => c.textContent === "Transcribing 42 %"), "job shows its percent");
   check(!doc.querySelector("#r-now").hidden && doc.querySelector("#r-start").disabled, "banner while recording, start disabled");
-  check(doc.querySelector("#r-lang").options.length === 4 && doc.querySelector("#r-lang").value === "sv", "meeting languages: English, Swedish, English + Swedish, Detect; Swedish default");
+  check(doc.querySelector("#r-lang").options.length === 2 && doc.querySelector("#r-lang").value === "en", "meeting languages: only the user's English, and Detect (dictado-607)");
   const s = doc.querySelector("#r-search");
   s.value = "planering"; s.dispatchEvent(new window.Event("input")); await sleep(250);
   check(doc.querySelectorAll(".r-row").length === 1, "search filters sessions");
@@ -400,7 +407,7 @@ async function load(query) {
   check(!doc.querySelector("#r-detail-view").hidden && doc.querySelector("#r-list-view").hidden, "one click opens the session");
   check(!doc.querySelector("#r-d-live-actions").hidden && doc.querySelector("#r-d-stop").textContent === "Stop", "Stop visible while recording");
   const sel = doc.querySelector("#r-d-lang");
-  check(sel.value === "sv" && sel.options.length === 4, "live view shows the meeting language");
+  check(sel.value === "sv" && sel.options.length === 3, "live view shows the meeting language, even one outside the user's list");
   sel.value = "en"; sel.dispatchEvent(new window.Event("change")); await sleep(100);
   check(window.__lang === "en" && doc.querySelector("#toast").textContent.includes("English"), "switching the language mid-meeting");
   const first = doc.querySelectorAll(".r-seg").length;
@@ -580,6 +587,21 @@ async function load(query) {
   const t = ng.doc.querySelector("#toast").textContent;
   check(ng.window.__emailHow === "" && t.startsWith("Transcript copied. Google Calendar is open on") && t.includes("Email guests"),
     "no invite: Google Calendar on that day, the steps in the toast");
+}
+{ // dictado-607: a user with Swedish and Spanish sees both, Swedish removable like an added one
+  const { window, doc } = await load("page=ajustes&langs=en,sv,es");
+  await sleep(200);
+  check([...doc.querySelectorAll("#f-languages input")].map((i) => i.value).join(",") === "en,sv,es", "ticked Swedish shows");
+  check([...doc.querySelectorAll("#vc-head th")].map((t) => t.textContent).join(",") === "What it does,English,Swedish,Spanish", "both columns");
+  check(doc.querySelector("#vc-help").textContent.includes("Swedish and Spanish work too"), "both in the help line");
+  doc.querySelector('#f-languages input[value="sv"]').closest("label").querySelector(".lang-x").click(); await sleep(20);
+  check(!doc.querySelector('#f-languages input[value="sv"]') && [...doc.querySelector("#lang-add").options].some((o) => o.value === "sv"),
+    "removed Swedish goes back to the picker");
+  let sent = null;
+  const api = window.__ecoscribe.api, orig = api.save_settings;
+  api.save_settings = async (v) => { sent = v; return orig(v); };
+  doc.querySelector("#save").click(); await sleep(100);
+  check(sent && sent.languages === "en,es" && !("extra_languages" in sent), "saves the ticks without Swedish: " + JSON.stringify(sent));
 }
 { // Settings > the two switches that use Claude (dictado-bd6)
   const { doc } = await load("page=ajustes");

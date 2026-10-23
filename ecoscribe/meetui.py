@@ -22,14 +22,15 @@ APP_NAMES = {"msteams": "Teams", "ms-teams": "Teams", "teams": "Teams", "slack":
              "discord": "Discord", "signal": "Signal", "telegram": "Telegram", "webex": "Webex",
              "whatsapp": "WhatsApp", "chrome": "Chrome", "msedge": "Edge", "firefox": "Firefox",
              "brave": "Brave", "opera": "Opera"}
-# Meeting / file language choices: English + Swedish built in, plus the user's added languages
-# (dictado-ehs). The background app refills it from the config at start (set_langs).
+# Meeting / file language choices: the user's own languages (dictado-607: ticked, added, the meeting
+# default), refilled from the config at start (set_langs).
 LANGS: list[tuple[str, str]] = []
 
 
-def set_langs(extra) -> list[tuple[str, str]]:
-    from .languages import available, meeting_options
-    LANGS[:] = meeting_options(available(extra))
+def set_langs(extra, dictation=None, meeting: str = "") -> list[tuple[str, str]]:
+    """With `dictation`, only the user's own languages (dictado-607); without, every available one."""
+    from .languages import available, meeting_options, user_langs
+    LANGS[:] = meeting_options(available(extra) if dictation is None else user_langs(dictation, extra, meeting))
     return LANGS
 
 

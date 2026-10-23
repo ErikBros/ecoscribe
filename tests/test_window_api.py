@@ -227,7 +227,7 @@ def test_api_exposes_no_public_data_attributes(api):
 
 def test_meeting_settings_and_on_demand_round_trip(api):
     v = api.get_settings()
-    assert v["values"]["meet_mode"] == "prompt" and v["values"]["meet_lang"] == "sv" and v["values"]["on_demand"] is True
+    assert v["values"]["meet_mode"] == "prompt" and v["values"]["meet_lang"] == "en" and v["values"]["on_demand"] is True
     assert [o["value"] for o in v["options"]["meet_modes"]] == ["prompt", "auto", "off"]
     assert api.save_settings({"meet_mode": "auto", "meet_lang": "el", "on_demand": False})["ok"]
     c = config.load(api._config_path)
@@ -280,7 +280,7 @@ def test_languages_are_add_ons(tmp_path):
     api = Api(data_dir=tmp_path, config_path=cfg, signal_reload=lambda: True)
     s = api.get_settings()
     assert [o["value"] for o in s["options"]["languages"]] == ["en", "sv"] and s["values"]["extra_languages"] == []
-    assert [o["value"] for o in s["options"]["meet_langs"]] == ["en", "sv", "en,sv", "auto"]
+    assert [o["value"] for o in s["options"]["meet_langs"]] == ["en", "auto"]  # only the user's own (dictado-607)
     assert any(o["value"] == "el" for o in s["options"]["all_languages"]) and len(s["options"]["all_languages"]) == 98
     assert not api.save_settings({"languages": "en,es"})["ok"]  # Spanish isn't added yet
     assert api.save_settings({"extra_languages": ["es", "el"], "languages": "el,sv,en,es"})["ok"]
@@ -290,7 +290,7 @@ def test_languages_are_add_ons(tmp_path):
     assert api.save_settings({"meet_lang": "el"})["ok"]
     assert api.save_settings({"extra_languages": ["es"]})["ok"]  # remove Greek
     c = config.load(cfg)
-    assert c.whisper.languages == ["en", "sv", "es"] and c.meetings.default_lang == "sv"  # Greek dropped everywhere
+    assert c.whisper.languages == ["en", "sv", "es"] and c.meetings.default_lang == "en"  # Greek dropped everywhere
     assert not api.save_settings({"extra_languages": ["xx"]})["ok"]
 
 
@@ -474,3 +474,17 @@ def test_an_open_window_takes_the_page_it_was_asked_for_once(tmp_path, monkeypat
     ipc.ask_page("ajustes/claude")
     assert api.take_page() == "ajustes/claude"
     assert api.take_page() is None  # once
+
+
+def test_lists_show_only_the_users_languages(tmp_path):
+    """dictado-607: a built-in language nobody ticked (Swedish) stays out of the meeting list; a saved
+    meeting language stays in it; voice commands carry their key for the window's help line."""
+    from ecoscribe.window import Api
+    api = Api(data_dir=tmp_path, config_path=tmp_path / "config.toml", signal_reload=lambda: True)
+    s = api.get_settings()
+    assert s["values"]["meet_lang"] == "en"
+    assert [r["key"] for r in s["voice_command_list"]] == ["paragraph", "line", "enter"]
+    assert api.save_settings({"meet_lang": "sv"})["ok"]  # chosen by hand (or an older config): kept selectable
+    assert [o["value"] for o in api.get_settings()["options"]["meet_langs"]] == ["en", "sv", "en,sv", "auto"]
+    assert api.save_settings({"meet_lang": "en", "extra_languages": ["es"], "languages": "en,es"})["ok"]
+    assert [o["value"] for o in api.get_settings()["options"]["meet_langs"]] == ["en", "es", "en,es", "auto"]

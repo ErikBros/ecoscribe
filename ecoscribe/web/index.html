@@ -375,10 +375,10 @@
         </div>
 
         <div class="card group" data-sec="words">
-          <div class="group-head"><h3>Languages you dictate in</h3><p class="muted">Each dictation, Ecoscribe picks among these by itself, and the pill shows which one it heard. Wrong guess? Hold <kbd id="lang-key">Right Ctrl</kbd> and press <kbd>L</kbd> to choose the next dictation's language (or the tray icon: Next dictation in). With Swedish (or most added languages) ticked, dictation uses the larger model: still under a second, about twice as slow.</p></div>
+          <div class="group-head"><h3>Languages you dictate in</h3><p class="muted">Each dictation, Ecoscribe picks among these by itself, and the pill shows which one it heard. Wrong guess? Hold <kbd id="lang-key">Right Ctrl</kbd> and press <kbd>L</kbd> to choose the next dictation's language (or the tray icon: Next dictation in). Many languages besides English use the larger model for dictation: still under a second, about twice as slow.</p></div>
           <div class="lang-checks" id="f-languages" role="group" aria-label="Languages you dictate in"></div>
           <div class="lang-add-row"><select id="lang-add" aria-label="Add a language"></select>
-            <span class="muted small">English and Swedish are built in. Added languages also appear for meetings and files; nothing is downloaded.</span></div>
+            <span class="muted small">Added languages also appear for meetings and files; nothing is downloaded.</span></div>
         </div>
 
         <div class="card group" data-sec="words">
@@ -447,10 +447,10 @@
             <input type="checkbox" class="switch" name="on_demand" id="f-on-demand"></label>
           <label class="row toggle-row"><span class="row-text"><span class="row-label">Sounds</span><span class="muted small">A short sound when it starts and stops.</span></span>
             <input type="checkbox" class="switch" name="sounds" id="f-sounds"></label>
-          <label class="row toggle-row"><span class="row-text"><span class="row-label">Voice commands</span><span class="muted small">Say "new line" or "new paragraph" for a break, and end with "send it" to press Enter after the text (handy in Claude Code). Spanish and Swedish work too: "nueva línea", "envíalo", "ny rad", "skicka". Quotes work even with this off: "quote, your words, end quote" writes "your words".</span></span>
+          <label class="row toggle-row"><span class="row-text"><span class="row-label">Voice commands</span><span class="muted small"><span id="vc-help">Say "new line" or "new paragraph" for a break, and end with "send it" to press Enter after the text (handy in Claude Code).</span> Quotes work even with this off: "quote, your words, end quote" writes "your words".</span></span>
             <input type="checkbox" class="switch" name="voice_commands" id="f-voice-commands"></label>
           <details class="vc-list" id="vc-list"><summary>See all commands</summary>
-            <table class="vc-table"><thead><tr><th>What it does</th><th>English</th><th>Spanish</th><th>Swedish</th></tr></thead>
+            <table class="vc-table"><thead><tr id="vc-head"><th>What it does</th><th>English</th></tr></thead>
               <tbody id="vc-rows"></tbody></table>
             <p class="muted small">A command only counts on its own: at the start, or after a pause or punctuation, and before one or the end. "We need a new line of products" stays text. Saying only "send it" presses Enter on what's already in the box.</p>
           </details>
@@ -484,7 +484,7 @@
           <label class="row toggle-row"><span class="row-text"><span class="row-label">Fix it when you correct yourself</span><span class="muted small">Say "scratch that" to drop the sentence before it. Say "no wait" or "sorry, I mean" and Claude fixes that dictation before it's pasted: "on Tuesday, no wait, on Thursday" becomes "on Thursday", about 3 seconds later. If Claude doesn't answer in 5 seconds, the text goes in as you said it.</span></span>
             <input type="checkbox" class="switch" name="self_corrections" id="f-self-corrections"></label>
           <details class="vc-list" id="sc-list"><summary>See all phrases</summary>
-            <table class="vc-table"><thead><tr><th>What it does</th><th>English</th><th>Spanish</th><th>Swedish</th><th>Greek</th></tr></thead>
+            <table class="vc-table"><thead><tr id="sc-head"><th>What it does</th><th>English</th></tr></thead>
               <tbody id="sc-rows"></tbody></table>
             <p class="muted small">A phrase only counts on its own, after a pause or punctuation: "scratch that itch" stays text. Only dictations with one of these phrases go to Claude.</p>
           </details>

@@ -31,3 +31,12 @@ def test_model_follows_the_languages():
     assert dictation_model(WhisperCfg(languages=["en", "es", "fr"]))[0] == "large-v3-turbo"
     for langs in (["sv"], ["en", "sv"], ["el"], ["is"], ["en", "fi"]):
         assert "turbo" not in dictation_model(WhisperCfg(languages=langs))[0], langs
+
+
+def test_user_langs_are_only_the_users_own():
+    """dictado-607: ticked, added and the meeting language; a built-in nobody picked stays out."""
+    assert L.user_langs(["en"], []) == ["en"]
+    assert L.user_langs(["en"], [], "sv") == ["en", "sv"]
+    assert L.user_langs(["sv", "en"], ["es"], "auto") == ["en", "sv", "es"]
+    assert L.user_langs(["en"], [], "el,en") == ["en", "el"]  # a saved mix outside the list still shows
+    assert L.user_langs([], []) == ["en"]

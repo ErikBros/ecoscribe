@@ -51,12 +51,12 @@ def test_meetings_defaults_and_round_trip(tmp_path):
     from ecoscribe import tomlw
     c = config.load(None)
     assert (c.meetings.mode, c.meetings.grace_s, c.meetings.silence_stop_s, c.meetings.default_lang) == \
-        ("prompt", 10, 180, "sv")
-    c.meetings.mode, c.meetings.default_lang = "auto", "en"
+        ("prompt", 10, 180, "en")  # English by default (dictado-607)
+    c.meetings.mode, c.meetings.default_lang = "auto", "sv"
     p = tmp_path / "c.toml"
     tomlw.save(c, p)
     back = config.load(p)
-    assert back.meetings.mode == "auto" and back.meetings.default_lang == "en"
+    assert back.meetings.mode == "auto" and back.meetings.default_lang == "sv"
 
 
 def test_a_saved_old_call_end_wait_moves_to_10_s(tmp_path):

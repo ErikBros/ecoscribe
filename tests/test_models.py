@@ -271,3 +271,12 @@ def test_delete_frees_a_shared_blob_too(tmp_path, monkeypatch):
     assert models.disk_size("m", root=root) >= 4096
     assert models.delete("m", root=root) is True
     assert not repo.exists() and not big.exists()
+
+
+def test_setup_models_name_only_the_users_languages():
+    """dictado-607: the model rows name the user's own languages, not a fixed Swedish and Greek."""
+    from ecoscribe.config import WhisperCfg
+    fast, big = models.setup_models(WhisperCfg(), ["en"])
+    assert fast["use"].startswith("For your English;") and "Swedish" not in big["use"] and "Greek" not in big["use"]
+    fast, big = models.setup_models(WhisperCfg(), ["en", "es", "sv", "el"])
+    assert fast["use"].startswith("For your English and Spanish;") and big["use"].startswith("For your Swedish and Greek;")
