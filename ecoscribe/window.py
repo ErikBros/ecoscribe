@@ -119,6 +119,7 @@ def _copy(text: str) -> None:
 REPLACE_BACKUP = "transcript.before-replace.json"  # dictado-9lo: the transcript before the Replace list, for Undo
 BUSY = "It's still being written: try again when it has finished."
 
+GCAL_DAY = "https://calendar.google.com/calendar/r/day"  # dictado-qxr: /yyyy/m/d, the day view
 MAILTO_MAX = 1800  # longer mailto: links get cut by Windows and some mail programs: copy the transcript instead
 
 
@@ -889,15 +890,18 @@ class Api:
         self._copy(text)
         return {"ok": True, "chars": len(text)}
 
-    def email_participants(self, name: str) -> dict:
+    def email_participants(self, name: str, how: str = "") -> dict:
         """Meetings > Email to participants (dictado-fnw): a draft in the user's own mail program,
         To: the invite's guests, the transcript in the body when it fits, else copied to paste in.
-        Ecoscribe sends nothing itself."""
+        Ecoscribe sends nothing itself.
+        dictado-qxr: a recorded call with no guest addresses and no calendar to ask (no iCal link, no
+        Google sign-in): the note and transcript are copied and Google Calendar opens on the call's day,
+        where the event's own Email guests button writes to them. how="draft" / "calendar" picks one."""
         from urllib.parse import quote
         s = self.get_session(name)
         meta = sessions.read_meta(self._session(name))
         info = meta.get("calendar") or {}
-        if not info.get("emails") and meta.get("source") == "meeting":
+        if not info.get("emails") and meta.get("source") == "meeting" and how != "calendar":
             info = self._google_event(name, meta) or info
         to = [e for e in info.get("emails") or [] if "@" in e]
         title = info.get("title") or meta.get("title") or "our meeting"
@@ -905,6 +909,12 @@ class Api:
         transcript = export.to_txt(s["segments"]).strip()
         note = ("Hi,\n\nHere's the transcript of our call. It was made automatically by Ecoscribe from a "
                 "recording, so expect some mistakes.\n\n")
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", day) and (how == "calendar" or (
+                how != "draft" and not to and meta.get("source") == "meeting" and not self._has_calendar())):
+            self._copy(note + transcript + "\n")
+            y, m, dd = (int(x) for x in day.split("-"))
+            self._open_url(f"{GCAL_DAY}/{y}/{m}/{dd}")
+            return {"ok": True, "to": [], "via": "calendar", "day": day, "chars": len(transcript)}
         subject = f"Transcript: {title}" + (f" ({day})" if day else "")
 
         def url(body: str) -> str:
@@ -913,7 +923,16 @@ class Api:
         inline = len(full) <= MAILTO_MAX
         self._copy(transcript)
         self._open_url(full if inline else url(note + "(The transcript follows: paste it here.)\n"))
-        return {"ok": True, "to": to, "inline": inline, "chars": len(transcript)}
+        return {"ok": True, "to": to, "inline": inline, "chars": len(transcript), "via": "draft"}
+
+    def _has_calendar(self) -> bool:
+        """An iCal link or a Google sign-in: somewhere Ecoscribe can look up a call's guests."""
+        if self._load().meetings.calendar_url:
+            return True
+        try:
+            return self._gcal().connected
+        except Exception:
+            return False
 
     def save_export(self, name: str, fmt: str) -> dict:
         if fmt not in ("txt", "md", "srt"):

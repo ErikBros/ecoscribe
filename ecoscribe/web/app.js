@@ -197,7 +197,12 @@ function demoApi() {
       return { ok: true };
     },
     copy_transcript: async () => ({ ok: true }),
-    email_participants: async (name) => { window.__emailed = name; return { ok: true, to: ["ana@example.com", "bo@example.com"], inline: false, chars: 9000 }; },
+    email_participants: async (name, how) => {  // ?noguests=1: a call with no invite and no calendar (dictado-qxr)
+      window.__emailed = name; window.__emailHow = how || "";
+      if (how === "calendar" || (how !== "draft" && params.get("noguests") === "1"))
+        return { ok: true, to: [], via: "calendar", day: (find(name)?.created || "2026-10-05").slice(0, 10), chars: 9000 };
+      return { ok: true, to: params.get("noguests") === "1" ? [] : ["ana@example.com", "bo@example.com"], inline: false, chars: 9000, via: "draft" };
+    },
     get_status: async () => (params.get("state") === "stopped" ? { state: "stopped", alive: false, version: "1.1.0" }
       : { state: params.get("state") || "ready", alive: true, device: "cuda", model: "large-v3-turbo", mic: "Microphone (Anker PowerConf C20", languages: settings.values.languages.split(","), hotkey: "rctrl", version: "1.1.0",
           ...(params.get("gpurt") === "downloading" ? { device: "cpu", gpu_runtime: { state: "downloading", version: 1, done: 214e6, total: 476e6 } }
@@ -1195,6 +1200,11 @@ function rWire() {
   $("#r-email").onclick = async () => {  // dictado-fnw: the user's mail program sends, never Ecoscribe
     const res = await api.email_participants(r.open);
     if (!res.ok) { toast(res.error || "Couldn't open a draft."); return; }
+    if (res.via === "calendar") {  // dictado-qxr: no guest list and no calendar to ask: Google Calendar on the call's day
+      const day = new Date(res.day + "T12:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+      toast(`Transcript copied. Google Calendar is open on ${day}: click this call, then Email guests (the envelope), and paste.`, 9000);
+      return;
+    }
     const who = res.to.length ? `to ${res.to.length} ${res.to.length === 1 ? "person" : "people"}` : "with an empty To (no calendar invite)";
     toast(res.inline ? `Draft opened ${who}. Check it and press Send.` : `Draft opened ${who}. The transcript is copied: paste it in, then Send.`, 5000);
   };
@@ -2115,6 +2125,7 @@ async function boot() {
     if (p) show(p);
   }, 1000);
   if (params.get("demo") === "1" && params.get("replaced") === "1") setTimeout(() => $("#r-replace-go")?.click(), 500);  // screenshot (dictado-9lo)
+  if (params.get("demo") === "1" && params.get("email") === "1") setTimeout(() => $("#r-email")?.click(), 500);  // screenshot (dictado-qxr)
   if (params.get("demo") === "1" && params.get("retrymenu") === "1") setTimeout(() => $(".h-retry button")?.click(), 300);  // screenshot
   if (params.get("demo") === "1" && params.get("models") === "scroll") setTimeout(() => $("#m-rows").scrollIntoView(), 300);  // screenshot
   if (params.get("demo") === "1" && params.get("addlangs")) setTimeout(() => { sx.langs.push(...params.get("addlangs").split(",")); paintLangs(); }, 300);  // screenshot

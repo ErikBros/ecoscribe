@@ -409,10 +409,42 @@ def test_email_participants_long_transcript_is_copied_to_paste(tmp_path, monkeyp
     a = Api(data_dir=tmp_path, copy=copied.append, open_url=opened.append)
     monkeypatch.setattr(a, "_session", lambda name: d)
     monkeypatch.setattr(a, "get_session", lambda name: {"segments": json.loads((d / "transcript.json").read_text())["segments"], "notes": ""})
-    r = a.email_participants(d.name)
+    r = a.email_participants(d.name, "draft")  # no guests and no calendar would go to Google Calendar (dictado-qxr)
     assert r["ok"] and not r["inline"] and r["to"] == []
     assert len(opened[0]) < 1800 and "paste%20it%20here" in opened[0]
     assert copied[0].count("word") == 2000
+
+
+def _no_guests(tmp_path, monkeypatch, cfg_text="", source="meeting"):
+    from ecoscribe import sessions as S
+    d = S.create("Call", "en", source, tmp_path / "transcripts", now=__import__("datetime").datetime(2026, 3, 7, 18, 5))
+    S.write_meta(d, status="done")
+    (d / "transcript.json").write_text(json.dumps({"segments": [{"t0": 0, "t1": 2, "text": "The red kite flew.", "speaker": "Others"}]}),
+                                       encoding="utf-8")
+    cfg = tmp_path / "config.toml"
+    cfg.write_text(cfg_text, encoding="utf-8")
+    opened, copied = [], []
+    a = Api(data_dir=tmp_path, config_path=cfg, copy=copied.append, open_url=opened.append)
+    monkeypatch.setattr(a, "_session", lambda name: d)
+    monkeypatch.setattr(a, "get_session", lambda name: {"segments": json.loads((d / "transcript.json").read_text())["segments"], "notes": ""})
+    return a, d, opened, copied
+
+
+def test_no_guests_and_no_calendar_opens_google_calendar_on_that_day(tmp_path, monkeypatch):  # dictado-qxr
+    a, d, opened, copied = _no_guests(tmp_path, monkeypatch)
+    r = a.email_participants(d.name)
+    assert r == {"ok": True, "to": [], "via": "calendar", "day": "2026-03-07", "chars": len("The red kite flew.")}
+    assert opened == ["https://calendar.google.com/calendar/r/day/2026/3/7"]
+    assert copied[0].startswith("Hi,") and "red kite" in copied[0]  # ready to paste into Email guests
+    r = a.email_participants(d.name, "draft")  # "an empty email instead"
+    assert r["via"] == "draft" and opened[1].startswith("mailto:?subject=")
+
+
+def test_with_a_calendar_link_or_an_imported_file_it_stays_a_draft(tmp_path, monkeypatch):
+    a, d, opened, _ = _no_guests(tmp_path, monkeypatch, '[meetings]\ncalendar_url = "https://example.com/basic.ics"\n')
+    assert a.email_participants(d.name)["via"] == "draft" and opened[0].startswith("mailto:")
+    a, d, opened, _ = _no_guests(tmp_path / "imp", monkeypatch, source="import")
+    assert a.email_participants(d.name)["via"] == "draft"
 
 
 def test_session_rows_carry_people_and_app_for_the_meeting_page(tmp_path):

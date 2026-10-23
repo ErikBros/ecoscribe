@@ -506,6 +506,12 @@ async function load(query) {
   b.click(); await sleep(150);
   check(window.__emailed === "2026-10-05_0915_planering" && doc.querySelector("#toast").textContent.includes("to 2 people")
     && doc.querySelector("#toast").textContent.includes("paste it in"), "opens a draft to the participants, says to paste");
+  const ng = await load("page=reuniones/2026-10-05_0915_planering&noguests=1");
+  await sleep(300);
+  ng.doc.querySelector("#r-email").click(); await sleep(150);
+  const t = ng.doc.querySelector("#toast").textContent;
+  check(ng.window.__emailHow === "" && t.startsWith("Transcript copied. Google Calendar is open on") && t.includes("Email guests"),
+    "no invite: Google Calendar on that day, the steps in the toast");
 }
 { // Settings > the two switches that use Claude (dictado-bd6)
   const { doc } = await load("page=ajustes");

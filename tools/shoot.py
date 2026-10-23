@@ -26,6 +26,7 @@ SHOTS = {
     "reunion-resumiendo": "page=reuniones/2026-10-04_1600_kund",
     "reunion-reemplazar": "page=reuniones/2026-10-04_1600_kund&replace=1",  # the Replace list offered (dictado-9lo)
     "reunion-reemplazado": "page=reuniones/2026-10-04_1600_kund&replace=1&replaced=1",  # ... and applied, with Undo
+    "reunion-sin-invitados": "page=reuniones/2026-10-05_0915_planering&noguests=1&email=1",  # Email participants, no invite (dictado-qxr)
     "historial-editar": "page=historial&hedit=1", "historial-aprender": "page=historial&learn=1",
     "insights": "page=insights&insights=1",
 }

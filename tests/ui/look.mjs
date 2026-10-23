@@ -30,7 +30,7 @@ const PAGES = {
   cargando: "page=inicio&state=loading", "inicio-version": "page=inicio&update=1", reuniones: "page=reuniones", "reuniones-vacia": "page=reuniones&rec=0",
   "reunion-directo": "page=reuniones/2026-10-05_1400_retro", "reunion-lista": "page=reuniones/2026-10-05_0915_planering",
   "reunion-cola": "page=reuniones/2026-10-05_1130_podcast",
-  "reunion-reemplazar": "page=reuniones/2026-10-04_1600_kund&replace=1", "reunion-reemplazado": "page=reuniones/2026-10-04_1600_kund&replace=1&replaced=1",
+  "reunion-reemplazar": "page=reuniones/2026-10-04_1600_kund&replace=1", "reunion-reemplazado": "page=reuniones/2026-10-04_1600_kund&replace=1&replaced=1", "reunion-sin-invitados": "page=reuniones/2026-10-05_0915_planering&noguests=1&email=1",
   insights: "page=insights&insights=1",
 };
 
