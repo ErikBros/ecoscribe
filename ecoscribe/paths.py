@@ -27,6 +27,9 @@ def config_path() -> Path:
 
 
 def downloads_dir() -> Path:
+    """The user's Downloads; ECOSCRIBE_DOWNLOADS points it elsewhere (the tests: never the real one)."""
+    if os.environ.get("ECOSCRIBE_DOWNLOADS"):
+        return Path(os.environ["ECOSCRIBE_DOWNLOADS"])
     return Path(os.environ.get("USERPROFILE", Path.home())) / "Downloads"
 
 

@@ -35,6 +35,17 @@ def _config_without_after_hook() -> None:
 
 _config_without_after_hook()
 
+
+def _downloads_elsewhere() -> None:
+    """An export a test makes lands in a temporary folder, never in the user's Downloads
+    (paths.downloads_dir; a test that exported a transcript left a file there on every run)."""
+    if not os.environ.get("ECOSCRIBE_DOWNLOADS"):
+        import tempfile
+        os.environ["ECOSCRIBE_DOWNLOADS"] = tempfile.mkdtemp(prefix="ecoscribe-test-downloads-")
+
+
+_downloads_elsewhere()
+
 # Windows-only modules (SendInput, the LL hook): run on the PC; macOS has its own tests for its versions
 collect_ignore = ["test_deliver_win.py", "test_hook_win.py", "test_hook_process.py"] if MAC else []
 
