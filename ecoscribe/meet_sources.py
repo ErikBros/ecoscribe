@@ -57,8 +57,17 @@ class Sources:
                 self._switch(kind, str(req[kind]), "asked from the meeting page")
 
     def tick(self) -> dict:
+        """Once a second. Never raises: a recording never stops over what it reports."""
+        try:
+            return self._tick()
+        except Exception:
+            log.debug("meeting sources tick failed", exc_info=True)
+            return {}
+
+    def _tick(self) -> dict:
         now = self.clock()
-        mic, system = self.rec.levels()
+        levels = getattr(self.rec, "levels", None)
+        mic, system = levels() if levels else (0.0, 0.0)
         for kind, level in (("mic", mic), ("system", system)):
             if level >= LOUD:
                 self.loud[kind] = now

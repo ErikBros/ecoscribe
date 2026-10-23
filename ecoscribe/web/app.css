@@ -404,7 +404,7 @@ h3 { margin: 0; font: 700 var(--fs-lead)/1.3 var(--font-display); letter-spacing
 .r-src-row { display: flex; align-items: center; gap: 6px; }
 .r-src-ico { width: 18px; height: 18px; fill: none; stroke: var(--ink-soft); stroke-width: var(--icon-stroke); stroke-linecap: round; stroke-linejoin: round; }
 .r-src-bar { width: 54px; height: 6px; border-radius: var(--radius-pill); background: var(--well); overflow: hidden; }
-.r-src-bar span { display: block; height: 100%; width: var(--lvl, 0%); border-radius: inherit; background: var(--aegean); transition: width .25s ease-out; }
+.r-src-bar span { display: block; height: 100%; width: 0; border-radius: var(--radius-pill); background: var(--aegean); transition: width .25s ease-out; }
 .r-src-row.bad .r-src-ico { stroke: var(--tile); }
 .r-src-row.bad .r-src-bar { background: var(--tile-soft); }
 .r-d-actions:has(.r-src) .r-live-note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

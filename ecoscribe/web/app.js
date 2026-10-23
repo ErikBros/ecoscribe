@@ -1207,7 +1207,7 @@ async function renderSources(recording) {
     const w = srcWarning(k, s, out.call);
     row.classList.toggle("bad", !!w);
     const bar = $(".r-src-bar", row), state = w ? `silent ${fmtT(s.quiet_s)}` : pct >= 8 ? SRC_WORD[k] : "quiet";
-    bar.style.setProperty("--lvl", `${pct}%`); bar.setAttribute("aria-valuenow", pct);
+    $("span", bar).style.width = `${pct}%`; bar.setAttribute("aria-valuenow", pct);
     row.title = `${k === "mic" ? "You" : "The others"}: ${s.name || "the default device"} · ${state}`;  // the device on hover
     bad = bad || w;
   }
