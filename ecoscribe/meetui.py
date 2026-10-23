@@ -82,6 +82,79 @@ def hovering(cursor, rect, margin: int = HOVER_MARGIN) -> bool:
     return l - margin <= x <= r + margin and t - margin <= y <= b + margin
 
 
+# The pill where the user put it (dictado-06i): dragging the meeting chip moves it, and the pill
+# (chip and dictation pill alike) shows at that spot from then on. The spot is the pill's bottom
+# centre on screen, kept in pill.json; a double-click on the chip puts it back at the bottom centre.
+DRAG_START = 4  # px the mouse moves with the button down before a press is a drag
+DOUBLE_S = 0.4  # two clicks this close are a double-click
+
+
+def load_spot(path) -> tuple[int, int] | None:
+    try:
+        d = json.loads(Path(path).read_text(encoding="utf-8"))
+        return int(d["x"]), int(d["y"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def save_spot(path, spot: tuple[int, int] | None) -> None:
+    """None: back to the bottom centre (the file says so, rather than being deleted)."""
+    try:
+        Path(path).write_text(json.dumps({"x": spot[0], "y": spot[1]} if spot else {}), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def fit_spot(spot, size, work) -> tuple[int, int]:
+    """The bottom centre `spot` moved just enough that a pill of `size` sits wholly inside `work`
+    (left, top, right, bottom): a pill dragged off the edge, or grown by its live line, stays on screen."""
+    (x, y), (w, h), (l, t, r, b) = spot, size, work
+    x = min(max(x, l + w // 2), r - (w - w // 2))
+    y = min(max(y, t + h), b)
+    return x, y
+
+
+class Drag:
+    """Mouse button and cursor, polled every tick, turned into what the pill does. step() answers
+    ("move", spot) while the chip is dragged, ("drop", None) when it's let go, ("reset", None) on a
+    double-click, else None. A press only counts when it starts on the chip."""
+
+    def __init__(self):
+        self.press = None  # (cursor, spot) at the press on the chip
+        self.moving = False
+        self._down = False
+        self._click = -1.0  # when the last click (a press without a drag) ended
+
+    @property
+    def held(self) -> bool:
+        return self.press is not None
+
+    def step(self, now: float, cursor, down: bool, over: bool, spot):
+        pressed, released = down and not self._down, self._down and not down
+        self._down = down
+        if pressed:
+            self.press, self.moving = ((cursor, spot), False) if over and cursor and spot else (None, False)
+            return None
+        if down and self.press:
+            (cx, cy), (sx, sy) = self.press
+            dx, dy = cursor[0] - cx, cursor[1] - cy
+            if self.moving or max(abs(dx), abs(dy)) >= DRAG_START:
+                self.moving = True
+                return "move", (sx + dx, sy + dy)
+            return None
+        if released and self.press:
+            self.press, moved = None, self.moving
+            self.moving = False
+            if moved:
+                self._click = -1.0
+                return "drop", None
+            if self._click >= 0 and now - self._click <= DOUBLE_S:
+                self._click = -1.0
+                return "reset", None
+            self._click = now
+        return None
+
+
 def pill_layer(dictation_mode: str, view: dict | None) -> str:
     """dictation | meeting | hidden. Dictation modes are Overlay.mode values."""
     if dictation_mode in ("recording", "busy"):

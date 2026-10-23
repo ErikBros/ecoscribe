@@ -103,3 +103,4 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Install a new version by itself: when idle or at Quit, never in a call (Settings switch, off by default; Home > Install when idle) | done (dictado-nmo: downloads the release's own installer, checks size and SHA-256, runs it silently only with no meeting, job or dictation) | ticket dictado-6gr (Home keeps Download, Settings hides the switch) |
 | Installer | done (.exe, Inno Setup) | done (Ecoscribe.app + .dmg, com.erikbros.ecoscribe, self-signed: this Mac only; a public build needs a Developer ID) |
 | Claude Code from the app (summaries, self-corrections) | done (wsl.exe, a login shell: Claude Code lives in WSL) | ticket dictado-1xg (a zsh login shell; not yet tried on the Mac) |
+| Move the pill: drag the meeting chip, it stays there; double-click puts it back | done (dictado-06i: click-through except while the mouse is on the chip; the spot in pill.json) | ticket dictado-8dy |

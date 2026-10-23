@@ -409,6 +409,8 @@ def main(argv=None) -> int:
         from .platform.macos.shell import cancel_hint as mac_hint
         hint = mac_hint(cfg.hotkey)
     overlay = Overlay(root, hint=hint) if cfg.ui.overlay else None
+    if overlay and hasattr(overlay, "remember_at"):  # the pill stays where it was dragged (dictado-06i; Mac: dictado-8dy)
+        overlay.remember_at(data / "pill.json")
     sounds = Sounds(data / "sounds", enabled=cfg.ui.sounds and not args.no_sounds)
     ui = Ui(root, overlay, sounds)
 
