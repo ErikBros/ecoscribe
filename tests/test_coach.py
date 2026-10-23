@@ -154,6 +154,7 @@ def test_one_meeting_talk_share_monologues_questions_and_hedges():
     assert m["monologues"] == 1 and m["longest_s"] == 95
     assert m["questions"] == 2
     assert m["hedges"] == {"i think": 1, "maybe": 1} and m["words"] == 23
+    assert m["hedges_per_100"] == round(100 * 2 / 23, 1)  # per meeting too, for its row (dictado-9bl.3)
     assert coach.meeting_stats([seg(0, 5, "Others", "Hi.")], "en") is None  # nothing from me: says nothing
     assert coach.meeting_stats([seg(0, 5, "Me", "Τι ώρα είναι; Πού πάμε;")], "el")["questions"] == 2
     assert coach.meeting_stats([seg(0, 5, "Me", "¿Vienes mañana?")], "es")["questions"] == 1

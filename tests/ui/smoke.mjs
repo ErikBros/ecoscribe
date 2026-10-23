@@ -215,8 +215,20 @@ async function load(query) {
     && doc.querySelectorAll("#i-top-hedges .i-chip").length === 3, "hedges and fillers in messages to people (9jc.3)");
   check(doc.querySelectorAll("#i-pace-rows .i-habit").length === 2 && doc.querySelector("#i-pace-rows .i-habit-num").textContent === "148"
     && doc.querySelectorAll("#i-pace-hist path.bar:not(.dim)").length === 3, "pace to people and to AI apps, the 130-160 band marked (9jc.4)");
-  check(doc.querySelector("#i-meet-share").textContent === "41%" && doc.querySelectorAll("#i-meet-list .i-hbar").length === 3
-    && doc.querySelector("#i-meet-list .i-hbar-val").textContent === "38% · 6 questions", "meetings: share, long turns, questions (9jc.5)");
+  const meetRow = doc.querySelector("#i-meet-list tbody tr");
+  check(doc.querySelector("#i-meet-share").textContent === "41%" && doc.querySelectorAll("#i-meet-list tbody tr").length === 4
+    && meetRow.querySelector(".i-table-name span").textContent === "Weekly planning with the product team"
+    && [...meetRow.querySelectorAll("td.num")].map((td) => td.textContent).join("|") === "0|6|1.4"
+    && doc.querySelector("#i-meet-how").textContent.startsWith("From 4 recorded meetings"), "meetings: share, long turns, questions, hedges per meeting, whole names (9jc.5, 9bl.3)");
+  check(doc.querySelector("#i-markers-how").textContent.includes("Hedges soften what you say"), "what a hedge is, under the number (9bl.1)");
+  const ticks = [...doc.querySelectorAll("#i-markers-weeks .tick")].map((t) => t.textContent);
+  check(ticks.length === 6 && ticks[5] === "This week" && /^\d+ \w+$/.test(ticks[0]), "weekly chart: from the first week with data, every week labelled (9bl.5): " + ticks.join(", "));
+  const hit = doc.querySelectorAll("#i-markers-weeks rect.hit")[4];
+  hit.dispatchEvent(new window.Event("focus"));
+  const tipLines = [...doc.querySelector("#i-tip").children].map((e) => e.textContent);
+  check(/^Week of /.test(tipLines[0]) && tipLines[1] === "2.2 hedges per 100 words" && tipLines[2] === "1.1 filler words per 100 words", "tooltip: the week first, one value per line (9bl.2): " + tipLines.join(" / "));
+  hit.dispatchEvent(new window.Event("blur"));
+  check(doc.querySelector("#i-suggest li .i-suggest-word").textContent.includes("probably Ecoscribe"), "words to add say what they are (9bl.4)");
   const add = doc.querySelector("#i-suggest li button");
   add.click(); await sleep(30);
   check(window.__added === "Ecoscribe" && doc.querySelectorAll("#i-suggest li").length === 2, "Add puts the suggested spelling in Your words");

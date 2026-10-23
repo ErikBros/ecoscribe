@@ -293,11 +293,13 @@ def meeting_stats(segments: list[dict], lang: str | None = None) -> dict | None:
             turns.append([x["t0"], x["t1"], x.get("speaker") == "Me"])
     mine = [b - a for a, b, is_me in turns if is_me]
     text = " ".join(x["text"].strip() for x in me)
+    n_words, hedges = len(WORD.findall(text)), markers(text, lang)["hedges"]
     return {"me_s": round(me_s), "others_s": round(others_s),
             "talk_share": round(100 * me_s / (me_s + others_s)) if me_s + others_s else 100,
             "monologues": sum(t > MONOLOGUE_S for t in mine), "longest_s": round(max(mine)),
             "questions": _questions(text, lang),
-            "words": len(WORD.findall(text)), "hedges": markers(text, lang)["hedges"]}
+            "words": n_words, "hedges": hedges,
+            "hedges_per_100": round(100 * sum(hedges.values()) / n_words, 1) if n_words else 0}  # dictado-9bl.3
 
 
 def meetings_summary(meetings: list[dict], now: datetime | None = None, days: int | None = None) -> dict:

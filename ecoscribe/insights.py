@@ -2,7 +2,7 @@
 
 Everything is computed here, on this computer, from the dictation history (history.jsonl): time
 saved against typing, when and where you dictate, your languages, filler words, the phrases you
-repeat, names Whisper keeps spelling its own way (one click adds them to Your words), your week as
+repeat, names you say often that aren't in Your words yet (one click adds them), your week as
 a prompt for Claude, and speech coaching (coach.py, dictado-9jc). Nothing here leaves the computer except what you copy yourself.
 """
 from __future__ import annotations

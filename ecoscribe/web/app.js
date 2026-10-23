@@ -27,7 +27,7 @@ function demoInsights(days) {  // invented numbers and text for the demo and scr
     rhythm: { hours, days: dayList, streak: 2 },
     languages: [{ lang: "en", words: Math.round(8200 * k) }, { lang: "sv", words: Math.round(2900 * k) }, { lang: "de", words: Math.round(500 * k) }, { lang: "mixed", words: Math.round(200 * k) }],
     apps: [{ app: "slack.exe", dictations: 96 }, { app: "code.exe", dictations: 71 }, { app: "outlook.exe", dictations: 44 }, { app: "chrome.exe", dictations: 29 }, { app: "SnippingTool.exe", dictations: 3 }],
-    habits: [{ lang: "en", words: 8200, per_100: 3.1, top: [{ word: "like", count: 120 }, { word: "you know", count: 61 }, { word: "basically", count: 40 }, { word: "kind of", count: 33 }] },
+    habits: [{ lang: "en", words: 8200, per_100: 3.1, top: [{ word: "like", count: 120 }, { word: "you know", count: 61 }, { word: "basically", count: 40 }, { word: "literally", count: 33 }] },
       { lang: "sv", words: 2900, per_100: 1.4, top: [{ word: "typ", count: 25 }, { word: "liksom", count: 16 }] }],
     phrases: [{ phrase: "at the end of", count: 18 }, { phrase: "let me check", count: 14 }, { phrase: "as soon as", count: 11 }, { phrase: "on the other hand", count: 9 }],
     suggestions: [{ heard: "Ecoskribe", count: 5, suggest: "Ecoscribe" }, { heard: "Klaude", count: 3, suggest: "Claude" }, { heard: "Kristineberg", count: 3, suggest: "Kristineberg" }],
@@ -46,9 +46,10 @@ function demoInsights(days) {  // invented numbers and text for the demo and scr
       top_fillers: [{ word: "like", count: 22 }, { word: "basically", count: 9 }],
       top_hedges: [{ word: "maybe", count: 31 }, { word: "i think", count: 24 }, { word: "kind of", count: 12 }] },
     meetings: { meetings: 4, talk_share: 41, monologues: 2, questions: 17, hedges_per_100: 1.9, top_hedges: [{ word: "i think", count: 14 }],
-      list: [{ created: "2026-10-06T10:00", title: "Weekly planning", talk_share: 38, monologues: 0, questions: 6, longest_s: 70 },
-        { created: "2026-10-03T14:30", title: "Design review", talk_share: 57, monologues: 2, questions: 3, longest_s: 140 },
-        { created: "2026-10-01T09:00", title: "Intro call", talk_share: 29, monologues: 0, questions: 8, longest_s: 45 }] },
+      list: [{ created: "2026-10-06T10:00", title: "Weekly planning with the product team", talk_share: 38, monologues: 0, questions: 6, longest_s: 70, hedges_per_100: 1.4 },
+        { created: "2026-10-03T14:30", title: "Design review", talk_share: 57, monologues: 2, questions: 3, longest_s: 140, hedges_per_100: 2.6 },
+        { created: "2026-10-01T09:00", title: "Intro call", talk_share: 29, monologues: 0, questions: 8, longest_s: 45, hedges_per_100: 1.2 },
+        { created: "2026-09-29T15:00", title: "Retro", talk_share: 44, monologues: 0, questions: 0, longest_s: 60, hedges_per_100: 2.1 }] },
     pace: { people: { dictations: Math.round(64 * k), wpm: 148, pauses: 22, in_range: 58 }, ai: { dictations: Math.round(150 * k), wpm: 163, pauses: 31, in_range: 35 },
       range: [130, 160], histogram: [0, 1, 1, 3, 5, 8, 12, 14, 9, 5, 3, 2, 1, 0, 0].map((n, i) => ({ from: 80 + 10 * i, dictations: n })) },
   };
@@ -443,7 +444,7 @@ async function show(page) {
 let iDays = null;
 const SVGNS = "http://www.w3.org/2000/svg";
 const langName = (c) => {
-  if (c === "mixed") return "Mixed";
+  if (c === "mixed") return "Mixed languages";
   try { return new Intl.DisplayNames(["en"], { type: "language" }).of(c); } catch { return c; }
 };
 function svgEl(tag, attrs) {
@@ -451,12 +452,12 @@ function svgEl(tag, attrs) {
   for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
   return e;
 }
-function tip(e, lines) {
+function tip(e, title, lines) {  // title first (the week, day or hour), then one value per line (dictado-9bl.2)
   const t = $("#i-tip");
-  if (!lines) { t.hidden = true; return; }
+  if (!e) { t.hidden = true; return; }
   t.textContent = "";
-  const b = document.createElement("strong"); b.textContent = lines[0]; t.append(b);
-  if (lines[1]) t.append(document.createTextNode(" " + lines[1]));
+  const b = document.createElement("strong"); b.textContent = title; t.append(b);
+  for (const line of lines || []) { const l = document.createElement("span"); l.textContent = line; t.append(l); }
   t.hidden = false;
   const r = e.target.getBoundingClientRect();
   const x = e.clientX || r.left + r.width / 2, y = e.clientY || r.top;
@@ -464,16 +465,17 @@ function tip(e, lines) {
   t.style.top = `${y - t.offsetHeight - 10}px`;
 }
 /* Columns, one series: thin bars (<= 24 px), 4 px rounded tops square at the baseline, a hairline
-   baseline, a few tick labels, and a hover / focus readout per column (dataviz). */
+   baseline, a few tick labels, and a hover / focus readout per column (dataviz). Drawn at the chart's own
+   width, so the labels stay small however wide the card is (dictado-9bl). */
 function columns(el, data, tickEvery) {
   el.textContent = "";
-  const W = 320, H = 118, top = 6, base = 96, slot = W / data.length;
+  const W = Math.round(el.clientWidth) || 320, H = 118, top = 6, base = 96, slot = W / data.length;
   const bw = Math.min(24, slot * 0.62), max = Math.max(1, ...data.map((d) => d.value));
   const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": el.dataset.label || "" });
   data.forEach((d, i) => {
     const x = i * slot + (slot - bw) / 2, h = d.value ? Math.max(2, (base - top) * d.value / max) : 0;
     const hit = svgEl("rect", { x: i * slot, y: top, width: slot, height: base - top, class: "hit", tabindex: 0 });
-    const show = (e) => tip(e, [d.tipValue, d.tipLabel]);
+    const show = (e) => tip(e, d.tipTitle, d.tipLines);
     hit.addEventListener("pointermove", show); hit.addEventListener("focus", show);
     hit.addEventListener("pointerleave", () => tip(null)); hit.addEventListener("blur", () => tip(null));
     svg.append(hit);
@@ -512,20 +514,26 @@ function iChip(text, count, title) {
   if (title) c.title = title;
   return c;
 }
+function weekly(el, weeks, has, value, lines) {  // dictado-9bl.5: from the first week with data, every week labelled
+  const first = weeks.findIndex(has), shown = first < 0 ? weeks.slice(-1) : weeks.slice(first), n = shown.length;
+  columns(el, shown.map((w, i) => {
+    const now = i === n - 1;
+    return { value: has(w) ? value(w) : 0, dim: !now, label: now ? "This week" : shortDate(w.week),
+      tipTitle: now ? `This week (from ${shortDate(w.week)})` : `Week of ${shortDate(w.week)}`, tipLines: lines(w) };
+  }), () => true);
+}
 function renderMarkers(m) {  // dictado-9jc.3: fillers and hedges in messages to people
   const has = !!(m && m.words);
   $("#i-markers-empty").hidden = has; $("#i-markers-body").hidden = !has;
   if (!has) return;
   $("#i-hedges").textContent = String(m.hedges_per_100);
   $("#i-fillers").textContent = String(m.fillers_per_100);
-  const day = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-  const n = m.weeks.length;
-  columns($("#i-markers-weeks"), m.weeks.map((w, i) => {
-    const v = w.hedges_per_100 == null ? 0 : w.hedges_per_100 + w.fillers_per_100;
-    return { value: v, dim: i !== n - 1, label: i === n - 1 ? "This week" : day(w.week),
-      tipValue: w.hedges_per_100 == null ? "Too few words to say" : `${w.hedges_per_100} hedges · ${w.fillers_per_100} fillers per 100`,
-      tipLabel: `week of ${day(w.week)}` };
-  }), (i) => i === 0 || i === n - 1);
+  // dictado-9bl.1: what a hedge is, right under the number, and what it was counted in
+  $("#i-markers-how").textContent = `Hedges soften what you say: "maybe", "I think", "kind of". Filler words fill a pause: "like", "basically". `
+    + `Counted in ${fmtNum(m.dictations)} ${m.dictations === 1 ? "message" : "messages and emails"} to people (${fmtNum(m.words)} words), not in prompts to AI apps.`;
+  weekly($("#i-markers-weeks"), m.weeks, (w) => w.hedges_per_100 != null, (w) => w.hedges_per_100,
+    (w) => w.hedges_per_100 == null ? [w.words ? `Only ${fmtNum(w.words)} words to people: too few to count` : "No messages to people"]
+      : [`${w.hedges_per_100} hedges per 100 words`, `${w.fillers_per_100} filler words per 100 words`, `${fmtNum(w.words)} words to people`]);
   const chips = $("#i-top-hedges"); chips.textContent = "";
   for (const h of m.top_hedges) chips.append(iChip(h.word, h.count));
   if (!m.top_hedges.length) chips.append(iChip("None so far"));
@@ -534,27 +542,41 @@ function renderMeetings(m) {  // dictado-9jc.5
   const has = !!(m && m.meetings);
   $("#i-meet-empty").hidden = has; $("#i-meet-body").hidden = !has;
   if (!has) return;
+  $("#i-meet-how").textContent = `From ${fmtNum(m.meetings)} recorded ${m.meetings === 1 ? "meeting" : "meetings"}${m.list.length < m.meetings ? ` (the last ${m.list.length} below)` : ""}. Your mic is you, the call's sound is everyone else.`;
   $("#i-meet-share").textContent = `${m.talk_share}%`;
   $("#i-meet-mono").textContent = fmtNum(m.monologues);
   $("#i-meet-q").textContent = fmtNum(m.questions);
   $("#i-meet-hedges").textContent = String(m.hedges_per_100);
-  hbars($("#i-meet-list"), m.list.map((x) => {
-    const extra = [x.monologues ? `${x.monologues} long ${x.monologues === 1 ? "turn" : "turns"}` : "",
-      x.questions ? `${x.questions} ${x.questions === 1 ? "question" : "questions"}` : ""].filter(Boolean);
-    return { name: x.title, value: x.talk_share, label: [`${x.talk_share}%`, ...extra].join(" · ") };
-  }), 100);
+  const body = $("#i-meet-list tbody"); body.textContent = "";
+  for (const x of m.list) {
+    const tr = document.createElement("tr");
+    const name = document.createElement("td"), nameBox = document.createElement("div"); nameBox.className = "i-table-name";
+    const title = document.createElement("span"); title.textContent = x.title; title.title = x.title;
+    const when = document.createElement("span"); when.className = "muted"; when.textContent = shortDate(String(x.created).slice(0, 10));
+    nameBox.append(title, when); name.append(nameBox);
+    const share = document.createElement("td"), shareBox = document.createElement("div"); shareBox.className = "i-table-share";
+    const bar = document.createElement("span"); bar.className = "i-table-bar";
+    const fill = document.createElement("span"); fill.style.width = `${Math.max(1.5, x.talk_share)}%`; bar.append(fill);
+    const pct = document.createElement("span"); pct.textContent = `${x.talk_share}%`;
+    shareBox.append(bar, pct); share.append(shareBox);
+    tr.append(name, share);
+    for (const v of [fmtNum(x.monologues), fmtNum(x.questions), x.hedges_per_100 == null ? "0" : String(x.hedges_per_100)]) {
+      const td = document.createElement("td"); td.className = "num"; td.textContent = v; tr.append(td);
+    }
+    body.append(tr);
+  }
 }
 function renderPace(p) {  // dictado-9jc.4
   const has = !!(p && (p.people || p.ai));
   $("#i-pace-empty").hidden = has; $("#i-pace-body").hidden = !has;
   if (!has) return;
   const rows = $("#i-pace-rows"); rows.textContent = "";
-  for (const [key, who] of [["people", "to people"], ["ai", "to AI apps"]]) {
+  for (const [key, who, unit] of [["people", "in messages to people", ["message", "messages"]], ["ai", "in prompts to AI apps", ["prompt", "prompts"]]]) {
     const g = p[key]; if (!g) continue;
     const row = document.createElement("div"); row.className = "i-habit";
     const num = document.createElement("span"); num.className = "i-habit-num"; num.textContent = String(g.wpm);
     const lab = document.createElement("span"); lab.className = "muted";
-    lab.textContent = `words a minute ${who}, ${g.pauses}% of the time pausing (${fmtNum(g.dictations)} ${g.dictations === 1 ? "dictation" : "dictations"})`;
+    lab.textContent = `words a minute ${who}, pausing ${g.pauses}% of the time (${fmtNum(g.dictations)} ${unit[g.dictations === 1 ? 0 : 1]})`;
     row.append(num, lab); rows.append(row);
   }
   const [lo, hi] = p.range, last = p.histogram.length - 1;
@@ -562,21 +584,17 @@ function renderPace(p) {  // dictado-9jc.4
   columns($("#i-pace-hist"), p.histogram.map((b, i) => {
     const name = i === 0 ? `under ${b.from + 10}` : i === last ? `${b.from}+` : `${b.from}-${b.from + 9}`;
     return { value: b.dictations, dim: b.from < lo || b.from >= hi, label: i === last ? `${b.from}+` : String(b.from),
-      tipValue: `${b.dictations} ${b.dictations === 1 ? "message" : "messages"}`, tipLabel: `${name} words a minute` };
+      tipTitle: `${name} words a minute`, tipLines: [`${b.dictations} ${b.dictations === 1 ? "message" : "messages"} to people`] };
   }), (i) => i === 0 || i === last || p.histogram[i].from === lo || p.histogram[i].from === hi);
 }
 function renderClarity(c) {  // dictado-9jc.1
   const has = !!(c && c.dictations);
   $("#i-clarity-empty").hidden = has; $("#i-clarity-body").hidden = !has;
   if (!has) return;
-  const day = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
   $("#i-clarity").textContent = `${c.clarity}%`;
-  $("#i-clarity-how").textContent = `of your words heard clearly, over ${fmtNum(c.dictations)} ${c.dictations === 1 ? "dictation" : "dictations"} since ${day(c.since)}`;
-  const n = c.weeks.length;
-  columns($("#i-clarity-weeks"), c.weeks.map((w, i) => ({ value: w.clarity || 0, dim: i !== n - 1,
-    label: i === n - 1 ? "This week" : day(w.week),
-    tipValue: w.clarity == null ? "No dictations" : `${w.clarity}% heard clearly`, tipLabel: `week of ${day(w.week)}` })),
-    (i) => i === 0 || i === n - 1);
+  $("#i-clarity-how").textContent = `of your words heard clearly (Ecoscribe was sure of them), over ${fmtNum(c.dictations)} ${c.dictations === 1 ? "dictation" : "dictations"} since ${shortDate(c.since)}`;
+  weekly($("#i-clarity-weeks"), c.weeks, (w) => w.clarity != null, (w) => w.clarity,
+    (w) => w.clarity == null ? ["No dictations"] : [`${w.clarity}% of words heard clearly`, `${fmtNum(w.dictations)} ${w.dictations === 1 ? "dictation" : "dictations"}`]);
   const box = $("#i-unsure"); box.textContent = "";
   for (const l of c.words) {
     const row = document.createElement("div"); row.className = "i-habit";
@@ -593,11 +611,13 @@ function iWeek(m) {  // the one-line "this week" from the hedges per week (dicta
   box.hidden = weeks.length < 2;
   if (box.hidden) return;
   const [prev, last] = weeks.slice(-2), a = prev.hedges_per_100, b = last.hedges_per_100;
-  const top = (m.top_hedges || [])[0];
-  const dir = b < a ? "less" : b > a ? "more" : "as much as before";
-  $("#i-week-text").innerHTML = `<b>This week:</b> you hedged ${dir === "as much as before" ? dir : dir + ` in messages to people, ${a} → ${b} per 100 words`}.`
-    + (top ? ` <span></span>` : "");
-  if (top) $("#i-week-text span").textContent = `"${top.word}" is still the one you use most.`;
+  const top = (m.top_hedges || [])[0], all = m.weeks || [];
+  const when = last === all[all.length - 1] ? "This week" : `Week of ${shortDate(last.week)}`;
+  const dir = b < a ? "fewer" : b > a ? "more" : "as many";
+  $("#i-week-text").innerHTML = `<b>${when}:</b> <span></span>`;
+  $("#i-week-text span").textContent = `${dir} hedges ("maybe", "I think") in your messages to people, `
+    + (dir === "as many" ? `${b} per 100 words, as the week before.` : `${a} → ${b} per 100 words.`)
+    + (top ? ` "${top.word}" is still the one you use most.` : "");
 }
 async function renderInsights() {
   for (const b of $$("#i-range .seg")) b.setAttribute("aria-checked", String((b.dataset.days || null) === iDays));
@@ -623,8 +643,8 @@ async function renderInsights() {
   $("#i-talk").textContent = fmtDur(t.talk_s);
   $("#i-streak").textContent = `${d.rhythm.streak} ${d.rhythm.streak === 1 ? "day" : "days"}`;
   const peak = Math.max(...d.rhythm.hours);
-  columns($("#i-hours"), d.rhythm.hours.map((v, h) => ({ value: v, label: String(h).padStart(2, "0"), dim: v < peak,
-    tipValue: `${v} ${v === 1 ? "dictation" : "dictations"}`, tipLabel: `${String(h).padStart(2, "0")}:00-${String((h + 1) % 24).padStart(2, "0")}:00` })),
+  columns($("#i-hours"), d.rhythm.hours.map((v, h) => ({ value: v, label: `${String(h).padStart(2, "0")}:00`, dim: v < peak,
+    tipTitle: `${String(h).padStart(2, "0")}:00-${String((h + 1) % 24).padStart(2, "0")}:00`, tipLines: [`${v} ${v === 1 ? "dictation" : "dictations"}`] })),
     (i) => i % 6 === 0);
   const busy = d.rhythm.hours.indexOf(peak), hh = (h) => `${String(h % 24).padStart(2, "0")}:00`;  // dictado-7qo
   $("#i-hours-note").textContent = `The highlighted bar is your busiest hour, ${hh(busy)}-${hh(busy + 1)}.`;
@@ -633,7 +653,7 @@ async function renderInsights() {
     const dt = new Date(x.date + "T12:00:00");
     return { value: x.words, dim: i !== n - 1,
       label: i === n - 1 ? "Today" : dt.toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
-      tipValue: `${fmtNum(x.words)} words`, tipLabel: dt.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }) };
+      tipTitle: dt.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }), tipLines: [`${fmtNum(x.words)} ${x.words === 1 ? "word" : "words"}`] };
   }), (i) => i === 0 || i === n - 1 || i === Math.floor((n - 1) / 2));
   const lw = d.languages.reduce((a, x) => a + x.words, 0) || 1;
   hbars($("#i-langs"), d.languages.map((x) => ({ name: langName(x.lang), value: x.words,
@@ -644,7 +664,7 @@ async function renderInsights() {
   for (const h of d.habits) {
     const row = document.createElement("div"); row.className = "i-habit";
     const num = document.createElement("span"); num.className = "i-habit-num"; num.textContent = String(h.per_100);
-    const lab = document.createElement("span"); lab.className = "muted"; lab.textContent = `filler words per 100 in ${langName(h.lang)}`;
+    const lab = document.createElement("span"); lab.className = "muted"; lab.textContent = `filler words per 100 words in ${langName(h.lang)}`;
     const chips = document.createElement("span"); chips.className = "i-chips";
     for (const f of h.top) chips.append(iChip(f.word, f.count));
     row.append(num, lab, chips); hab.append(row);
@@ -663,7 +683,11 @@ async function renderInsights() {
   for (const s of d.suggestions) {
     const li = document.createElement("li");
     const heard = document.createElement("span");
-    heard.textContent = s.heard === s.suggest ? `“${s.heard}”, ${s.count} times` : `Heard “${s.heard}” ${s.count} times`;
+    heard.className = "i-suggest-word";  // dictado-9bl.4: a name you say, and how often
+    const b = document.createElement("b"); b.textContent = s.heard;
+    const note = document.createElement("span"); note.className = "muted";
+    note.textContent = s.heard === s.suggest ? `said ${s.count} times` : `written this way ${s.count} times; probably ${s.suggest}`;
+    heard.append(b, note);
     const input = document.createElement("input"); input.value = s.suggest; input.setAttribute("aria-label", `Add ${s.suggest} to Your words`);
     const btn = document.createElement("button"); btn.type = "button"; btn.className = "btn btn-ghost btn-sm"; btn.textContent = "Add";
     btn.onclick = async () => {
