@@ -94,27 +94,28 @@ async function load(query) {
   check(sent && sent.theme === "light" && Object.keys(sent).length === 1 && doc.querySelector("#toast").textContent === "Saved." && !errors.length,
         "saves only the theme, no restart: " + JSON.stringify(sent) + " / " + doc.querySelector("#toast").textContent);
 }
-{ // ajustes: Style per app (dictado-h0m), a menu per kind of app
+{ // ajustes: Style per app (dictado-h0m, dictado-lrm): three named choices per kind of app, and what a sentence becomes
   const { window, doc, errors } = await load("page=ajustes");
   const rows = () => [...doc.querySelectorAll("#st-rows .st-row")];
-  const look = (i) => rows()[i].querySelector(".st-look"), vcOf = (i) => rows()[i].querySelector(".st-vc input");
+  const segs = (i) => [...rows()[i].querySelectorAll(".st-looks .seg")], on = (i) => rows()[i].querySelector('.seg[aria-checked="true"]');
+  const out = (i) => rows()[i].querySelector(".st-out").textContent, vcOf = (i) => rows()[i].querySelector(".st-vc input");
   const sw = doc.querySelector("#f-per-app");
   check(sw && !sw.checked && rows().length === 4 && doc.querySelector("#st-wrap").classList.contains("off")
-    && rows().every((r) => [...r.querySelectorAll("select, input")].every((i) => i.disabled)), "Style per app: off by default, four rows, greyed out");
-  check(look(0).selectedOptions[0].textContent === "check the logs first" && look(3).selectedOptions[0].textContent === "Check the logs first."
-    && [...look(1).options].map((o) => o.textContent).join("|") === "Check the logs first.|Check the logs first|check the logs first",
-    "each menu shows how a sentence comes out");
+    && rows().every((r) => [...r.querySelectorAll("button, input")].every((i) => i.disabled)), "Style per app: off by default, four rows, greyed out");
+  check(segs(1).map((b) => b.textContent).join("|") === "Normal|No full stop|Lower case" && on(0).textContent === "Lower case"
+    && out(0) === "check the logs first" && out(3) === "Check the logs first.", "each row names its choices and shows what a sentence becomes");
   sw.checked = true; sw.dispatchEvent(new window.Event("change", { bubbles: true }));
-  check(!look(1).disabled && vcOf(1).disabled && !doc.querySelector("#st-vc-off").hidden,
-    "on: the menus work; voice commands wait for the Behaviour switch");
-  look(1).value = "1,1"; look(1).dispatchEvent(new window.Event("change", { bubbles: true }));
+  check(!segs(1)[0].disabled && vcOf(1).disabled && rows()[1].querySelector(".st-vc span").textContent === "Voice commands (off in Behaviour)",
+    "on: the choices work; a greyed voice commands switch says why");
+  segs(1)[0].click();
+  check(on(1).textContent === "Normal" && out(1) === "Check the logs first.", "picking Normal shows the full stop come back");
   let sent = null;
   const api = window.__ecoscribe.api, orig = api.save_settings;
   api.save_settings = async (x) => { sent = x; return orig(x); };
   doc.querySelector("#save").click(); await sleep(100);
   const chat = sent && sent.app_styles.find((r) => r.kind === "chat");
   check(sent && sent.per_app_styles === true && chat.full_stop === true && chat.capital === true && typeof chat.commands === "boolean"
-    && Object.keys(sent).length === 2 && !errors.length, "saves the switch and the menus: " + JSON.stringify(sent));
+    && Object.keys(sent).length === 2 && !errors.length, "saves the switch and the choices: " + JSON.stringify(sent));
 }
 { // ajustes: voice memory (t0u.32)
   const { window, doc } = await load("page=ajustes");

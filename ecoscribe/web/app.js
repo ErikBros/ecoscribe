@@ -63,7 +63,7 @@ function demoApi() {
   const dl = { running: false, error: null, models: {} };  // the demo model download
   let settings = {
     values: { hotkey: "rctrl", mic: "Anker PowerConf", languages: demoLangs.join(","), extra_languages: demoLangs.filter((c) => !["en", "sv"].includes(c)), sounds: true, overlay: true, live_text: true, insights: params.get("insights") === "1", speech_feedback: false, unmute: true, startup: true,
-      meet_mode: "prompt", meet_end: "10", meet_lang: demoLangs[0], on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: params.get("styles") === "1", self_corrections: false, command_mode: false, command_key: params.get("cmkey") || "e", voice_phrases: params.get("vp") === "1" ? { line: { en: ["new line", "next line"] }, enter: { en: ["send it", "press enter", "ship it"] } } : {}, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, update_check: true, auto_update: params.get("auto") === "1", theme: params.get("theme") || "system",
+      meet_mode: "prompt", meet_end: "10", meet_lang: demoLangs[0], on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: params.get("styles") === "1" && params.get("vc") !== "0", self_corrections: false, command_mode: false, command_key: params.get("cmkey") || "e", voice_phrases: params.get("vp") === "1" ? { line: { en: ["new line", "next line"] }, enter: { en: ["send it", "press enter", "ship it"] } } : {}, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, update_check: true, auto_update: params.get("auto") === "1", theme: params.get("theme") || "system",
       export_dir: "C:/x/Downloads", export_default: true,
       snippets: [{ trigger: "my email", text: "alex@example.com" }], replacements: [{ heard: "poll request", write: "pull request" }],
       per_app_styles: params.get("styles") === "1",
@@ -1633,7 +1633,7 @@ function formValues() {
       .filter((x) => x.heard && x.write),
     per_app_styles: $("#f-per-app").checked,
     app_styles: $$("#st-rows .st-row").map((row) => {
-      const [capital, full_stop] = $(".st-look", row).value.split(",").map((x) => x === "1");
+      const [capital, full_stop] = $('.seg[aria-checked="true"]', row).dataset.look.split(",").map((x) => x === "1");
       return { kind: row.dataset.kind, capital, full_stop, commands: $(".st-vc input", row).checked };
     }),
   };
@@ -1641,6 +1641,9 @@ function formValues() {
 // Style per app (dictado-h0m): one row per kind of app, a menu of how a sentence comes out there, and voice commands.
 const ST_SAMPLE = "Check the logs first.";
 const ST_LOOKS = [[true, true], [true, false], [false, false]];  // [capital first, full stop]
+function stName(capital, fullStop) {  // dictado-lrm: each choice says what it does, then shows it
+  return capital ? (fullStop ? "Normal" : "No full stop") : (fullStop ? "Lower case start" : "Lower case, no full stop");
+}
 function stSample(capital, fullStop) {
   let t = ST_SAMPLE;
   if (!capital) t = t[0].toLowerCase() + t.slice(1);
@@ -1652,18 +1655,21 @@ function stylesCard(rows) {
   for (const r of rows || []) {
     const row = document.createElement("div"); row.className = "row st-row"; row.dataset.kind = r.kind;
     row.innerHTML = '<span class="row-text"><span class="row-label"></span><span class="muted small"></span></span>'
-      + '<span class="st-ctl"><select class="st-look"></select>'
-      + '<label class="st-vc"><input type="checkbox" class="switch"><span class="muted small">Voice commands</span></label></span>';
+      + '<span class="st-pick"><span class="segmented st-looks" role="radiogroup"></span><span class="st-out"></span></span>'
+      + '<label class="st-vc"><input type="checkbox" class="switch"><span class="muted small">Voice commands</span></label>';
     $(".row-label", row).textContent = r.label; $(".muted", row).textContent = r.apps;
-    const sel = $(".st-look", row), mine = [!!r.capital, !!r.full_stop];
-    const looks = ST_LOOKS.some(([c, f]) => c === mine[0] && f === mine[1]) ? ST_LOOKS : [...ST_LOOKS, mine];  // a saved mix the menu lacks stays
+    const segs = $(".st-looks", row), mine = [!!r.capital, !!r.full_stop];
+    segs.setAttribute("aria-label", `${r.label}: how a sentence comes out`);
+    const looks = ST_LOOKS.some(([c, f]) => c === mine[0] && f === mine[1]) ? ST_LOOKS : [...ST_LOOKS, mine];  // a saved mix stays
     for (const [c, f] of looks) {
-      const o = document.createElement("option"); o.value = `${+c},${+f}`; o.textContent = stSample(c, f); sel.append(o);
+      const b = document.createElement("button"); b.type = "button"; b.className = "seg"; b.setAttribute("role", "radio");
+      b.dataset.look = `${+c},${+f}`; b.textContent = stName(c, f).replace("Lower case, no full stop", "Lower case");
+      b.setAttribute("aria-checked", String(c === mine[0] && f === mine[1]));
+      b.onclick = () => { for (const x of $$(".seg", segs)) x.setAttribute("aria-checked", String(x === b)); stylesState(); dirty(); };
+      segs.append(b);
     }
-    sel.value = `${+mine[0]},${+mine[1]}`;
-    sel.setAttribute("aria-label", `${r.label}: how a sentence comes out`);
     const vc = $(".st-vc input", row); vc.checked = !!r.commands;
-    sel.onchange = vc.onchange = () => { stylesState(); dirty(); };
+    vc.onchange = () => { stylesState(); dirty(); };
     body.append(row);
   }
   stylesState();
@@ -1672,10 +1678,12 @@ function stylesState() {
   const on = $("#f-per-app").checked, vc = $("#f-voice-commands").checked;
   $("#st-wrap").classList.toggle("off", !on);
   for (const row of $$("#st-rows .st-row")) {
-    $(".st-look", row).disabled = !on;
+    const cur = $('.seg[aria-checked="true"]', row).dataset.look.split(",").map((x) => x === "1");
+    $(".st-out", row).textContent = stSample(...cur);
+    for (const b of $$(".seg", row)) b.disabled = !on;
     $(".st-vc input", row).disabled = !on || !vc;
+    $(".st-vc span", row).textContent = on && !vc ? "Voice commands (off in Behaviour)" : "Voice commands";
   }
-  $("#st-vc-off").hidden = !on || vc;
 }
 // Languages you dictate in (dictado-ehs): English, plus the ones the user added from "Add a language".
 // dictado-607: a built-in language nobody ticked (Swedish) waits in the picker like any other, so the

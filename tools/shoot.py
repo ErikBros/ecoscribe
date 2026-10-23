@@ -25,6 +25,8 @@ SHOTS = {
     # Voice commands and the language card, for an English-only user and one with Spanish added (dictado-607)
     "ajustes-comandos": "page=ajustes&vc=1", "ajustes-comandos-es": "page=ajustes&vc=1&langs=en,es",
     "ajustes-idiomas": "page=ajustes&sec=words", "ajustes-idiomas-es": "page=ajustes&sec=words&langs=en,sv,es",
+    "ajustes-estilos-sin-comandos": "page=ajustes&styles=1&vc=0",  # the same with Voice commands off in Behaviour (dictado-lrm)
+    "ajustes-estilos-oscuro": "page=ajustes&styles=1&theme=dark",  # Style per app in dark (dictado-lrm)
     "reuniones": "page=reuniones", "reuniones-vacia": "page=reuniones&rec=0",
     "reunion-directo": "page=reuniones/2026-10-05_1400_retro",
     "reunion-lista": "page=reuniones/2026-10-05_0915_planering",
