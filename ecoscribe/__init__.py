@@ -1,2 +1,2 @@
 """Ecoscribe: local push-to-dictate for Windows. Tap Right Ctrl, talk, tap again."""
-__version__ = "1.19.0"
+__version__ = "1.20.0"
