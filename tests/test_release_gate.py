@@ -66,6 +66,8 @@ def test_a_failed_check_means_not_installed(tmp_path, monkeypatch, capsys):
     installed = []
     monkeypatch.setattr(gate, "check_tests", lambda: (False, "1 failed"))
     monkeypatch.setattr(gate, "check_selftest", lambda: (True, "cuda"))
+    for name in ("check_split", "check_runtime_pack", "check_runtime_published"):  # no build, no network here
+        monkeypatch.setattr(gate, name, lambda: (True, "ok"))
     monkeypatch.setattr(gate, "check_no_meeting", lambda: (True, "idle"))
     monkeypatch.setattr(gate, "install", lambda *a: installed.append(a) or (True, {}))
     monkeypatch.setattr(gate, "OUT", tmp_path)

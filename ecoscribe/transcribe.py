@@ -164,8 +164,14 @@ def credit_retry(model, audio: np.ndarray, segments, lang: str, cfg: TranscribeC
             yield SimpleNamespace(start=r.start + s.start, end=r.end + s.start, text=r.text)
 
 
-def steps(cfg: TranscribeCfg) -> list[tuple[str, str]]:
-    """Load attempts in order: configured precision, then int8_float16 on CUDA, then CPU."""
+def steps(cfg: TranscribeCfg, runtime_missing=None) -> list[tuple[str, str]]:
+    """Load attempts in order: configured precision, then int8_float16 on CUDA, then CPU. Only the CPU
+    while the GPU runtime pack is still being fetched (dictado-7e1)."""
+    from .gpu_runtime import missing
+    why = (runtime_missing or missing)()
+    if why:
+        log.info("%s: transcribing on the CPU", why)
+        return [("cpu", "int8")]
     out = [("cuda", cfg.compute_type)]
     if cfg.compute_type != "int8_float16":
         out.append(("cuda", "int8_float16"))

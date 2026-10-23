@@ -145,6 +145,10 @@ CAPABILITIES: dict[str, dict] = {
         "windows": "ecoscribe.models:ensure_local,prepare,is_ready",  # progress from the HF blobs (dictado-zpz)
         "macos": "ecoscribe.platform.macos.mlx_engine:ensure_mlx,is_cached_mlx",  # bytes from the HF blobs (dictado-kuu)
     },
+    "GPU runtime: the CUDA libraries download once, not in every installer": {
+        "windows": "ecoscribe.gpu_runtime:ensure,Fetcher,dll_root",  # %LOCALAPPDATA%\\ecoscribe\\runtime\\<version> (dictado-7e1)
+        "macos": ("not_needed", "no CUDA: mlx runs on Metal, which comes with macOS"),
+    },
     "Installer": {
         "windows": "file:packaging/windows/ecoscribe.iss",
         "macos": "file:tools/build_mac.py",  # Ecoscribe.app + .dmg, signed so permissions survive updates

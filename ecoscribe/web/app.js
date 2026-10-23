@@ -199,7 +199,9 @@ function demoApi() {
     copy_transcript: async () => ({ ok: true }),
     email_participants: async (name) => { window.__emailed = name; return { ok: true, to: ["ana@example.com", "bo@example.com"], inline: false, chars: 9000 }; },
     get_status: async () => (params.get("state") === "stopped" ? { state: "stopped", alive: false, version: "1.1.0" }
-      : { state: params.get("state") || "ready", alive: true, device: "cuda", model: "large-v3-turbo", mic: "Microphone (Anker PowerConf C20", languages: settings.values.languages.split(","), hotkey: "rctrl", version: "1.1.0" }),
+      : { state: params.get("state") || "ready", alive: true, device: "cuda", model: "large-v3-turbo", mic: "Microphone (Anker PowerConf C20", languages: settings.values.languages.split(","), hotkey: "rctrl", version: "1.1.0",
+          ...(params.get("gpurt") === "downloading" ? { device: "cpu", gpu_runtime: { state: "downloading", version: 1, done: 214e6, total: 476e6 } }
+            : params.get("gpurt") === "failed" ? { device: "cpu", gpu_runtime: { state: "failed", version: 1, error: "no connection", retry_s: 300 } } : {}) }),
     start_app: async () => ({ ok: true }),
     restart_app: async () => ({ ok: true }),
     get_settings: async () => JSON.parse(JSON.stringify(settings)),
@@ -648,7 +650,22 @@ function paintFacts(s, state) {
   $("#fact-lang").textContent = !langs.length ? none
     : langs.length === 1 ? (DICT_LANGS[langs[0]] || langs[0]) : langs.map((l) => l.toUpperCase()).join(" · ") + ", detected";
   $("#fact-lang").title = langs.map((l) => DICT_LANGS[l] || l).join(", ");
-  $("#fact-engine").textContent = s.device ? (s.device === "cuda" || s.device === "mlx" ? "GPU · fast" : "CPU · slow") : none;
+  $("#fact-engine").textContent = engineFact(s, none);
+  $("#fact-engine").title = engineTitle(s.gpu_runtime);
+}
+// dictado-7e1: while the GPU part (the CUDA libraries) downloads once, dictation runs on the CPU
+function engineFact(s, none) {
+  const rt = s.gpu_runtime || {};
+  if (rt.state === "downloading") return `CPU · getting GPU ${rt.total ? Math.floor((100 * rt.done) / rt.total) : 0}%`;
+  if (rt.state === "failed") return "CPU · GPU download failed";
+  return s.device ? (s.device === "cuda" || s.device === "mlx" ? "GPU · fast" : "CPU · slow") : none;
+}
+function engineTitle(rt) {
+  if (!rt) return "";
+  const mb = (n) => `${Math.round((n || 0) / 1e6)} MB`;
+  if (rt.state === "downloading") return `Downloading the GPU part once: ${mb(rt.done)} of ${mb(rt.total)}`;
+  if (rt.state === "failed") return `GPU part not downloaded: ${rt.error || "unknown error"}. Ecoscribe tries again by itself.`;
+  return "";
 }
 function paintHero(s, state, short, long) {
   $(".hero").dataset.state = state;

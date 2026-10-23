@@ -91,6 +91,16 @@ def _loaded_nvidia_dlls() -> list[str]:
 _KEEP: list = []
 
 
+def _runtime_dir() -> str | None:
+    """Where this process takes the CUDA DLLs from when it is the GPU runtime pack (dictado-7e1)."""
+    try:
+        from .gpu_runtime import dll_root
+        p = dll_root()
+        return str(p) if p else None
+    except Exception as e:
+        return f"error: {e}"
+
+
 def selftest(wav: str, out: str | None) -> int:
     """Proves a (frozen) build can load CUDA + VAD + model and transcribe."""
     import json
@@ -111,7 +121,8 @@ def selftest(wav: str, out: str | None) -> int:
         r = e.transcribe(audio)
         res.update(ok=e.device in ("cuda", "mlx") and bool(r.text), device=e.device, fallback=e.fallback_reason,
                    ms=r.ms, text=r.text, lang=r.lang, frozen=bool(getattr(sys, "frozen", False)),
-                   exe=sys.executable, pid=_os.getpid(), nvidia_dlls=_loaded_nvidia_dlls())
+                   exe=sys.executable, pid=_os.getpid(), nvidia_dlls=_loaded_nvidia_dlls(),
+                   gpu_runtime=_runtime_dir())
     except Exception as ex:  # report, don't crash silently in a windowed exe
         res["error"] = f"{type(ex).__name__}: {ex}"
     data = json.dumps(res, ensure_ascii=False)
@@ -151,6 +162,47 @@ def _calendar_feed(cfg, data, ctl, log):
     threading.Thread(target=loop, name="ecoscribe-calendar", daemon=True).start()
     log.info("calendar on")
     return feed
+
+
+def _start_gpu_runtime(cfg, data, status_path, ui, engine, log):
+    """dictado-7e1: the installed app fetches the CUDA libraries once (gpu_runtime.py), in the background,
+    while dictation runs on the CPU. status.json "gpu_runtime" says how far it is; the pill says when it
+    starts, fails (once) and is done. No NVIDIA driver, or one too old for CUDA 12: nothing to fetch."""
+    from . import gpu, gpu_runtime, status
+    m = gpu_runtime.manifest()
+    if cfg.whisper.device == "cpu" or not gpu_runtime.needed(m):
+        status.write(status_path, gpu_runtime=None)  # nothing to fetch: no word left from an earlier run
+        return None
+    base = {"version": m["version"]}
+    if gpu_runtime.dll_root(data, m):
+        status.write(status_path, gpu_runtime={"state": "ready", **base})
+        return None
+    driver = gpu.driver_cuda()
+    if not driver or driver < m.get("min_driver", gpu_runtime.MIN_DRIVER):
+        log.info("GPU runtime not fetched: NVIDIA driver runs CUDA %s, needs %s", driver, m.get("min_driver"))
+        status.write(status_path, gpu_runtime={"state": "no_gpu" if not driver else "old_driver", **base})
+        return None
+    told: set = set()
+
+    def on_state(state, **info):
+        status.write(status_path, gpu_runtime={"state": state, **base, **info})
+        if state == "downloading" and state not in told:
+            told.add(state)
+            ui.flash(f"Getting Ecoscribe's GPU part ({int(m['size']) // 10**6} MB, once). "
+                     "Dictation works on the CPU meanwhile.", 8.0)
+        elif state == "failed" and state not in told:
+            told.add(state)
+            ui.flash(f"Couldn't get the GPU part: {info.get('error')}. Dictating on the CPU; "
+                     f"trying again in {max(1, int(info.get('retry_s', 60)) // 60)} min.", 10.0)
+        elif state == "ready":
+            winutil.add_cuda_dll_dirs()
+            if hasattr(engine, "renew"):
+                engine.renew()  # the worker on the CPU makes way: the next dictation runs on the GPU
+            elif getattr(engine, "device", None) == "cpu":
+                log.info("GPU runtime ready: the in-process engine uses it from the next start")
+            if told:
+                ui.flash("GPU part installed: dictation runs on the GPU now.", 6.0)
+    return gpu_runtime.Fetcher(data, m, on_state, legacy=gpu_runtime.legacy_dir()).start()
 
 
 def _start_meetings(cfg, data, ui, root, log, app=None):
@@ -384,6 +436,11 @@ def main(argv=None) -> int:
     app.start()
 
     meet_ctl, watch = _start_meetings(cfg, data, ui, root, log, app=app) if not args.test else (None, None)
+    if not args.test:
+        try:
+            _start_gpu_runtime(cfg, data, status_path, ui, engine, log)
+        except Exception:
+            log.exception("GPU runtime check failed; dictation runs on the CPU")
 
     def quit_app():
         log.info("quit requested")

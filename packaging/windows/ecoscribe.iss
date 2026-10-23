@@ -41,6 +41,9 @@ Name: "en"; MessagesFile: "compiler:Default.isl"
 Name: "startup"; Description: "Start Ecoscribe with Windows"; GroupDescription: "Options:"
 
 [Files]
+; no CUDA DLLs since dictado-7e1: the app downloads the GPU runtime pack once into {localappdata}\ecoscribe\runtime.
+; An update over an older install leaves {app}\_internal\nvidia alone: the app moves those DLLs into the runtime
+; folder when they are the same files, so that update downloads nothing.
 Source: "{#DistDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
@@ -62,6 +65,8 @@ Type: filesandordirs; Name: "{localappdata}\Programs\Dictado"
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"
+; the GPU runtime pack the app downloaded (dictado-7e1): NVIDIA's DLLs, no user data
+Type: filesandordirs; Name: "{localappdata}\ecoscribe\runtime"
 
 [Code]
 const

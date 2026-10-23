@@ -1,22 +1,16 @@
 # PyInstaller spec for Ecoscribe.exe (onedir). Build with: python tools/build.py
-import os
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
 
 APP = Path(SPECPATH).parents[1]  # packaging/windows -> the repo
-SITE = Path(os.environ.get("ECOSCRIBE_SITE", ""))
-KEEP = [l.strip() for l in (Path(SPECPATH) / "cuda_dlls.txt").read_text().splitlines()
-        if l.strip() and not l.startswith("#")] if (Path(SPECPATH) / "cuda_dlls.txt").exists() else None
-
+# No CUDA DLLs in the app (dictado-7e1): they are the GPU runtime pack (cuda_dlls.txt, tools/runtime_pack.py),
+# downloaded once by the app. tools/build.py fails the build if any of them ends up in dist anyway.
 binaries = collect_dynamic_libs("ctranslate2")
-for pkg in sorted((SITE / "nvidia").glob("*/bin")):
-    for dll in pkg.glob("*.dll"):
-        if KEEP is None or dll.name in KEEP:
-            binaries.append((str(dll), f"nvidia/{pkg.parent.name}/bin"))
 
 datas = collect_data_files("faster_whisper") + [(str(APP / "ecoscribe" / "web"), "ecoscribe/web")] \
     if (APP / "ecoscribe" / "web").exists() else collect_data_files("faster_whisper")
+datas += [(str(APP / "ecoscribe" / "gpu_runtime.json"), "ecoscribe")]  # which GPU runtime this app downloads
 datas += collect_data_files("tzdata")  # zoneinfo reads the zone files from the tzdata package
 icon = Path(SPECPATH) / "ecoscribe.ico"
 
