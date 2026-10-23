@@ -53,10 +53,33 @@ def spawn(args: list[str]) -> subprocess.Popen:
     return subprocess.Popen(exe, cwd=_package_parent(), creationflags=flags, close_fds=True)
 
 
+UI_CLASS = "WindowsForms10."  # pywebview's window on Windows
+
+
+def find_ui() -> int:
+    """The user's open Ecoscribe window, or 0 (dictado-le7). Only a visible pywebview window counts: Windows 11
+    gives a browser tab titled "Ecoscribe" an Explorer stand-in window with that title, and the tests' quiet
+    copies are hidden windows with it too; taking either for the app's window meant Open showed nothing."""
+    import win32gui
+    found: list[int] = []
+
+    def match(hwnd, _):
+        if (win32gui.GetWindowText(hwnd) == UI_TITLE and win32gui.IsWindowVisible(hwnd)
+                and win32gui.GetClassName(hwnd).startswith(UI_CLASS)):
+            found.append(hwnd)
+        return not found
+
+    try:
+        win32gui.EnumWindows(match, None)
+    except Exception:  # EnumWindows raises when the callback stops it early
+        pass
+    return found[0] if found else 0
+
+
 def focus_ui() -> bool:
     """Bring an already open Ecoscribe window to the front. True if there was one."""
     import win32gui
-    hwnd = win32gui.FindWindow(None, UI_TITLE)
+    hwnd = find_ui()
     if not hwnd:
         return False
     try:
