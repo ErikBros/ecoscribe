@@ -1584,47 +1584,48 @@ function formValues() {
     replacements: $$(".rep").map((r) => ({ heard: $(".rep-heard", r).value.trim(), write: $(".rep-write", r).value.trim() }))
       .filter((x) => x.heard && x.write),
     per_app_styles: $("#f-per-app").checked,
-    app_styles: $$("#st-rows tr").map((tr) => ({ kind: tr.dataset.kind,
-      ...Object.fromEntries(ST_OPTS.map(([o]) => [o, $(`[data-opt="${o}"]`, tr).checked])) })),
+    app_styles: $$("#st-rows .st-row").map((row) => {
+      const [capital, full_stop] = $(".st-look", row).value.split(",").map((x) => x === "1");
+      return { kind: row.dataset.kind, capital, full_stop, commands: $(".st-vc input", row).checked };
+    }),
   };
 }
-// Style per app (dictado-h0m): one row per kind of app, three switches, and how a sentence comes out there.
-const ST_OPTS = [["capital", "Capital at the start"], ["full_stop", "Full stop at the end"], ["commands", "Voice commands"]];
+// Style per app (dictado-h0m): one row per kind of app, a menu of how a sentence comes out there, and voice commands.
 const ST_SAMPLE = "Check the logs first.";
-function stSample(st) {
+const ST_LOOKS = [[true, true], [true, false], [false, false]];  // [capital first, full stop]
+function stSample(capital, fullStop) {
   let t = ST_SAMPLE;
-  if (!st.capital) t = t[0].toLowerCase() + t.slice(1);
-  if (!st.full_stop) t = t.replace(/\.$/, "");
+  if (!capital) t = t[0].toLowerCase() + t.slice(1);
+  if (!fullStop) t = t.replace(/\.$/, "");
   return t;
 }
 function stylesCard(rows) {
   const body = $("#st-rows"); body.innerHTML = "";
   for (const r of rows || []) {
-    const tr = document.createElement("tr"); tr.dataset.kind = r.kind;
-    const th = document.createElement("th"); th.scope = "row";
-    th.innerHTML = '<span class="row-label"></span><span class="muted small"></span>';
-    th.children[0].textContent = r.label; th.children[1].textContent = r.apps;
-    tr.append(th);
-    for (const [o, label] of ST_OPTS) {
-      const td = document.createElement("td"), i = document.createElement("input"); td.className = "st-opt";
-      i.type = "checkbox"; i.className = "switch"; i.dataset.opt = o; i.checked = !!r[o];
-      i.setAttribute("aria-label", `${r.label}: ${label}`);
-      i.onchange = () => { stylesState(); dirty(); };
-      td.append(i); tr.append(td);
+    const row = document.createElement("div"); row.className = "row st-row"; row.dataset.kind = r.kind;
+    row.innerHTML = '<span class="row-text"><span class="row-label"></span><span class="muted small"></span></span>'
+      + '<span class="st-ctl"><select class="st-look"></select>'
+      + '<label class="st-vc"><input type="checkbox" class="switch"><span class="muted small">Voice commands</span></label></span>';
+    $(".row-label", row).textContent = r.label; $(".muted", row).textContent = r.apps;
+    const sel = $(".st-look", row), mine = [!!r.capital, !!r.full_stop];
+    const looks = ST_LOOKS.some(([c, f]) => c === mine[0] && f === mine[1]) ? ST_LOOKS : [...ST_LOOKS, mine];  // a saved mix the menu lacks stays
+    for (const [c, f] of looks) {
+      const o = document.createElement("option"); o.value = `${+c},${+f}`; o.textContent = stSample(c, f); sel.append(o);
     }
-    const td = document.createElement("td"), sample = document.createElement("span"); sample.className = "st-sample";
-    td.append(sample); tr.append(td);
-    body.append(tr);
+    sel.value = `${+mine[0]},${+mine[1]}`;
+    sel.setAttribute("aria-label", `${r.label}: how a sentence comes out`);
+    const vc = $(".st-vc input", row); vc.checked = !!r.commands;
+    sel.onchange = vc.onchange = () => { stylesState(); dirty(); };
+    body.append(row);
   }
   stylesState();
 }
 function stylesState() {
   const on = $("#f-per-app").checked, vc = $("#f-voice-commands").checked;
   $("#st-wrap").classList.toggle("off", !on);
-  for (const tr of $$("#st-rows tr")) {
-    const st = Object.fromEntries(ST_OPTS.map(([o]) => [o, $(`[data-opt="${o}"]`, tr).checked]));
-    $(".st-sample", tr).textContent = stSample(st);
-    for (const i of $$("input", tr)) i.disabled = !on || (i.dataset.opt === "commands" && !vc);
+  for (const row of $$("#st-rows .st-row")) {
+    $(".st-look", row).disabled = !on;
+    $(".st-vc input", row).disabled = !on || !vc;
   }
   $("#st-vc-off").hidden = !on || vc;
 }
