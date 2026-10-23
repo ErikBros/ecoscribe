@@ -2,9 +2,10 @@
 once a day, from a background thread of the app; the window's Home shows a quiet notice with a
 Download link to the release page (the .exe and the .dmg are both there).
 
-State lives in <data dir>/update.json: when we last asked, what the latest release was, and the
-version the user dismissed (hidden until a newer one appears). The app writes the first two, the
-window the last; each write reloads the file and changes only its own keys.
+State lives in <data dir>/update.json: when we last asked, what the latest release was (and its
+installer, `asset`, for selfupdate.py), and the version the user dismissed (hidden until a newer one
+appears) or okayed for Install when idle (`install`). The app writes the first ones and the self-update
+progress, the window `dismissed` and `install`; each write reloads the file and changes only its own keys.
 Pure apart from the file and the one fetch, which tests replace."""
 from __future__ import annotations
 
@@ -24,7 +25,7 @@ API_URL = f"https://api.github.com/repos/{REPO}/releases/latest"
 STATE = "update.json"
 EVERY_S = 24 * 3600  # once a day at most
 FIRST_DELAY_S = 60   # after start: never in the way of loading the model
-TICK_S = 3600        # how often the thread looks whether a day has passed
+TICK_S = 60          # how often the thread looks whether a day has passed (and at the self-update)
 TIMEOUT_S = 5.0
 _TAG = re.compile(r"^v?(\d+)\.(\d+)(?:\.(\d+))?$")
 
@@ -52,18 +53,28 @@ def due(state: dict, now: float, every: float = EVERY_S) -> bool:
     return now - last >= every or last > now + 60  # the clock went back: ask again
 
 
-def fetch_latest(timeout: float = TIMEOUT_S, opener=urllib.request.urlopen) -> str | None:
-    """The latest release's tag, or None (offline, rate limited, no release, a bad answer). Never raises."""
+def fetch_release(timeout: float = TIMEOUT_S, opener=urllib.request.urlopen) -> dict | None:
+    """The latest release: {"tag", "asset"} (asset: its checked Windows installer, or None), or None
+    (offline, rate limited, no release, a bad answer). Never raises."""
     req = urllib.request.Request(API_URL, headers={"Accept": "application/vnd.github+json",
                                                    "User-Agent": "Ecoscribe-update-check"})
     try:
         with opener(req, timeout=timeout) as r:
-            data = json.loads(r.read(200_000).decode("utf-8"))
+            data = json.loads(r.read(500_000).decode("utf-8"))
     except Exception as e:  # noqa: BLE001  offline, DNS, TLS, 403/404, junk: all mean "don't know"
         log.info("update check: no answer (%s)", type(e).__name__)
         return None
     tag = data.get("tag_name") if isinstance(data, dict) else None
-    return tag if parse(tag) else None
+    if not parse(tag):
+        return None
+    from .selfupdate import pick_asset
+    return {"tag": tag, "asset": pick_asset(data)}
+
+
+def fetch_latest(timeout: float = TIMEOUT_S, opener=urllib.request.urlopen) -> str | None:
+    """The latest release's tag, or None."""
+    r = fetch_release(timeout, opener)
+    return r["tag"] if r else None
 
 
 def load(data_dir: Path) -> dict:
@@ -87,17 +98,20 @@ def _update(data_dir: Path, **keys) -> dict:
     return state
 
 
-def check(data_dir: Path, now: float | None = None, fetch=fetch_latest, every: float = EVERY_S) -> dict:
+def check(data_dir: Path, now: float | None = None, fetch=fetch_release, every: float = EVERY_S) -> dict:
     """Ask GitHub if a day has passed since the last time (a failed ask counts too: once a day at
-    most, whatever happens). Keeps the last known release when the ask fails."""
+    most, whatever happens). Keeps the last known release when the ask fails. fetch returns a tag or
+    fetch_release's {"tag", "asset"}."""
     now = time.time() if now is None else now
     state = load(data_dir)
     if not due(state, now, every):
         return state
-    tag = fetch()
+    got = fetch()
     keys = {"checked_at": now}
-    if tag:
-        keys["latest"] = tag
+    if isinstance(got, dict) and got.get("tag"):
+        keys["latest"], keys["asset"] = got["tag"], got.get("asset")
+    elif got:
+        keys["latest"] = got
     return _update(data_dir, **keys)
 
 
@@ -119,17 +133,26 @@ def dismiss(data_dir: Path, version: str) -> None:
         _update(data_dir, dismissed=str(version).lstrip("v"))
 
 
-def start(data_dir: Path, enabled: bool, fetch=fetch_latest, delay_s: float = FIRST_DELAY_S) -> threading.Thread | None:
-    """The app's background thread: first look a minute after start, then hourly; asks only when due."""
+def start(data_dir: Path, enabled: bool, fetch=fetch_release, delay_s: float = FIRST_DELAY_S,
+          updater=None) -> threading.Thread | None:
+    """The app's background thread: first look a minute after start, then every minute; asks GitHub
+    only when due. updater: selfupdate.SelfUpdater (dictado-nmo), whose tick() gets and installs a new
+    version when allowed and safe."""
     if not enabled:
         log.info("update check off")
         return None
 
     def loop():
         time.sleep(delay_s)
+        last = None
         while True:
             try:
                 check(data_dir, fetch=fetch)
+                if updater is not None:
+                    r = updater.tick()
+                    if r != last:
+                        log.info("self-update: %s", r)
+                        last = r
             except Exception:  # noqa: BLE001  never take the app down over this
                 log.exception("update check failed")
             time.sleep(TICK_S)

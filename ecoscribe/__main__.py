@@ -449,8 +449,26 @@ def main(argv=None) -> int:
         except Exception:
             log.exception("GPU runtime check failed; dictation runs on the CPU")
 
+    pending_install: list = []  # dictado-nmo: (installer, asset, relaunch) to start as the app ends
+
+    from . import selfupdate
+    from .meetings import read_state as read_meetings
+    updater = selfupdate.SelfUpdater(
+        data, __version__, auto=lambda: cfg.ui.auto_update,
+        meetings=lambda: meet_ctl.state() if meet_ctl else read_meetings(data),
+        app_busy=lambda: app.state != "idle" or app._pending > 0,
+        last_dictation=lambda: app._t_start or None,  # monotonic, like the updater's clock
+        install=lambda p, a, relaunch: root.after(0, lambda: install_now(p, a, relaunch)))
+
     def quit_app():
         log.info("quit requested")
+        if not pending_install and not args.test:  # before the meeting stops: a call saving now means no install
+            try:
+                r = updater.at_quit()
+                if r:
+                    pending_install.append((*r, False))
+            except Exception:
+                log.exception("self-update: at quit")
         status.write(status_path, state="stopped")  # the watchdog reads this: a quit, not a crash
         if meet_ctl:
             meet_ctl.stop_meeting()  # the worker finalizes on its own; a queued job waits for the next start
@@ -496,6 +514,15 @@ def main(argv=None) -> int:
                        if len(cfg.whisper.languages) > 1 else None,
                        dict_lang=lambda: app.next_lang or "", set_dict_lang=lambda c: app.set_next_language(c),
                        **meet_kw)
+
+    def install_now(path, asset, relaunch):
+        """dictado-nmo, on the main thread: still nothing busy? Then quit; the installer starts as we end."""
+        why = updater.blockers()
+        if why:
+            log.info("self-update: not now (%s)", "; ".join(why))
+            return
+        pending_install.append((path, asset, relaunch))
+        quit_app()
 
     def restart():
         """Settings were saved: come back with the new config (a clean re-exec)."""
@@ -604,7 +631,11 @@ def main(argv=None) -> int:
     threading.Thread(target=load_model, name="ecoscribe-load", daemon=True).start()
     if not args.test:  # dictado-cjk: a newer version? once a day, in the background; Home shows it
         from . import updates
-        updates.start(data, cfg.ui.update_check)
+        try:
+            selfupdate.after_start(data, __version__)  # dictado-nmo: did the last install work?
+        except Exception:
+            log.exception("self-update: after start")
+        updates.start(data, cfg.ui.update_check, updater=updater if selfupdate.SUPPORTED else None)
     if not args.test and (sys.platform == "darwin" or getattr(sys, "frozen", False)
                           or os.environ.get("ECOSCRIBE_SUPERVISE")):
         from . import supervise
@@ -629,6 +660,19 @@ def main(argv=None) -> int:
         hook.stop()
         if gate:
             gate.restore()
+        for path, asset, relaunch in pending_install[:1]:  # last of all: the installer stops what's left
+            started = False
+            try:
+                started = selfupdate.run_installer(data, path, asset, relaunch)
+            except Exception:
+                log.exception("self-update: installer not started")
+            if not started and relaunch:  # quit only to install: don't leave the user without Ecoscribe
+                try:
+                    winutil.release_instance()
+                    ipc.spawn([a for a in (sys.argv[1:] if argv_in is None else argv_in) if a != "--restarted"]
+                              + ["--restarted"])
+                except Exception:
+                    log.exception("self-update: Ecoscribe not started again")
         log.info("ecoscribe stopped")
     winutil.hard_exit(0)
 

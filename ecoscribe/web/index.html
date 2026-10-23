@@ -60,6 +60,7 @@
         <svg class="update-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
         <p class="update-text"><strong id="update-title">A new version of Ecoscribe is out</strong>
           <span id="update-sub">Your settings and history stay as they are.</span></p>
+        <button type="button" class="btn btn-primary btn-sm" id="update-idle" hidden>Install when idle</button>  <!-- dictado-nmo -->
         <button type="button" class="btn btn-primary btn-sm" id="update-get">Download</button>
         <button type="button" class="home-tip-x" id="update-x" aria-label="Not now" title="Hide until a newer version is out">×</button>
       </div>
@@ -455,6 +456,8 @@
             <input type="checkbox" class="switch" name="startup" id="f-startup"></label>
           <label class="row toggle-row"><span class="row-text"><span class="row-label">Check for new versions</span><span class="muted small">Once a day Ecoscribe asks GitHub for the newest version number and says so on Home when there is one. Nothing from your dictations or meetings is sent.</span></span>
             <input type="checkbox" class="switch" name="update_check" id="f-update-check"></label>
+          <label class="row toggle-row" id="row-auto-update"><span class="row-text"><span class="row-label">Install new versions by itself</span><span class="muted small">Gets a new version in the background and installs it when you step away from the computer or quit Ecoscribe. Never during a call, while a meeting is being saved or while you dictate.</span></span>
+            <input type="checkbox" class="switch" name="auto_update" id="f-auto-update"></label>
         </div>
         <div class="card group" data-sec="dictation" data-card="claude">
           <div class="group-head"><h3>With Claude</h3><p class="muted">These send the text to Claude through your Claude Code login on this PC, and nothing else. Off until you turn them on.</p></div>

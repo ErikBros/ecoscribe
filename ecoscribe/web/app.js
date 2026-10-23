@@ -60,7 +60,7 @@ function demoApi() {
   const dl = { running: false, error: null, models: {} };  // the demo model download
   let settings = {
     values: { hotkey: "rctrl", mic: "Anker PowerConf", languages: "en", sounds: true, overlay: true, live_text: true, insights: params.get("insights") === "1", speech_feedback: false, unmute: true, startup: true,
-      meet_mode: "prompt", meet_end: "10", meet_lang: "sv", on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: false, self_corrections: false, command_mode: false, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, update_check: true,
+      meet_mode: "prompt", meet_end: "10", meet_lang: "sv", on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: false, self_corrections: false, command_mode: false, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, update_check: true, auto_update: params.get("auto") === "1",
       export_dir: "C:/x/Downloads", export_default: true,
       snippets: [{ trigger: "my email", text: "alex@example.com" }], replacements: [{ heard: "poll request", write: "pull request" }] },
     options: {
@@ -75,6 +75,7 @@ function demoApi() {
     },
     can_startup: true,
     speakers_addon: params.get("addon") !== "0",
+    auto_update_supported: !MAC,
     voice_command_list: [{ what: "Paragraph break", en: '"new paragraph"', es: '"nuevo párrafo", "punto y aparte"', sv: '"nytt stycke"' },
       { what: "Line break", en: '"new line"', es: '"nueva línea"', sv: '"ny rad"' },
       { what: "Press Enter after the text (at the very end only)", en: '"send it", "press enter"', es: '"envíalo", "enviar"', sv: '"skicka"' }],
@@ -170,7 +171,15 @@ function demoApi() {
     voices_info: async () => window.__noVoices ? { count: 0, names: [], on: true } : { count: 2, names: ["Ana", "Tom"], on: true },
     crashes: async () => (params.get("crash") === "1" ? { items: [{ name: "2026-10-06_140325", when: "2026-10-06 140325", exit: MAC ? "unknown" : "0xC0000005 (access violation)" }], gave_up: false } : { items: [], gave_up: false }),
     copy_crash_report: async () => ({ ok: true }), dismiss_crash: async () => ({ ok: true }),
-    update_notice: async () => (params.get("update") === "1" && !window.__updDismissed ? { version: "1.18.0", url: "https://github.com/ErikBros/ecoscribe/releases/tag/v1.18.0" } : {}),
+    update_notice: async () => {  // update=1 offer, dl downloading, ready, failed (dictado-nmo)
+      const u = params.get("update");
+      if (!u || window.__updDismissed) return {};
+      const n = { version: "1.18.0", url: "https://github.com/ErikBros/ecoscribe/releases/tag/v1.18.0" };
+      if (MAC) return n;
+      const install = window.__updInstall ? "downloading" : { 1: "offer", dl: "downloading", ready: "ready", failed: "failed" }[u] || "offer";
+      return { ...n, install, ...(install === "downloading" ? { pct: 42 } : {}) };
+    },
+    install_update_when_idle: async (v) => { window.__updInstall = v; return { ok: true }; },
     open_update: async () => { window.__updOpened = true; return { ok: true }; },
     dismiss_update: async (v) => { window.__updDismissed = v; return { ok: true }; },
     copy_debug_info: async () => ({ ok: true }), open_logs_folder: async () => ({ ok: true }),
@@ -782,10 +791,28 @@ async function updateNote() {  // dictado-cjk: a newer version is out (the app c
   const box = $("#update-note");
   box.hidden = !n.version;
   if (box.hidden) return;
-  $("#update-title").textContent = `Ecoscribe ${n.version} is out`;
-  $("#update-sub").textContent = `You have ${lastStatus?.version || "an older version"}. Your settings and history stay as they are.`;
-  $("#update-get").onclick = () => api.open_update();
+  // dictado-nmo: offer -> downloading -> ready (installs when idle or at Quit, never in a call); failed -> Download
+  const step = n.install || "";
+  const have = `You have ${lastStatus?.version || "an older version"}.`;
+  const [title, sub] = {
+    "": [`Ecoscribe ${n.version} is out`, `${have} Your settings and history stay as they are.`],
+    offer: [`Ecoscribe ${n.version} is out`, `${have} Your settings and history stay as they are.`],
+    downloading: [`Getting Ecoscribe ${n.version} ready`, n.error || `Downloading in the background, ${n.pct || 0}%. It installs when you step away or quit, never during a call.`],
+    ready: [`Ecoscribe ${n.version} is ready`, "It installs when you step away from the computer or quit Ecoscribe. Never during a call."],
+    failed: [`Ecoscribe ${n.version} is out`, "It couldn't install by itself. Download it and run the installer."],
+  }[step] || [`Ecoscribe ${n.version} is out`, have];
+  box.dataset.step = step;
+  $("#update-title").textContent = title;
+  $("#update-sub").textContent = sub;
+  const get = $("#update-get"), idle = $("#update-idle");
+  idle.hidden = step !== "offer";
+  get.hidden = step === "downloading" || step === "ready";
+  get.className = step === "offer" ? "btn btn-sm" : "btn btn-primary btn-sm";
+  get.onclick = () => api.open_update();
+  idle.onclick = async () => { await api.install_update_when_idle(n.version); updateNote(); };
   $("#update-x").onclick = async () => { await api.dismiss_update(n.version); updateNote(); };
+  clearTimeout(updateNote.timer);
+  if (step === "downloading") updateNote.timer = setTimeout(() => { if (!box.hidden && current === "inicio") updateNote(); }, 5000);
 }
 
 async function renderInicio() {  // the dictate banner, today's numbers, recent dictations (dictado-6oe.3)
@@ -1539,7 +1566,7 @@ function formValues() {
     speakers: $("#f-speakers").checked, voice_commands: $("#f-voice-commands").checked,
     self_corrections: $("#f-self-corrections").checked, command_mode: $("#f-command-mode").checked,
     screen_names: $("#f-screen-names").checked, hold_to_talk: $("#f-hold").checked, numpad_enter: $("#f-numpad-enter").checked,
-    voice_memory: $("#f-voice-memory").checked, debug_log: $("#f-debug-log").checked, update_check: $("#f-update-check").checked, calendar_url: $("#f-calendar").value.trim(), my_name: $("#f-my-name").value.trim(),
+    voice_memory: $("#f-voice-memory").checked, debug_log: $("#f-debug-log").checked, update_check: $("#f-update-check").checked, auto_update: $("#f-auto-update").checked, calendar_url: $("#f-calendar").value.trim(), my_name: $("#f-my-name").value.trim(),
     vocabulary: $("#f-vocabulary").value.split("\n").map((w) => w.trim()).filter(Boolean).join("\n"),
     snippets: $$(".snip").map((r) => ({ trigger: $(".snip-trigger", r).value.trim().toLowerCase().replace(/\s+/g, " "),
                                        text: $(".snip-text", r).value }))
@@ -1682,6 +1709,8 @@ async function renderSettings() {
   $("#f-my-name").value = s.values.my_name || "";
   $("#f-debug-log").checked = !!s.values.debug_log;
   $("#f-update-check").checked = s.values.update_check !== false;
+  $("#f-auto-update").checked = !!s.values.auto_update;  // dictado-nmo: off by default
+  $("#row-auto-update").hidden = !s.auto_update_supported;  // the Mac: Download only (dictado-6gr)
   const vc = $("#vc-rows"); vc.innerHTML = "";
   if (params.get("vc") === "1") $("#vc-list").open = true;  // screenshot
   for (const r of s.voice_command_list || []) {
