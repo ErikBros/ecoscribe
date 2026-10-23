@@ -149,7 +149,7 @@ class MeetingsCfg:
     mode: str = "prompt"
     grace_s: float = 10  # mic released this long = the call ended (mute toggles, quick rejoins); 20 felt too long (dictado-mtc)
     silence_stop_s: float = 180  # backup when the end is missed: both tracks silent this long
-    default_lang: str = "sv"
+    default_lang: str = "en"  # English by default, like dictation (dictado-607); a saved config keeps its own
     speakers: bool = True  # tell remote voices apart after a call (needs the speaker add-on)
     voice_memory: bool = True  # t0u.32: name a voice once, recognised in later calls (local voices.json)
     my_name: str = ""  # the user's own lines show this instead of "Me" (window, exports); empty = "Me"

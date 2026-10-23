@@ -396,7 +396,8 @@ def main(argv=None) -> int:
         log.exception("bad config, using defaults")
         cfg = config_mod.Config()
     from . import meetui
-    meetui.set_langs(cfg.whisper.extra_languages)  # dictado-ehs: English + Swedish + the added languages
+    meetui.set_langs(cfg.whisper.extra_languages, cfg.whisper.languages,  # dictado-607: the user's own languages
+                     cfg.meetings.default_lang)
     if cfg.ui.debug_log:  # Settings > Troubleshooting > Detailed logging (t0u.37)
         logging.getLogger().setLevel(logging.DEBUG)
         log.info("detailed logging on")

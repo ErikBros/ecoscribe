@@ -57,6 +57,7 @@ class Clock:
 def make(tmp_path, mode="prompt", langs=None):
     cfg = Config()
     cfg.meetings.mode = mode
+    cfg.meetings.default_lang = "sv"  # a saved config of a Swedish speaker (the default is English since dictado-607)
     if langs:
         (tmp_path / "meeting_langs.json").write_text(json.dumps(langs), encoding="utf-8")
     ctl, world, clock, prompts = FakeController(), World(), Clock(), []

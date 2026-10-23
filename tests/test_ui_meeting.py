@@ -221,6 +221,8 @@ def test_tray_language_submenu():
         items = meetui.tray_lang_items("el")
         assert [n for _, n, _ in items] == ["English", "Swedish", "Spanish", "Greek", "Mixed: EN · SV · ES · EL", "Detect"]
         assert [c for c, _, ticked in items if ticked] == ["el"]  # the last language used is ticked
+        meetui.set_langs([], ["en"], "en")  # dictado-607: an English-only user sees no Swedish
+        assert [n for _, n, _ in meetui.tray_lang_items("en")] == ["English", "Detect"]
     finally:
         meetui.set_langs([])
     assert meetui.tray_recording(EMPTY) is False and meetui.tray_recording(st()) is True

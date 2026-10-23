@@ -201,12 +201,18 @@ SIZES = {"large-v3-turbo": 1_620_000_000, "Systran/faster-whisper-large-v3": 3_0
 def setup_models(wcfg, languages) -> list[dict]:
     """The two speech models Ecoscribe uses, fast first. `required`: the one dictation in
     `languages` runs on; the other is recommended (meetings and files use both)."""
-    from .languages import needs_big_model
+    from .languages import ALL, TURBO_OK, needs_big_model
     big = needs_big_model(languages)
+    # dictado-607: named with the user's own languages, never a fixed "Swedish, Greek" for everyone
+    names = lambda cs: " and ".join(filter(None, [", ".join(ALL.get(c, c) for c in cs[:-1]), ALL.get(cs[-1], cs[-1])]))  # noqa: E731
+    fast = [c for c in languages or [] if c in TURBO_OK]
+    slow = [c for c in languages or [] if c not in TURBO_OK]
     return [
-        {"name": wcfg.model, "label": "Fast", "use": "English, Spanish and similar; finds the language in meetings and files",
+        {"name": wcfg.model, "label": "Fast", "use": (f"For your {names(fast)}" if fast else "English, Spanish and similar")
+         + "; finds the language in meetings and files",
          "size": SIZES.get(wcfg.model, 1_620_000_000), "required": not big},
-        {"name": wcfg.sv_model, "label": "Most accurate", "use": "Swedish, Greek and other languages; meetings and files in them",
+        {"name": wcfg.sv_model, "label": "Most accurate", "use": (f"For your {names(slow)}" if slow else "Languages the fast one isn't good at")
+         + "; meetings and files in them",
          "size": SIZES.get(wcfg.sv_model, 3_090_000_000), "required": big},
     ]
 

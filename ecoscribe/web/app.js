@@ -54,13 +54,15 @@ function demoInsights(days) {  // invented numbers and text for the demo and scr
   };
 }
 
+const DEMO_LANG_NAMES = { en: "English", sv: "Swedish", es: "Spanish", el: "Greek", de: "German", fr: "French" };
 function demoApi() {
+  const demoLangs = (params.get("langs") || "en").split(",").filter((c) => DEMO_LANG_NAMES[c]);  // ?langs=en,sv,es
   const now = new Date();
   const iso = (mins) => new Date(now - mins * 60000).toISOString().slice(0, 19);
   const dl = { running: false, error: null, models: {} };  // the demo model download
   let settings = {
-    values: { hotkey: "rctrl", mic: "Anker PowerConf", languages: "en", sounds: true, overlay: true, live_text: true, insights: params.get("insights") === "1", speech_feedback: false, unmute: true, startup: true,
-      meet_mode: "prompt", meet_end: "10", meet_lang: "sv", on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: params.get("styles") === "1", self_corrections: false, command_mode: false, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, update_check: true, auto_update: params.get("auto") === "1", theme: params.get("theme") || "system",
+    values: { hotkey: "rctrl", mic: "Anker PowerConf", languages: demoLangs.join(","), extra_languages: demoLangs.filter((c) => !["en", "sv"].includes(c)), sounds: true, overlay: true, live_text: true, insights: params.get("insights") === "1", speech_feedback: false, unmute: true, startup: true,
+      meet_mode: "prompt", meet_end: "10", meet_lang: demoLangs[0], on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: params.get("styles") === "1", self_corrections: false, command_mode: false, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, update_check: true, auto_update: params.get("auto") === "1", theme: params.get("theme") || "system",
       export_dir: "C:/x/Downloads", export_default: true,
       snippets: [{ trigger: "my email", text: "alex@example.com" }], replacements: [{ heard: "poll request", write: "pull request" }],
       per_app_styles: params.get("styles") === "1",
@@ -78,14 +80,15 @@ function demoApi() {
       meet_modes: [{ value: "prompt", label: "Ask" }, { value: "auto", label: "Start by itself" }, { value: "off", label: "Don't detect" }],
       themes: [{ value: "system", label: MAC ? "Match macOS" : "Match Windows" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }],
       meet_ends: [{ value: "5", label: "5 seconds" }, { value: "10", label: "10 seconds" }, { value: "15", label: "15 seconds" }, { value: "30", label: "30 seconds" }, { value: "60", label: "1 minute" }, { value: "120", label: "2 minutes" }],
-      meet_langs: [{ value: "en", label: "English" }, { value: "sv", label: "Swedish" }, { value: "en,sv", label: "English + Swedish" }, { value: "auto", label: "Detect" }],
+      meet_langs: [...demoLangs.map((c) => ({ value: c, label: DEMO_LANG_NAMES[c] })),  // only the user's (dictado-607)
+        ...(demoLangs.length > 1 ? [{ value: demoLangs.join(","), label: demoLangs.map((c) => DEMO_LANG_NAMES[c]).join(" + ") }] : []), { value: "auto", label: "Detect" }],
     },
     can_startup: true,
     speakers_addon: params.get("addon") !== "0",
     auto_update_supported: !MAC,
-    voice_command_list: [{ what: "Paragraph break", en: '"new paragraph"', es: '"nuevo párrafo", "punto y aparte"', sv: '"nytt stycke"' },
-      { what: "Line break", en: '"new line"', es: '"nueva línea"', sv: '"ny rad"' },
-      { what: "Press Enter after the text (at the very end only)", en: '"send it", "press enter"', es: '"envíalo", "enviar"', sv: '"skicka"' }],
+    voice_command_list: [{ key: "paragraph", what: "Paragraph break", en: '"new paragraph"', es: '"nuevo párrafo", "punto y aparte"', sv: '"nytt stycke"' },
+      { key: "line", what: "Line break", en: '"new line"', es: '"nueva línea"', sv: '"ny rad"' },
+      { key: "enter", what: "Press Enter after the text (at the very end only)", en: '"send it", "press enter"', es: '"envíalo", "enviar"', sv: '"skicka"' }],
     correction_list: [{ what: "Drops the sentence before it", en: '"scratch that", "delete that", "strike that"', es: '"borra eso", "tacha eso"', sv: '"stryk det", "sudda det"', el: '"σβήσε το", "σβήσ\' το"' },
       { what: "Claude applies the correction", en: '"no wait", "sorry I mean", "sorry I meant", "correction"', es: '"no perdón", "no espera", "perdón quise decir", "corrijo"', sv: '"nej förlåt", "nej vänta", "förlåt jag menar", "rättelse"', el: '"όχι συγγνώμη", "όχι περίμενε", "συγγνώμη εννοώ"' }],
   };
@@ -289,8 +292,8 @@ function demoApi() {
     setup_info: async (langs) => {
       const big = (langs || "").split(",").some((c) => c && !["en", "es", "de", "fr"].includes(c));
       return { models: [
-        { name: "large-v3-turbo", label: "Fast", use: "English, Spanish and similar; finds the language in meetings and files", size: 1.62e9, required: !big, ready: params.get("models") === "ready" },
-        { name: "Systran/faster-whisper-large-v3", label: "Most accurate", use: "Swedish, Greek and other languages; meetings and files in them", size: 3.09e9, required: big, ready: false }],
+        { name: "large-v3-turbo", label: "Fast", use: "For your English; finds the language in meetings and files", size: 1.62e9, required: !big, ready: params.get("models") === "ready" },
+        { name: "Systran/faster-whisper-large-v3", label: "Most accurate", use: "Languages the fast one isn't good at; meetings and files in them", size: 3.09e9, required: big, ready: false }],
       permissions: MAC ? [{ key: "microphone", label: "Microphone", granted: true }, { key: "accessibility", label: "Accessibility", granted: false },
         { key: "input", label: "Input Monitoring", granted: false, ask: true }] : [] };
     },
@@ -313,8 +316,8 @@ function demoApi() {
       return { ok: true, text: r.text, lang: r.lang };
     },
     models_info: async () => ({ models: [
-      { name: "large-v3-turbo", label: "Fast", use: "English, Spanish and similar; finds the language in meetings and files", size: 1.62e9, required: true, ready: !window.__deleted, disk: 1.62e9 },
-      { name: "Systran/faster-whisper-large-v3", label: "Most accurate", use: "Swedish, Greek and other languages; meetings and files in them", size: 3.09e9, required: false,
+      { name: "large-v3-turbo", label: "Fast", use: "For your English; finds the language in meetings and files", size: 1.62e9, required: true, ready: !window.__deleted, disk: 1.62e9 },
+      { name: "Systran/faster-whisper-large-v3", label: "Most accurate", use: "Languages the fast one isn't good at; meetings and files in them", size: 3.09e9, required: false,
         ready: !!(dl.models["Systran/faster-whisper-large-v3"] || {}).ready, disk: 3.09e9 }] }),
     delete_model: async (name) => { window.__deleted = name; return { ok: true }; },
   };
@@ -924,8 +927,8 @@ async function renderTodos() {
 
 /* ---------------------------------------------------------------- reuniones */
 const SPEAKER = { Yo: "Me", Otros: "Others" };
-// Meeting / file languages: English + Swedish built in, plus added ones (dictado-ehs); boot() loads the real list.
-let R_LANGS = [["en", "English"], ["sv", "Swedish"], ["en,sv", "English + Swedish"], ["auto", "Detect"]];
+// Meeting / file languages: the user's own (dictado-ehs, dictado-607); boot() loads the real list.
+let R_LANGS = [["en", "English"], ["auto", "Detect"]], R_DEFAULT = "";
 const R_STATUS = {
   recording: "Recording", finalizing: "Saving", stopping: "Saving", queued: "Queued", new: "Queued",
   running: "Transcribing", downloading: "Downloading model", done: "Ready", failed: "Failed",
@@ -933,7 +936,7 @@ const R_STATUS = {
 const r = { open: null, next: 0, timer: null, status: null, segs: 0, busy: false, speakers: null, names: {} };
 const ACTIVE = new Set(["recording", "finalizing", "stopping", "queued", "new", "running", "downloading"]);
 function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
-function rLang() { return $("#r-lang").value || "sv"; }
+function rLang() { return $("#r-lang").value || R_LANGS[0][0]; }
 function fmtDur(s) {
   if (!s && s !== 0) return "";
   s = Math.round(s);
@@ -1007,7 +1010,7 @@ function paintNow(state) {
   if (!m) return;
   const stopping = m.status === "stopping" || m.status === "finalizing";
   $("#r-now-title").textContent = stopping ? "Saving the meeting" : "Recording";
-  const lang = (R_LANGS.find(([c]) => c === m.lang) || [null, m.lang])[1];
+  const lang = (R_LANGS.find(([c]) => c === m.lang) || [null, DICT_LANGS[m.lang] || m.lang])[1];
   $("#r-now-meta").textContent = [m.app ? appName(m.app + ".exe") : "", lang, m.started ? `since ${when(m.started)}` : ""].filter(Boolean).join(" · ");
   $("#r-now-stop").hidden = stopping;
   $("#r-now-open").onclick = () => openSession(m.name);
@@ -1156,7 +1159,13 @@ async function renderDetail(name) {
     s.speakers === "failed" ? "couldn't tell the speakers apart" : "",
     s.recognised?.length ? `recognised by voice: ${s.recognised.join(", ")}` : ""].filter(Boolean).join(" · ");
   const recording = s.status === "recording";
-  if (recording && document.activeElement !== $("#r-d-lang")) $("#r-d-lang").value = s.lang || "sv";
+  if (recording && document.activeElement !== $("#r-d-lang")) {
+    const dl = $("#r-d-lang");
+    if (s.lang && ![...dl.options].some((o) => o.value === s.lang)) {  // a language outside the user's list (dictado-607)
+      const o = document.createElement("option"); o.value = s.lang; o.textContent = s.lang_name || s.lang; dl.append(o);
+    }
+    dl.value = s.lang || R_LANGS[0][0];
+  }
   $("#r-d-live-actions").hidden = !recording;
   if (!recording) $("#r-jump").hidden = true;
   $("#r-d-done-actions").hidden = s.status !== "done";
@@ -1295,7 +1304,7 @@ async function rDropped(paths) {  // from Python's drop handler: full paths of t
 function rWire() {
   const sel = $("#r-lang");
   for (const [c, n] of R_LANGS) { const o = document.createElement("option"); o.value = c; o.textContent = n; sel.append(o); }
-  sel.value = store("ecoscribe.r-lang") || "sv";
+  sel.value = store("ecoscribe.r-lang") || R_DEFAULT;  // else Settings' meeting language
   if (!sel.value) sel.value = R_LANGS[0][0];  // a stored language that was removed
   sel.onchange = () => store("ecoscribe.r-lang", sel.value);
   $("#r-start").onclick = rStart;
@@ -1629,21 +1638,24 @@ function stylesState() {
   }
   $("#st-vc-off").hidden = !on || vc;
 }
-// Languages you dictate in (dictado-ehs): English + Swedish built in; "Add a language" for the rest.
-let extraLangs = [], langNames = {}, baseLangs = ["en", "sv"];
+// Languages you dictate in (dictado-ehs): English, plus the ones the user added from "Add a language".
+// dictado-607: a built-in language nobody ticked (Swedish) waits in the picker like any other, so the
+// card, the voice commands and the meeting lists show only the user's own languages.
+let extraLangs = [], langNames = {}, baseLangs = ["en", "sv"], shownBase = [];
 function langCard(on) {
   const box = $("#f-languages");
   box.innerHTML = "";
-  for (const code of [...baseLangs, ...extraLangs]) {
+  for (const code of ["en", ...shownBase, ...extraLangs]) {
     const l = document.createElement("label"); l.className = "lang-check";
     const i = document.createElement("input"); i.type = "checkbox"; i.value = code; i.checked = on.has(code);
-    i.onchange = () => { if (!$$("#f-languages input:checked").length) i.checked = true; dirty(); };  // at least one
+    i.onchange = () => { if (!$$("#f-languages input:checked").length) i.checked = true; phraseTables(); dirty(); };  // at least one
     l.append(i, document.createTextNode(langNames[code] || code));
-    if (!baseLangs.includes(code)) {
+    if (code !== "en") {
       const x = document.createElement("button"); x.type = "button"; x.className = "lang-x"; x.textContent = "×";
       x.title = `Remove ${langNames[code] || code}`; x.setAttribute("aria-label", x.title);
-      x.onclick = (e) => { e.preventDefault(); extraLangs = extraLangs.filter((c) => c !== code); on.delete(code);
-        if (![...on].length) on.add("en"); langCard(currentChecks(on)); dirty(); };
+      x.onclick = (e) => { e.preventDefault(); extraLangs = extraLangs.filter((c) => c !== code); shownBase = shownBase.filter((c) => c !== code);
+        const checks = currentChecks(on); checks.delete(code); if (![...checks].length) checks.add("en");
+        langCard(checks); dirty(); };
       l.append(x);
     }
     box.append(l);
@@ -1651,15 +1663,46 @@ function langCard(on) {
   const add = $("#lang-add");
   add.innerHTML = '<option value="">Add a language…</option>';
   for (const [code, label] of Object.entries(langNames).sort((a, b) => a[1].localeCompare(b[1]))) {
-    if (baseLangs.includes(code) || extraLangs.includes(code)) continue;
+    if (code === "en" || shownBase.includes(code) || extraLangs.includes(code)) continue;
     const o = document.createElement("option"); o.value = code; o.textContent = label; add.append(o);
   }
   add.onchange = () => {
     if (!add.value) return;
-    extraLangs.push(add.value);
+    (baseLangs.includes(add.value) ? shownBase : extraLangs).push(add.value);
     const checks = currentChecks(on); checks.add(add.value);  // a new language is ticked right away
     langCard(checks); dirty();
   };
+  phraseTables();
+}
+// The user's own languages (dictado-607): ticked or added in the card above.
+function myLangs() {
+  return [...new Set([...$$("#f-languages input:checked").map((i) => i.value), ...extraLangs])];
+}
+const andList = (xs) => xs.length < 2 ? xs.join("") : xs.slice(0, -1).join(", ") + " and " + xs[xs.length - 1];
+let vcList = [], scList = [];
+// Voice commands and the self-correction phrases: English (they always work), then the user's other
+// languages that have phrases; nobody sees Spanish or Swedish they never added (dictado-607).
+function phraseTables() {
+  const mine = myLangs(), cols = ["en", ...mine.filter((c) => c !== "en")];
+  const label = (c) => langNames[c] || DICT_LANGS[c] || c;
+  const table = (head, body, rows) => {
+    const have = cols.filter((c) => c === "en" || rows.some((r) => r[c]));
+    head.innerHTML = "";
+    for (const t of ["What it does", ...have.map(label)]) { const th = document.createElement("th"); th.textContent = t; head.append(th); }
+    body.innerHTML = "";
+    for (const r of rows) {
+      const tr = document.createElement("tr");
+      for (const k of ["what", ...have]) { const td = document.createElement("td"); td.textContent = r[k] || ""; tr.append(td); }
+      body.append(tr);
+    }
+  };
+  table($("#vc-head"), $("#vc-rows"), vcList);
+  table($("#sc-head"), $("#sc-rows"), scList);
+  const first = (key, c) => ((vcList.find((r) => r.key === key) || {})[c] || "").match(/"[^"]+"/)?.[0];
+  const more = cols.filter((c) => c !== "en" && vcList.some((r) => r[c]));
+  const eg = more.flatMap((c) => [first("line", c), first("enter", c)]).filter(Boolean);
+  $("#vc-help").textContent = 'Say "new line" or "new paragraph" for a break, and end with "send it" to press Enter after the text (handy in Claude Code).'
+    + (more.length ? ` ${andList(more.map(label))} work${more.length === 1 ? "s" : ""} too: ${eg.join(", ")}.` : "");
 }
 function currentChecks(fallback) {
   const boxes = $$("#f-languages input");
@@ -1769,20 +1812,9 @@ async function renderSettings() {
              s.values.theme || "system");
   applyTheme(s.values.theme || "system");  // back to the saved one (Discard, or a preview left unsaved)
   $("#f-theme").onchange = () => { applyTheme($("#f-theme").value, false); dirty(); };  // a preview until Save
-  const vc = $("#vc-rows"); vc.innerHTML = "";
   if (params.get("vc") === "1") $("#vc-list").open = true;  // screenshot
-  for (const r of s.voice_command_list || []) {
-    const tr = document.createElement("tr");
-    for (const k of ["what", "en", "es", "sv"]) { const td = document.createElement("td"); td.textContent = r[k] || ""; tr.append(td); }
-    vc.append(tr);
-  }
-  const sc = $("#sc-rows"); sc.innerHTML = "";
   if (params.get("sc") === "1") $("#sc-list").open = true;  // screenshot
-  for (const r of s.correction_list || []) {
-    const tr = document.createElement("tr");
-    for (const k of ["what", "en", "es", "sv", "el"]) { const td = document.createElement("td"); td.textContent = r[k] || ""; tr.append(td); }
-    sc.append(tr);
-  }
+  vcList = s.voice_command_list || []; scList = s.correction_list || [];  // drawn after the language card (phraseTables)
   $("#dbg-copy").onclick = async () => { await api.copy_debug_info(); toast("Copied. Paste it to Claude."); };
   $("#dbg-open").onclick = () => api.open_logs_folder();
   $("#cal-result").textContent = "";
@@ -1797,6 +1829,7 @@ async function renderSettings() {
   stylesCard(s.values.app_styles);
   $("#f-per-app").onchange = $("#f-voice-commands").onchange = () => { stylesState(); dirty(); };
   if (params.get("styles") === "1") $("#styles-card").scrollIntoView?.({ block: "start" });  // screenshot
+  if (params.get("vc") === "1") $("#f-voice-commands").closest(".row").scrollIntoView?.({ block: "start" });  // screenshot
   $("#f-speakers").checked = s.values.speakers && s.speakers_addon;
   $("#f-speakers").disabled = !s.speakers_addon;
   $("#f-speakers-help").textContent = s.speakers_addon
@@ -1805,6 +1838,7 @@ async function renderSettings() {
   extraLangs = [...(s.values.extra_languages || [])];
   langNames = Object.fromEntries([...s.options.languages, ...(s.options.all_languages || [])].map((o) => [o.value, o.label]));
   baseLangs = s.options.base_languages || ["en", "sv"];
+  shownBase = String(s.values.languages || "en").split(",").filter((c) => baseLangs.includes(c) && c !== "en");
   langCard(new Set(String(s.values.languages || "en").split(",")));
   $("#lang-key").textContent = hotkeyLabel(s.values.hotkey || "rctrl");
   $("#f-sounds").checked = s.values.sounds; $("#f-overlay").checked = s.values.overlay; $("#f-live-text").checked = s.values.live_text !== false; $("#f-insights").checked = !!s.values.insights; $("#f-speech-feedback").checked = !!s.values.speech_feedback;
@@ -2273,7 +2307,7 @@ async function boot() {
   try { applyTheme(params.get("theme") || (await api.get_theme()).theme); } catch { applyTheme(store("ecoscribe.theme") || "system"); }
   window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", () => applyTheme(themeChoice, false));
   if (MAC) macify();
-  try { R_LANGS = (await api.get_settings()).options.meet_langs.map((o) => [o.value, o.label]); } catch {}
+  try { const st = await api.get_settings(); R_LANGS = st.options.meet_langs.map((o) => [o.value, o.label]); R_DEFAULT = st.values.meet_lang || ""; } catch {}
   for (const b of $$(".nav-item")) b.onclick = () => { if (b.dataset.page === "reuniones") r.open = null; show(b.dataset.page); };
   try { $("#nav-insights").hidden = !(await api.get_settings()).values.insights; } catch {}
   for (const b of $$("#i-range .seg")) b.onclick = () => { iDays = b.dataset.days || null; renderInsights(); };
@@ -2299,7 +2333,7 @@ async function boot() {
     store("ecoscribe.set-sec", k);
   };
   for (const b of $$("#set-tabs .seg")) b.onclick = () => secShow(b.dataset.sec);
-  secShow(store("ecoscribe.set-sec") || "dictation");
+  secShow(params.get("sec") || store("ecoscribe.set-sec") || "dictation");  // ?sec=words: a screenshot of that section
   window.__secShow = secShow;
   $("#settings").addEventListener("change", dirty);
   $("#settings").addEventListener("input", (e) => { if (e.target.id === "f-vocabulary" || e.target.id === "f-calendar" || e.target.closest(".snip") || e.target.closest(".rep")) dirty(); });  // savebar while typing words

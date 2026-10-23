@@ -19,7 +19,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from . import __version__, commands, config, diarize, hotkeys, export, ipc, meetings, paths, search, sessions, status, tomlw
-from .languages import ALL as ALL_LANGS, BASE as BASE_LANGS, available, meeting_options, valid_extra, valid_meeting_lang
+from .languages import ALL as ALL_LANGS, BASE as BASE_LANGS, available, meeting_options, user_langs, valid_extra, valid_meeting_lang
 from .routing import LANG_NAMES
 
 log = logging.getLogger(__name__)
@@ -36,8 +36,8 @@ MEET_ENDS = [(5, "5 seconds"), (10, "10 seconds"), (15, "15 seconds"), (30, "30 
 def _voice_command_list() -> list[dict]:
     """Settings > Voice commands > See all commands (t0u.38): from the table the matcher uses."""
     from .text import VOICE_COMMANDS
-    return [{"what": what, **{lang: ", ".join(f'"{p}"' for p in ps) for lang, ps in langs.items()}}
-            for _, what, langs in VOICE_COMMANDS]
+    return [{"key": key, "what": what, **{lang: ", ".join(f'"{p}"' for p in ps) for lang, ps in langs.items()}}
+            for key, what, langs in VOICE_COMMANDS]
 
 
 def _app_style_rows(saved) -> list[dict]:
@@ -268,7 +268,9 @@ class Api:
                 "meet_ends": [{"value": str(v), "label": l} for v, l in MEET_ENDS]
                 + ([] if int(c.meetings.grace_s) in dict(MEET_ENDS)  # a value typed into config.toml stays selectable
                    else [{"value": str(int(c.meetings.grace_s)), "label": f"{int(c.meetings.grace_s)} seconds"}]),
-                "meet_langs": [{"value": v, "label": l} for v, l in meeting_options(available(c.whisper.extra_languages))],
+                # dictado-607: only the user's own languages (and the saved choice), not every built-in one
+                "meet_langs": [{"value": v, "label": l} for v, l in meeting_options(
+                    user_langs(c.whisper.languages, c.whisper.extra_languages, c.meetings.default_lang))],
             },
             "can_startup": self._startup.app_command() is not None,
         }
@@ -337,7 +339,7 @@ class Api:
                 c.whisper.languages = [x for x in c.whisper.languages if x in avail] or ["en"]
                 if not valid_meeting_lang(c.meetings.default_lang) or any(
                         x not in avail for x in c.meetings.default_lang.split(",") if x != "auto"):
-                    c.meetings.default_lang = "sv"
+                    c.meetings.default_lang = c.whisper.languages[0]  # one of theirs, not a fixed Swedish
             if "languages" in values:
                 c.whisper.languages = parse_languages(values["languages"], c.whisper.extra_languages)
             if "theme" in values:  # dictado-u9h
