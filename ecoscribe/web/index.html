@@ -490,16 +490,11 @@
               <tbody id="sc-rows"></tbody></table>
             <p class="muted small">A phrase only counts on its own, after a pause or punctuation: "scratch that itch" stays text. Only dictations with one of these phrases go to Claude.</p>
           </details>
-          <div id="cm-block">  <!-- dictado-a1d: Command mode, its name everywhere, and keys the user picks -->
-          <label class="row toggle-row" id="row-command-mode"><span class="row-text"><span class="row-label">Command mode</span><span class="muted small">Change selected text by voice. Select text anywhere, press <kbd class="cm-key" id="cm-press">Right Ctrl + E</kbd>, say what to change ("make it shorter", "translate to Swedish") and <span id="cm-stop">tap <kbd class="cm-key">Right Ctrl</kbd></span>. Claude rewrites it in place; Ctrl+Z brings the old text back.</span></span>
+          <div id="cm-block">  <!-- dictado-a1d: Command mode by its name; its keys in the sentence, with "change" (look B, picked) -->
+          <label class="row toggle-row" id="row-command-mode"><span class="row-text"><span class="row-label">Command mode</span><span class="muted small">Change selected text by voice. Select text anywhere, press <kbd class="cm-key" id="cm-press">Right Ctrl + E</kbd> <button type="button" class="cm-change" id="cm-change">change</button>, say what to change ("make it shorter", "translate to Swedish") and <span id="cm-stop">tap <kbd class="cm-key">Right Ctrl</kbd></span>. Claude rewrites it in place; Ctrl+Z brings the old text back.</span></span>
             <input type="checkbox" class="switch" name="command_mode" id="f-command-mode"></label>
-          <div class="row" id="row-command-keys"><span class="row-label">Command mode keys</span>
-            <div class="hk">
-              <kbd class="key hk-key" id="cm-label">Right Ctrl + E</kbd>
-              <input type="hidden" name="command_key" id="f-command-key">
-              <button type="button" class="btn btn-ghost btn-sm" id="cm-change">Change</button>
-            </div></div>
-          <p class="muted small hk-hint" id="cm-hint"></p>
+          <input type="hidden" name="command_key" id="f-command-key">
+          <p class="muted small hk-hint cm-hint" id="cm-hint" hidden></p>
           </div>
         </div>
 

@@ -2084,15 +2084,18 @@ function hkName(e) {
 // o: label, input, button, hint (elements); idle() the hint at rest; shown() the label at rest;
 // check(value) -> {ok, value, label, error}; done(r) the hint after a pick; lone: a lone modifier tap
 // counts; chord(): the browser code of a held key that makes "<key>+<letter>" (Command mode's
-// dictation key + E), or null.
+// dictation key + E), or null; listening() the hint while it listens; words: the button's two texts.
+// An empty hint is hidden.
 function keyPicker(o) {
   const st = { on: false, other: false, held: new Set() };
+  const [rest, busy] = o.words || ["Change", "Cancel"];
   const stop = (msg, bad = false) => {
     st.on = false;
-    o.button.textContent = "Change";
+    o.button.textContent = rest;
     o.label.classList.remove("listening");
     o.hint.textContent = msg || o.idle();
     o.hint.classList.toggle("hk-bad", bad);
+    o.hint.hidden = !o.hint.textContent;
   };
   const tryIt = async (value) => {
     const r = await o.check(value);
@@ -2106,10 +2109,12 @@ function keyPicker(o) {
   o.button.onclick = () => {
     if (st.on) { stop(); o.label.textContent = o.shown(); return; }
     st.on = true; st.other = false; st.held.clear();
-    o.button.textContent = "Cancel";
+    o.button.textContent = busy;
     o.label.textContent = "Press it now…";
     o.label.classList.add("listening");
-    o.hint.textContent = "Esc cancels.";
+    o.hint.textContent = o.listening?.() || "Esc cancels.";
+    o.hint.classList.remove("hk-bad");
+    o.hint.hidden = false;
   };
   document.addEventListener("keydown", (e) => {
     if (!st.on) return;
@@ -2130,10 +2135,12 @@ function keyPicker(o) {
   }, true);
   return { stop };
 }
-// Command mode's keys (dictado-a1d): the dictation key + a letter (E), or a combo of its own.
-const CM_IDLE = () => ($("#f-hotkey").value || "").includes("+")
-  ? "Press a combo like Ctrl+Shift+E."
-  : `Hold ${hotkeyLabel($("#f-hotkey").value)} and press a letter, or press a combo like Ctrl+Shift+E.`;
+// Command mode's keys (dictado-a1d): the dictation key + a letter (E), or a combo of its own. Look B
+// (picked): the keys sit in the row's sentence with a "change" link; the hint shows only while picking.
+const CM_HOW = () => ($("#f-hotkey").value || "").includes("+")
+  ? "Press a combo like Ctrl+Shift+E. Esc cancels."
+  : `Hold ${hotkeyLabel($("#f-hotkey").value)} and press a letter, or press a combo like Ctrl+Shift+E. Esc cancels.`;
+const CM_BAD = "The dictation key is a combo now: change Command mode's keys to a combo too, like Ctrl+Shift+E.";
 function cmText() {  // the keys as words, from the form (the dictation key may have changed, unsaved)
   const key = $("#f-command-key").value || "e", dict = $("#f-hotkey").value;
   if (key.includes("+")) return hotkeyLabel(key);
@@ -2141,22 +2148,22 @@ function cmText() {  // the keys as words, from the form (the dictation key may 
 }
 function cmPaint() {
   const t = cmText(), key = $("#f-command-key").value || "e";
-  $("#cm-label").textContent = t || "Pick a combo";
   $("#cm-press").textContent = t || "its keys";
   const stop = $("#cm-stop"), k = document.createElement("kbd"); k.className = "cm-key";
   k.textContent = key.includes("+") ? t : hotkeyLabel($("#f-hotkey").value);
   stop.replaceChildren(key.includes("+") ? "press " : "tap ", k, key.includes("+") ? " again" : "");
   const bad = !t;
-  $("#cm-hint").textContent = bad ? `The dictation key is a combo now: pick a combo for Command mode too, like Ctrl+Shift+E.` : CM_IDLE();
+  $("#cm-hint").textContent = bad ? CM_BAD : "";
   $("#cm-hint").classList.toggle("hk-bad", bad);
+  $("#cm-hint").hidden = !bad;
 }
 function hkWire() {
   keyPicker({ label: $("#hk-label"), input: $("#f-hotkey"), button: $("#hk-change"), hint: $("#hk-hint"), lone: true,
     idle: () => HK_HINT, shown: () => hotkeyLabel($("#f-hotkey").value), check: (v) => api.check_hotkey(v),
     done: (r) => r.value.includes("+") ? `${r.label}: press it to start and again to stop. Save to apply.` : `${r.label}: tap it on its own. Save to apply.`,
     after: () => { holdFits(); cmPaint(); } });
-  keyPicker({ label: $("#cm-label"), input: $("#f-command-key"), button: $("#cm-change"), hint: $("#cm-hint"),
-    idle: CM_IDLE, shown: () => cmText() || "Pick a combo", check: (v) => api.check_command_key(v, $("#f-hotkey").value),
+  keyPicker({ label: $("#cm-press"), input: $("#f-command-key"), button: $("#cm-change"), hint: $("#cm-hint"),
+    words: ["change", "cancel"], listening: CM_HOW, idle: () => (cmText() ? "" : CM_BAD), shown: () => cmText() || "its keys", check: (v) => api.check_command_key(v, $("#f-hotkey").value),
     chord: () => { const k = $("#f-hotkey").value || ""; return k.includes("+") ? null : Object.keys(HK_CODE).find((c) => HK_CODE[c] === k) || (k.startsWith("f") ? k.toUpperCase() : null); },
     done: (r) => `${r.label} starts Command mode. Save to apply.`, after: cmPaint });
 }

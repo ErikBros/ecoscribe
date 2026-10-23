@@ -653,20 +653,24 @@ async function load(query) {
   await sleep(200);
   const key = (type, code, mods = {}) => doc.dispatchEvent(new window.KeyboardEvent(type, { code, bubbles: true, cancelable: true, ...mods }));
   check(doc.querySelector("#row-command-mode .row-label").textContent === "Command mode", "the row is called Command mode");
-  check(doc.querySelector("#cm-label").textContent === "Right Ctrl + E" && doc.querySelector("#cm-press").textContent === "Right Ctrl + E"
+  check(doc.querySelector("#row-command-mode #cm-change")?.textContent === "change" && !doc.querySelector("#row-command-keys")
+    && doc.querySelector("#cm-hint").hidden, "look B: the keys and a change link inside the sentence, no extra row, no hint at rest");
+  check(doc.querySelector("#cm-press").textContent === "Right Ctrl + E"
     && doc.querySelector("#cm-stop").textContent === "tap Right Ctrl", "default keys: Right Ctrl + E, then tap Right Ctrl");
   doc.querySelector("#cm-change").click();
-  check(doc.querySelector("#cm-label").textContent === "Press it now…", "the picker listens");
+  check(doc.querySelector("#cm-press").textContent === "Press it now…" && doc.querySelector("#cm-change").textContent === "cancel"
+    && !doc.querySelector("#cm-hint").hidden && doc.querySelector("#cm-hint").textContent.startsWith("Hold Right Ctrl and press a letter")
+    && !doc.querySelector("#f-command-mode").checked, "the picker listens in the sentence, says how, and leaves the switch alone");
   key("keydown", "ControlRight", { ctrlKey: true }); key("keydown", "KeyK", { ctrlKey: true }); await sleep(50);
   key("keyup", "KeyK", { ctrlKey: true }); key("keyup", "ControlRight"); await sleep(20);
-  check(doc.querySelector("#f-command-key").value === "k" && doc.querySelector("#cm-label").textContent === "Right Ctrl + K"
-    && doc.querySelector("#cm-press").textContent === "Right Ctrl + K", "holding Right Ctrl and pressing K picks Right Ctrl + K");
+  check(doc.querySelector("#f-command-key").value === "k" && doc.querySelector("#cm-press").textContent === "Right Ctrl + K"
+    && doc.querySelector("#cm-change").textContent === "change", "holding Right Ctrl and pressing K picks Right Ctrl + K");
   check(!doc.querySelector("#savebar").hidden, "a new pick offers Save");
   doc.querySelector("#cm-change").click();
   key("keydown", "ControlRight", { ctrlKey: true }); key("keydown", "KeyL", { ctrlKey: true }); await sleep(50);
   key("keyup", "KeyL", { ctrlKey: true }); key("keyup", "ControlRight"); await sleep(20);
   check(doc.querySelector("#f-command-key").value === "k" && doc.querySelector("#cm-hint").classList.contains("hk-bad")
-    && doc.querySelector("#cm-label").textContent === "Right Ctrl + K", "Right Ctrl + L (next language) is refused with the reason");
+    && !doc.querySelector("#cm-hint").hidden && doc.querySelector("#cm-press").textContent === "Right Ctrl + K", "Right Ctrl + L (next language) is refused with the reason");
   doc.querySelector("#cm-change").click();
   key("keydown", "ControlLeft", { ctrlKey: true }); key("keydown", "ShiftLeft", { ctrlKey: true, shiftKey: true });
   key("keydown", "KeyE", { ctrlKey: true, shiftKey: true }); await sleep(50);
