@@ -70,6 +70,12 @@ _gdi.SelectObject.argtypes, _gdi.SelectObject.restype = (w.HDC, w.HGDIOBJ), w.HG
 _gdi.DeleteObject.argtypes = (w.HGDIOBJ,)
 _gdi.DeleteDC.argtypes = (w.HDC,)
 ULW_ALPHA, AC_SRC_ALPHA = 2, 1
+# moving the pill (dictado-06i): the mouse button, polled; the monitor under a remembered spot
+_u.GetAsyncKeyState.argtypes, _u.GetAsyncKeyState.restype = (ctypes.c_int,), ctypes.c_short
+_u.GetSystemMetrics.argtypes = (ctypes.c_int,)
+_u.MonitorFromPoint.argtypes, _u.MonitorFromPoint.restype = (w.POINT, w.DWORD), w.HANDLE
+_u.GetMonitorInfoW.argtypes = (w.HANDLE, ctypes.c_void_p)
+VK_LBUTTON, VK_RBUTTON, SM_SWAPBUTTON = 0x01, 0x02, 23
 _EMPTY = art.Image.new("RGBA", (1, 1), (0, 0, 0, 0))
 
 
@@ -135,6 +141,15 @@ class Overlay:
         self.live_text = ""  # what the live transcript has heard so far (this recording)
         self._levels: list[float] = []  # the waveform: voice level per tick, newest last
         self.open = False  # the meeting chip is opened by the mouse over it (dictado-z4j)
+        self._spot: tuple[int, int] | None = None  # where the user put the pill (dictado-06i); None: bottom centre
+        self._spot_path = None
+        self._drag = meetui.Drag()
+        self._clickable = False  # click-through, except while the mouse is on the meeting chip
+
+    def remember_at(self, path) -> None:
+        """Keep the spot the pill is dragged to in `path` (pill.json), and start there."""
+        self._spot_path = path
+        self._spot = meetui.load_spot(path)
 
     def ex_style(self) -> int:
         return u32.GetWindowLongW(self.hwnd, GWL_EXSTYLE)
@@ -158,13 +173,23 @@ class Overlay:
             self._ulw_ok = False  # say it once, not 20 times a second
             log.warning("the pill couldn't be drawn (UpdateLayeredWindow failed, error %s)", ctypes.get_last_error())
 
-    def _place_and_show(self) -> None:
+    @staticmethod
+    def _work(mon) -> tuple[int, int, int, int] | None:
         mi = MONITORINFO()
         mi.cbSize = ctypes.sizeof(MONITORINFO)
-        mon = u32.MonitorFromWindow(u32.GetForegroundWindow(), 2)
-        if mon and u32.GetMonitorInfoW(mon, ctypes.byref(mi)):
+        if mon and _u.GetMonitorInfoW(mon, ctypes.byref(mi)):
             r = mi.rcWork
-            self._anchor = ((r.left + r.right) // 2, r.bottom - 80)
+            return r.left, r.top, r.right, r.bottom
+        return None
+
+    def _place_and_show(self) -> None:
+        if self._drag.moving:
+            pass  # the chip follows the mouse; a redraw (the timer) doesn't snap it back
+        elif self._spot and (work := self._work(_u.MonitorFromPoint(w.POINT(*self._spot), 0))):
+            self._anchor = meetui.fit_spot(self._spot, (self.w, self.h), work)  # where the user put it
+        elif work := self._work(u32.MonitorFromWindow(u32.GetForegroundWindow(), 2)):
+            l, _, r, b = work
+            self._anchor = ((l + r) // 2, b - 80)
         else:
             self._anchor = (600 + W // 2, 900 + H)
         self._blit()
@@ -186,12 +211,50 @@ class Overlay:
         keys = self.hint.split(" to ")[0].split(" + ")
         self._present(art.dictating(secs, self._levels, keys, self.live_text))
 
-    def _hover(self) -> bool:
+    @staticmethod
+    def _cursor() -> tuple[int, int] | None:
         pt = w.POINT()
-        if not u32.GetCursorPos(ctypes.byref(pt)) or not self._anchor:
+        return (pt.x, pt.y) if u32.GetCursorPos(ctypes.byref(pt)) else None
+
+    def _hover(self, cursor=None) -> bool:
+        cursor = cursor or self._cursor()
+        if not cursor or not self._anchor:
             return False
         x, y = self._origin()  # the pill itself, not its shadow
-        return meetui.hovering((pt.x, pt.y), (x + art.M, y + art.M, x + art.M + self.w, y + art.M + self.h))
+        return meetui.hovering(cursor, (x + art.M, y + art.M, x + art.M + self.w, y + art.M + self.h))
+
+    def _set_clickable(self, on: bool) -> None:
+        """Click-through unless the mouse is on the meeting chip: a press there moves the pill and
+        doesn't reach the app below (dictado-06i)."""
+        if on == self._clickable:
+            return
+        self._clickable = on
+        ex = self.ex_style()
+        u32.SetWindowLongW(self.hwnd, GWL_EXSTYLE, ex & ~WS_EX_TRANSPARENT if on else ex | WS_EX_TRANSPARENT)
+
+    def _chip_mouse(self, now: float) -> None:
+        """The meeting chip under the mouse: it opens to the live line, and it can be dragged."""
+        cursor = self._cursor()
+        hover = self._hover(cursor)
+        self._set_clickable(hover or self._drag.held)
+        button = VK_RBUTTON if _u.GetSystemMetrics(SM_SWAPBUTTON) else VK_LBUTTON  # the primary button
+        act = self._drag.step(now, cursor, bool(_u.GetAsyncKeyState(button) & 0x8000), hover, self._anchor)
+        if act and act[0] == "move":
+            work = self._work(_u.MonitorFromPoint(w.POINT(*cursor), 2))
+            self._anchor = meetui.fit_spot(act[1], (self.w, self.h), work) if work else act[1]
+            self._blit()
+        elif act and act[0] == "drop":
+            self._spot = self._anchor
+            if self._spot_path:
+                meetui.save_spot(self._spot_path, self._spot)
+        elif act and act[0] == "reset":
+            self._spot = None
+            if self._spot_path:
+                meetui.save_spot(self._spot_path, None)
+            self._place_and_show()
+        if hover != self.open:
+            self.open = hover
+            self._show_layer()
 
     def _meeting_pill(self, view: dict) -> None:
         key = (view["label"], view["line"], view["busy"], self.open)
@@ -252,16 +315,17 @@ class Overlay:
     def tick(self) -> None:
         """Called every 50 ms by the UI loop."""
         now = time.monotonic()
+        if not (self.mode == "hidden" and self.meeting and not self._flash_until):
+            self._set_clickable(False)
+            self._drag.press = None
+            self._drag.moving = False
         if self.mode == "recording":
             self._dictating_pill(int(now - self._t0), min(1.0, math.sqrt(self.level_fn()) * 4))
         elif self.mode == "hidden" and self._flash_until and now >= self._flash_until:
             self._flash_until = 0.0
             self._show_layer()
         elif self.mode == "hidden" and self.meeting and not self._flash_until:
-            hover = self._hover()  # the chip opens to the live line while the mouse is on it
-            if hover != self.open:
-                self.open = hover
-                self._show_layer()
+            self._chip_mouse(now)
         elif self.mode == "busy" and self._flash_until and now >= self._flash_until:
             self._flash_until = 0.0
             self.busy()
