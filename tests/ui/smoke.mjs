@@ -817,5 +817,25 @@ async function load(query) {
   await sleep(300);
   check(done.doc.querySelector("#r-src").hidden && done.doc.querySelector("#r-src-warn").hidden, "a finished meeting shows neither");
 }
+{ // dictado-gvai: a decision page from tools/before_after.py shows what happened to each choice after the read-back
+  const { execFileSync } = await import("child_process");
+  const py = 'import sys; sys.path.insert(0, "tools"); import before_after as b; '
+    + 'sys.stdout.buffer.write(b.build("Pill", "look-test", ["Calm", "Bold", "Plain"], {}, [980], True).encode())';
+  let page = null;
+  for (const exe of ["python3", "python"]) {
+    try { page = execFileSync(exe, ["-c", py], { cwd: path.resolve(here, "../.."), stdio: ["ignore", "pipe", "ignore"] }).toString("utf8"); break; } catch {}
+  }
+  const open = (html) => {
+    const dom = new JSDOM(html, { runScripts: "dangerously", pretendToBeVisual: true });
+    return dom.window.document.querySelector("#outcome");
+  };
+  if (!page) { check(false, "tools/before_after.py builds a page (needs python3 or python)"); page = ""; }
+  check(open(page)?.hidden, "a decision page before the read-back has no What happened panel");
+  const read = page.replace('{ id: "calm", title: "Calm" },', '{ id: "calm", title: "Calm", done: "Shipped in 1.0.0." },');
+  const oc = open(read), lines = [...oc.querySelectorAll("p")];
+  check(!oc.hidden && lines.length === 3, "after the read-back: one line per choice");
+  check(lines[0].className === "done" && lines[0].textContent === "CalmShipped in 1.0.0.", "a choice with a done line shows it");
+  check(lines[1].className === "open" && lines[1].textContent === "BoldOpen.", "a choice without one shows Open");
+}
 console.log(failed ? `\n${failed} FAILED` : "\nall ok");
 process.exit(failed ? 1 : 0);

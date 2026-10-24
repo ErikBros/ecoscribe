@@ -14,6 +14,10 @@ checkout that has ecoscribe/web). --after defaults to this working tree.
 Served by a page server that has /api/picks/<round> and /api/send/<round> (--round sets the id),
 Approve / Not this / a note and "Send to Claude" are saved there; opened as a file, the buttons
 copy the answer to paste into the chat instead.
+
+After the read-back, Claude adds a `done: "..."` to each choice's line in P (decision-page skill); the
+page then shows a "What happened" panel above the screens: each choice's done line, or Open
+(dictado-gvai).
 """
 from __future__ import annotations
 
@@ -204,6 +208,14 @@ figure img { cursor:zoom-in }
   color:#fff; font-size:30px; cursor:pointer; z-index:21; box-shadow:0 2px 10px rgba(0,0,0,.25) }
 .lb-side:hover { background:rgba(14,15,17,.88) }
 .lb-prev { left:14px } .lb-next { right:14px }
+/* what happened to each choice, once the read-back wrote its done line (dictado-gvai) */
+#outcome { max-width:1100px; margin:22px 40px 0; padding:14px 20px; background:var(--panel); border:1px solid var(--line); border-radius:14px; font-size:14.5px }
+#outcome h2 { font-size:15px; margin:0 0 8px }
+#outcome p { margin:5px 0; color:var(--ink) }
+#outcome p b { margin-right:6px }
+#outcome p.done b { color:var(--ok) }
+#outcome p.open { color:var(--mute) }
+#outcome p.open b { color:var(--no) }
 </style>
 </head>
 <body>
@@ -223,6 +235,7 @@ const D = __DATA__;
     <span class="lab" id="modelab">Show</span><div class="seg" id="modes"></div>
   </div>
 </header>
+<section id="outcome" hidden><h2>What happened</h2></section>
 <main id="main"></main>
 <div class="decide" id="decide"></div>
 <div class="lb" id="lb" hidden>
@@ -304,7 +317,21 @@ function answer() {
   return P.map(p => `${p.title}: ${({ yes: "approve", no: "not this", later: "later" })[(picks[p.id] || {}).choice] || "no answer"}` +
     ((picks[p.id] || {}).note ? ` (${picks[p.id].note})` : "")).join("; ");
 }
+function outcome() {  // a choice's done line once the read-back wrote it, else Open
+  const oc = $("#outcome");
+  oc.hidden = !P.some(p => p.done);
+  if (oc.hidden) return;
+  oc.querySelectorAll("p").forEach(x => x.remove());
+  for (const p of P) {
+    const line = document.createElement("p"), b = document.createElement("b"), mine = (picks[p.id] || {}).choice === "yes";
+    line.className = p.done ? "done" : "open";
+    b.textContent = p.title;
+    line.append(b, p.done || (mine ? "Open: your pick, not done yet." : "Open."));
+    oc.append(line);
+  }
+}
 function decide() {
+  outcome();
   const el = $("#decide");
   el.innerHTML = `<span class="q">${D.variants ? "Which look?" : "Ship this look?"}</span>`;
   for (const p of P) {
