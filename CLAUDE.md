@@ -35,7 +35,10 @@ outcomes in plain words and only real choices (money, publishing, his desktop, w
     page (every window page at 980/1470/1920 px, only what changed, slider, Approve / Not this); write it
     into his local decision-page folder so his answer is saved (his personal CLAUDE.md has where).
     Before showing it, the change passes `docs/look-checklist.md` (`npm run look` checks the testable part).
-11. **Installs on Erik's PC.** Check `%LOCALAPPDATA%\ecoscribe\meetings.json` before installing or
+11. **User guides.** A PR that changes the window, the pill, the tray or the prompt box updates the guides in
+    `docs/` (index: `docs/README.md`) or has a line in its body: `docs: not needed, because <reason>`.
+    pr-shape checks it (`tools/docs_check.py`).
+12. **Installs on Erik's PC.** Check `%LOCALAPPDATA%\ecoscribe\meetings.json` before installing or
     restarting; never during a live meeting (the installer also waits). Builds leave ~0.5 GB installers
     in the build folder (not in Downloads since dictado-38z): check C: free space before a build, and after an install delete every older Setup without asking
     (the owner's standing yes, 2026-10-23; the delete goes through the guard's queue).
