@@ -1,5 +1,6 @@
 # Standard process (CLAUDE.md): one ticket = one branch from main = one PR, never stacked.
-# Fails a PR that carries another open PR's unmerged commits, or that doesn't target main.
+# Fails a PR that carries another open PR's unmerged commits, or that doesn't target main,
+# and a PR that changes what the user sees without touching the guides in docs/ or saying why (dictado-xr3v).
 name: pr-shape
 on:
   pull_request:
@@ -39,6 +40,13 @@ jobs:
             fi
           done
           exit $bad
+      - name: User guides follow the app (tools/docs_check.py)
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          git diff --name-only "origin/main...$HEAD_SHA" | python3 tools/docs_check.py
       - name: Nothing personal or secret (gitleaks, .gitleaks.toml)
         env:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}

@@ -12,9 +12,11 @@ Get the latest version from **[Releases](https://github.com/ErikBros/ecoscribe/r
 | Needs | Windows 10 or 11, 64-bit; an NVIDIA GPU with 6 GB+ strongly recommended | Apple Silicon (M1 or newer), macOS 14.4 or newer |
 | Dictation key | Right Ctrl | Right Command |
 | First open | SmartScreen: **More info > Run anyway** | System Settings > Privacy & Security: **Open Anyway**, then allow the permissions it asks for |
-| Full guide | [docs/windows.md](docs/windows.md) | [docs/mac.md](docs/mac.md) |
+| Getting started | [docs/windows.md](docs/windows.md) | [docs/mac.md](docs/mac.md) |
 
 Neither installer is signed with a paid certificate yet, which is why each OS warns once the first time.
+
+All user guides (dictation, meetings, Claude, Insights, Settings, troubleshooting): **[docs/README.md](docs/README.md)**.
 
 ## What it does
 
@@ -42,7 +44,7 @@ One codebase for both systems. Most of Ecoscribe (speech engine, meetings, the w
 | `ecoscribe/platform/macos/` | **Mac only**: event tap, paste, menu bar and pill, Accessibility, LaunchAgent, mlx engine, system-audio tap |
 | `ecoscribe/platform/base.py` | The list of every OS-specific capability and where each platform has it |
 | `packaging/windows/`, `packaging/macos/` | Installer builds per OS (Inno Setup `.exe`, PyInstaller `.app` + `.dmg`); `packaging/speakers/` the speaker add-on |
-| `docs/` | User guides per OS |
+| `docs/` | User guides: getting started per OS, how-to pages, troubleshooting. A PR that changes the window or the pill updates them or says why not (`tools/docs_check.py`, in pr-shape) |
 | `tests/` | pytest suite (`e2e/` real-desktop scenarios, `ui/` the window in jsdom) |
 | `tools/` | Builds, screenshots, benchmarks (`tools/mac_*` and `build_mac.py` are the Mac ones) |
 
