@@ -32,7 +32,7 @@ from AppKit import (NSApplication, NSApplicationActivationPolicyAccessory, NSBac
 from Foundation import NSData, NSObject
 from PyObjCTools import AppHelper
 
-from ... import meetui
+from ... import glyphs, meetui
 from ...notice import notice
 from ... import palette as P
 
@@ -170,8 +170,8 @@ class PillView(NSView):
             t = NSString.stringWithString_(text)
             sz = t.sizeWithAttributes_(attrs)
             t.drawAtPoint_withAttributes_((x + (bw - sz.width) / 2, y + (bh - sz.height) / 2), attrs)
-        for kind, cx, cy, col in spec.get("glyphs", []):  # a notice's icon: the struck mic, the warning ring
-            _glyph(kind, cx, cy, col)
+        for kind, cx, cy, col in spec.get("glyphs", []):  # a notice's icon: the struck mic, the warning
+            _glyph(kind, cx, cy, col, 18)
         for x, top, bottom, col in spec.get("lines", []):  # the waveform: 2 px round-capped bars
             line = NSBezierPath.bezierPath()
             line.setLineWidth_(2)
@@ -744,44 +744,43 @@ def _stroke(path, col: str, width: float = 1.6) -> None:
     path.stroke()
 
 
-def _glyph(kind: str, cx: float, cy: float, g: str = P.AEGEAN_MUTED) -> None:
-    """The icon on the prompt's tile, centred on (cx, cy): a call started = a clay dot; still there? = a
-    clock; no mic = a struck-out mic; a transcript ended = a page with lines. The pill's notices use
-    "nomic" and "warn" (a ring with "!") in clay (pill A)."""
+def _glyph(kind: str, cx: float, cy: float, g: str = P.AEGEAN_MUTED, size: float = 22) -> None:
+    """The icon on the prompt's tile, centred on (cx, cy): a call started = a clay dot; the others are the
+    window's icons (glyphs.py, dictado-2yb): still there? = a clock, no mic = the struck mic, a setting
+    that is off = a switch, a transcript ended = the document. The pill's notices use "nomic" and "warn"
+    in clay at 18 px."""
     if kind == "start":
         color(P.CLAY_BRIGHT).setFill()
         NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(cx - 6, cy - 6, 12, 12)).fill()
-    elif kind == "end?":
-        _stroke(NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(cx - 8, cy - 8, 16, 16)), g)
-        hands = NSBezierPath.bezierPath()
-        hands.moveToPoint_((cx, cy - 5))
-        hands.lineToPoint_((cx, cy))
-        hands.lineToPoint_((cx + 4, cy + 2))
-        _stroke(hands, g)
-    elif kind == "nomic":
-        _stroke(NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(NSMakeRect(cx - 3.5, cy - 9, 7, 11), 3.5, 3.5), g)
-        stand = NSBezierPath.bezierPath()
-        stand.appendBezierPathWithArcWithCenter_radius_startAngle_endAngle_clockwise_((cx, cy - 1), 6, 0, 180, False)
-        stand.moveToPoint_((cx, cy + 5))
-        stand.lineToPoint_((cx, cy + 8))
-        _stroke(stand, g)
-        strike = NSBezierPath.bezierPath()
-        strike.moveToPoint_((cx - 8, cy - 8))
-        strike.lineToPoint_((cx + 8, cy + 8))
-        _stroke(strike, g)
-    elif kind == "warn":
-        _stroke(NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(cx - 8, cy - 8, 16, 16)), g, 2)
-        attrs = {NSFontAttributeName: font(CAP_FONT, True), NSForegroundColorAttributeName: color(g)}
-        t = NSString.stringWithString_("!")
-        sz = t.sizeWithAttributes_(attrs)
-        t.drawAtPoint_withAttributes_((cx - sz.width / 2, cy - sz.height / 2), attrs)
-    else:  # done / failed
-        _stroke(NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(NSMakeRect(cx - 6, cy - 8, 12, 16), 2, 2), g)
-        lines = NSBezierPath.bezierPath()
-        for dy in (-3, 0, 3):
-            lines.moveToPoint_((cx - 3, cy + dy))
-            lines.lineToPoint_((cx + 3, cy + dy))
-        _stroke(lines, g, 1.2)
+        return
+    for part in glyphs.placed(kind if kind in glyphs.GLYPHS else "doc", cx, cy, size):
+        k = part[0]
+        if k == "rrect":
+            _, x0, y0, x1, y1, r = part
+            _stroke(NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(NSMakeRect(x0, y0, x1 - x0, y1 - y0), r, r), g)
+        elif k in ("circle", "dot"):
+            _, px, py, r = part
+            oval = NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(px - r, py - r, 2 * r, 2 * r))
+            if k == "dot":
+                color(g).setFill()
+                oval.fill()
+            else:
+                _stroke(oval, g)
+        elif k == "arc":  # flipped view: angles run clockwise on screen, like glyphs.py
+            _, px, py, r, a0, a1 = part
+            arc = NSBezierPath.bezierPath()
+            arc.appendBezierPathWithArcWithCenter_radius_startAngle_endAngle_clockwise_((px, py), r, a0, a1, False)
+            _stroke(arc, g)
+        else:
+            _, closed, pts = part
+            path = NSBezierPath.bezierPath()
+            path.moveToPoint_(pts[0])
+            for pt in pts[1:]:
+                path.lineToPoint_(pt)
+            if closed:
+                path.closePath()
+            path.setLineJoinStyle_(1)  # NSLineJoinStyleRound
+            _stroke(path, g)
 
 
 # ---------------------------------------------------------------------------------------------------------------

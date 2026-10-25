@@ -30,15 +30,15 @@
     </div>
     <nav class="nav" aria-label="Sections">
       <button class="nav-item" data-page="inicio">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5h-5v5H5a1 1 0 0 1-1-1z"/></svg>Home</button>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path class="t" d="M4.5 10.3 11 4.9a1.6 1.6 0 0 1 2 0l6.5 5.4c.3.3.5.7.5 1.1v7.1a1.5 1.5 0 0 1-1.5 1.5H15v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5H5.5A1.5 1.5 0 0 1 4 18.5v-7.1c0-.4.2-.8.5-1.1z"/></svg>Home</button>
       <button class="nav-item" data-page="reuniones">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg>Meetings</button>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 10.5v3M8.25 8v8M12 4.5v15M15.75 8.5v7M19.5 10.5v3"/></svg>Meetings</button>
       <button class="nav-item" data-page="historial">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="8"/></svg>History</button>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle class="tf" cx="12" cy="12" r="8"/><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.4 4.6v3.2h3.2"/><path d="M12 8v4.2l2.8 1.8"/></svg>History</button>
       <button class="nav-item" data-page="insights" id="nav-insights" hidden>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V11M10 19V5M15 19v-6M20 19V9"/></svg>Insights</button>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19.5v-7M9.67 19.5V5M14.33 19.5v-6M19 19.5v-10"/></svg>Insights</button>
       <button class="nav-item" data-page="ajustes">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h8M17 7h2M5 17h2M11 17h8"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>Settings</button>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path class="t" d="M18.14 9.31L20.34 9.89L20.34 14.11L18.14 14.69L18.24 14.44L19.39 16.41L16.41 19.39L14.44 18.24L14.69 18.14L14.11 20.34L9.89 20.34L9.31 18.14L9.56 18.24L7.59 19.39L4.61 16.41L5.76 14.44L5.86 14.69L3.66 14.11L3.66 9.89L5.86 9.31L5.76 9.56L4.61 7.59L7.59 4.61L9.56 5.76L9.31 5.86L9.89 3.66L14.11 3.66L14.69 5.86L14.44 5.76L16.41 4.61L19.39 7.59L18.24 9.56z"/><circle cx="12" cy="12" r="2.6"/></svg>Settings</button>
     </nav>
     <div class="side-card">  <!-- what Home's facts were (dictado-6oe.3) -->
       <div class="side-status" id="side-status"><span class="dot"></span><span class="side-status-text">Checking…</span></div>
@@ -65,7 +65,7 @@
           <button type="button" class="btn btn-ghost btn-sm" id="crash-dismiss">Dismiss</button></div>
       </div>
       <div class="update-note" id="update-note" hidden>  <!-- dictado-cjk: a newer version is out -->
-        <svg class="update-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+        <svg class="update-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10.5M7.5 10.5 12 15l4.5-4.5"/><path d="M5 19.5h14"/></svg>
         <p class="update-text"><strong id="update-title">A new version of Ecoscribe is out</strong>
           <span id="update-sub">Your settings and history stay as they are.</span></p>
         <button type="button" class="btn btn-primary btn-sm" id="update-idle" hidden>Install when idle</button>  <!-- dictado-nmo -->
@@ -93,8 +93,8 @@
           <ul class="recent-list" id="recent-list"><li class="recent-item"><p class="last-text" id="last-text"><span class="muted">You haven't dictated anything yet.</span></p></li></ul>
         </div>
         <div class="home-actions">
-          <button type="button" class="action action-primary" id="home-record"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg><span><strong>Record a meeting</strong><span>Mic and the call's sound</span></span></button>
-          <button type="button" class="action" id="home-file"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span><strong>Transcribe a file</strong><span>Audio or video</span></span></button>
+          <button type="button" class="action action-primary" id="home-record"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 10.5v3M8.25 8v8M12 4.5v15M15.75 8.5v7M19.5 10.5v3"/></svg><span><strong>Record a meeting</strong><span>Mic and the call's sound</span></span></button>
+          <button type="button" class="action" id="home-file"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="t" d="M6 4.5A1.5 1.5 0 0 1 7.5 3H13l5 5v11.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19.5z"/><path d="M13 3v3.5A1.5 1.5 0 0 0 14.5 8H18"/><path d="M9.5 13.5v2.5M12 11.5v6.5M14.5 13v3.5"/></svg><span><strong>Transcribe a file</strong><span>Audio or video</span></span></button>
           <div class="home-tip" id="home-tip" hidden><p id="home-tip-text"></p><button type="button" class="home-tip-x" id="home-tip-x" aria-label="Hide this tip" title="Don't show this tip again">×</button></div>
         </div>
       </div>
@@ -118,7 +118,7 @@
         <header class="page-head r-head">  <!-- dictado-6oe.4: one primary action, the rest beside it -->
           <h1>Meetings</h1>
           <div class="search">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle class="t" cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5"/></svg>
             <input id="r-search" type="search" placeholder="Search meetings" autocomplete="off">
           </div>
           <div class="r-actions">
@@ -136,7 +136,7 @@
         </div>
         <ol class="history r-list" id="r-list"></ol>
         <div class="empty" id="r-empty" hidden>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 10.5v3M8.25 8v8M12 4.5v15M15.75 8.5v7M19.5 10.5v3"/></svg>
           <p id="r-empty-text">Your meetings and the audio you import will show up here.</p>
           <p class="muted small">Drag an audio or video file onto this window to transcribe it.</p>
         </div>
@@ -157,9 +157,9 @@
         </div>
         <!-- what the meeting records, live (dictado-s1a); app.js puts it in the Stop row -->
         <div class="r-src" id="r-src" hidden aria-label="What Ecoscribe is recording">
-          <div class="r-src-row" data-src="mic"><svg class="r-src-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+          <div class="r-src-row" data-src="mic"><svg class="r-src-ico" viewBox="0 0 24 24" aria-hidden="true"><rect class="t" x="8.5" y="3" width="7" height="11.5" rx="3.5"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
             <div class="r-src-bar" role="meter" aria-label="Your mic's level" aria-valuemin="0" aria-valuemax="100"><span></span></div></div>
-          <div class="r-src-row" data-src="system"><svg class="r-src-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5v5h3.5L12 19V5L7.5 9.5z"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></svg>
+          <div class="r-src-row" data-src="system"><svg class="r-src-ico" viewBox="0 0 24 24" aria-hidden="true"><path class="t" d="M4 10a1 1 0 0 1 1-1h2.5l3.8-3.4a.8.8 0 0 1 1.2.6v11.6a.8.8 0 0 1-1.2.6L7.5 15H5a1 1 0 0 1-1-1z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11"/></svg>
             <div class="r-src-bar" role="meter" aria-label="The call's level" aria-valuemin="0" aria-valuemax="100"><span></span></div></div>
         </div>
         <div class="r-d-actions" id="r-d-done-actions" hidden>  <!-- eight buttons became three (dictado-6oe.4) -->
@@ -184,12 +184,12 @@
         <div class="r-body">
           <div class="r-main">
           <div class="r-src-warn" id="r-src-warn" hidden role="alert">  <!-- dictado-s1a: a source that hears nothing -->
-            <svg class="r-src-warn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 2.5 20h19z"/><path d="M12 10v4.5M12 17.2v.3"/></svg>
+            <svg class="r-src-warn-ico" viewBox="0 0 24 24" aria-hidden="true"><path class="t" d="M10.3 4.9a2 2 0 0 1 3.4 0l7 12.1a2 2 0 0 1-1.7 3H5a2 2 0 0 1-1.7-3z"/><path d="M12 9.5v4.5M12 17v.01"/></svg>
             <div class="r-src-warn-text"><strong id="r-src-warn-title"></strong><span class="small" id="r-src-warn-detail"></span>
               <button class="btn btn-sm r-src-fix" id="r-src-fix"></button></div>
           </div>
           <div class="r-replace" id="r-replace" hidden role="status">  <!-- dictado-9lo: the Replace list on this saved transcript -->
-            <svg class="r-replace-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h15M15 4l4 4-4 4M20 16H5M9 12l-4 4 4 4"/></svg>
+            <svg class="r-replace-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h15M15.5 4.5 19 8l-3.5 3.5M20 16H5M8.5 12.5 5 16l3.5 3.5"/></svg>
             <div class="r-replace-text"><strong id="r-replace-title"></strong><span class="muted small" id="r-replace-detail"></span></div>
             <button class="btn btn-ghost btn-sm" id="r-replace-go">Apply</button>
             <button class="btn btn-ghost btn-sm" id="r-replace-undo" hidden>Undo</button>
@@ -243,7 +243,7 @@
           </div>
         </div>
         <div class="i-week" id="i-week" hidden>  <!-- this week's change, in one line (dictado-6oe.6) -->
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16l5-5 4 4 7-7"/><path d="M15 8h5v5"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 16.5 9 11l4 4 7.5-7.5"/><path d="M15 7.5h5.5V13"/></svg>
           <span id="i-week-text"></span>
         </div>
         <div class="i-grid">
@@ -338,13 +338,13 @@
           <button type="button" class="seg" data-kind="meet">Meetings</button>
         </div>
         <div class="search">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle class="t" cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5"/></svg>
           <input id="search" type="search" placeholder="Search" autocomplete="off">
         </div>
       </header>
       <ol class="history" id="history"></ol>
       <div class="empty" id="history-empty" hidden>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="8"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle class="tf" cx="12" cy="12" r="8"/><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.4 4.6v3.2h3.2"/><path d="M12 8v4.2l2.8 1.8"/></svg>
         <p id="history-empty-text">Everything you dictate will show up here.</p>
       </div>
       <footer class="page-foot">
@@ -564,7 +564,7 @@
         <div class="s-eyebrow">Set up</div>
         <h1 id="s-title">Let Ecoscribe listen and type</h1>
         <p class="s-sub">Three switches in System Settings. Ecoscribe only listens while you dictate.</p>
-        <p class="s-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/></svg>
+        <p class="s-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="t" d="M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.1v.6h5v-.6c0-.8.4-1.6 1.1-2.1A6 6 0 0 0 12 3z"/><path d="M9.5 19h5M10.5 21.5h3"/></svg>
           Turned one on? It ticks here by itself within a few seconds.</p>
       </div>
       <div class="s-card"><div class="s-rows" id="s-perms"></div></div>
@@ -575,7 +575,7 @@
         <div class="s-eyebrow">Set up</div>
         <h1>Which languages do you speak?</h1>
         <p class="s-sub">English to start with. Add the others you'll dictate in: it decides which speech models you need.</p>
-        <p class="s-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/></svg>
+        <p class="s-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="t" d="M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.1v.6h5v-.6c0-.8.4-1.6 1.1-2.1A6 6 0 0 0 12 3z"/><path d="M9.5 19h5M10.5 21.5h3"/></svg>
           Nothing to switch: Ecoscribe hears which one you speak, even two in one dictation.</p>
       </div>
       <div class="s-card">
@@ -589,7 +589,7 @@
         <div class="s-eyebrow">Set up</div>
         <h1>Getting your speech models ready</h1>
         <p class="s-sub">A one-time download. After that, everything runs on this computer, offline.</p>
-        <p class="s-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/></svg>
+        <p class="s-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="t" d="M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.1v.6h5v-.6c0-.8.4-1.6 1.1-2.1A6 6 0 0 0 12 3z"/><path d="M9.5 19h5M10.5 21.5h3"/></svg>
           We recommend both: meetings and files use both, and a language you add later won't wait for a download.</p>
       </div>
       <div class="s-card">
@@ -604,7 +604,7 @@
         <div class="s-eyebrow">Configure</div>
         <h1>Test your microphone</h1>
         <p class="s-sub">Say a few words at your normal volume.</p>
-        <p class="s-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/></svg>
+        <p class="s-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="t" d="M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.1v.6h5v-.6c0-.8.4-1.6 1.1-2.1A6 6 0 0 0 12 3z"/><path d="M9.5 19h5M10.5 21.5h3"/></svg>
           Headset connected? The bars follow the mic you pick.</p>
       </div>
       <div class="s-card s-card-center">
@@ -619,7 +619,7 @@
         <div class="s-eyebrow">Configure</div>
         <h1>Your dictation key</h1>
         <p class="s-sub">One key starts and stops dictation, in any app.</p>
-        <p class="s-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/></svg>
+        <p class="s-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="t" d="M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.1v.6h5v-.6c0-.8.4-1.6 1.1-2.1A6 6 0 0 0 12 3z"/><path d="M9.5 19h5M10.5 21.5h3"/></svg>
           Esc while you hold it cancels a dictation. You can change all of this in Settings.</p>
       </div>
       <div class="s-card s-card-center">
@@ -640,7 +640,7 @@
         <div class="s-eyebrow">Try it</div>
         <h1>Try your first dictation</h1>
         <p class="s-sub" id="s-try-sub">Tap <strong class="s-keyname">Right Ctrl</strong>, say something, and tap it again.</p>
-        <p class="s-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/></svg>
+        <p class="s-hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="t" d="M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.1v.6h5v-.6c0-.8.4-1.6 1.1-2.1A6 6 0 0 0 12 3z"/><path d="M9.5 19h5M10.5 21.5h3"/></svg>
           Speak as you would to a colleague. Ecoscribe adds the punctuation.</p>
       </div>
       <div class="s-card s-mock">
