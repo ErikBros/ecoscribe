@@ -27,7 +27,7 @@ CAPABILITIES: dict[str, dict] = {
     },
     "Take back the last paste (\"scratch that\") and paste it again (dictation key + R)": {
         "windows": "ecoscribe.platform.windows.deliver:undo_paste,foreground_window",  # + hook.VK_REPASTE
-        "macos": ("ticket", "dictado-cp1"),
+        "macos": "ecoscribe.platform.macos.deliver:undo_paste,foreground_window",  # + keyhook.KC_REPASTE
     },
     "Command mode (dictation key + E: say how to change the selection)": {
         "windows": "ecoscribe.platform.windows.deliver:copy_selection",  # + hook.VK_EDIT

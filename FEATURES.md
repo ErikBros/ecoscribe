@@ -66,7 +66,7 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 |---|---|---|
 | Hotkey (tap / hold / combo, Esc cancel) | done (low-level keyboard hook) | done (CGEventTap, Right Command) |
 | Language key (dictation key + L picks the next language) | done (Right Ctrl + L, swallowed) | done (Right Command + L, swallowed; real desktop run) |
-| Take back the last paste ("scratch that") and paste it again (dictation key + R) | done ("scratch that" alone sends Ctrl+Z, only in the window the dictation went into and within 60 s; with voice commands or self-corrections on) (dictado-ost) | ticket dictado-cp1 |
+| Take back the last paste ("scratch that") and paste it again (dictation key + R) | done ("scratch that" alone sends Ctrl+Z, only in the window the dictation went into and within 60 s; with voice commands or self-corrections on) (dictado-ost) | done (⌘Z into the same front window, Right Command + R; not tried on a Mac yet) (dictado-cp1) |
 | Command mode (dictation key + E: say how to change the selection) | done (the selection by Ctrl+C, clipboard put back; Haiku's answer pasted over it, Ctrl+Z undoes; [text] command_mode, off by default) (dictado-ua2) | ticket dictado-waw |
 | Command mode keys picked in Settings (the dictation key + a letter, or a combo) | done (Settings > With Claude > Command mode keys, the dictation key's picker; [text] command_key; a combo of its own works with a combo dictation key and is pressed again to stop) (dictado-a1d) | ticket dictado-waw (with command mode itself) |
 | Numpad Enter as a second dictation key | done (Settings > Numpad Enter dictates too; swallowed, the main Enter untouched) | done (keypad Enter, keycode 76, on an external keyboard; swallowed, Return untouched) |

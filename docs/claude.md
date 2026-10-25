@@ -36,7 +36,7 @@ Settings > Dictation > With Claude > **Fix it when you correct yourself** (off b
 on the computer; Ecoscribe sends the text through it and nothing else.
 
 - **"scratch that"** drops the sentence before it. No Claude needed for this one. Said on its own right after a paste, it
-  takes the whole last dictation back (Ctrl+Z, only in the same window and within 60 seconds; Windows, and also with
+  takes the whole last dictation back (Ctrl+Z, on a Mac ⌘Z, only in the same window and within 60 seconds; also with
   Voice commands on).
 - **"no wait"** or **"sorry, I mean"**: Claude fixes that dictation before it's pasted. "On Tuesday, no wait, on
   Thursday" becomes "on Thursday", about 3 seconds later. If Claude doesn't answer in 5 seconds, the text goes in as
