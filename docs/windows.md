@@ -21,7 +21,7 @@ From **[Releases](https://github.com/ErikBros/ecoscribe/releases/latest)**:
 | File | What it is | Needed? |
 |---|---|---|
 | `Ecoscribe-Setup-<version>.exe` | The app (about 0.5 GB) | Yes |
-| `Ecoscribe-Speakers-Setup-<version>.exe` | Speaker add-on: tells the people on a call apart (2.1 GB download, 4.6 GB installed) | Optional, not on the Releases page yet: build it from `packaging/speakers/` |
+| `Ecoscribe-Speakers-Setup-<version>.exe` | Speaker add-on: tells the people on a call apart (2.1 GB download, 4.6 GB installed) | Optional: its own release, **[Speaker add-on 1.2.0](https://github.com/ErikBros/ecoscribe/releases/tag/speakers-1.2.0)** |
 
 ## 2. Requirements
 
@@ -48,7 +48,7 @@ From **[Releases](https://github.com/ErikBros/ecoscribe/releases/latest)**:
 also tell you about a new version and install it by itself when you step away (see [Settings](settings.md#new-versions)).
 Setup waits if a meeting is recording.
 
-**Optional, the speaker add-on:** run **`Ecoscribe-Speakers-Setup-<version>.exe`** the same way (same SmartScreen
+**Optional, the speaker add-on:** download it from **[its release](https://github.com/ErikBros/ecoscribe/releases/tag/speakers-1.2.0)** and run **`Ecoscribe-Speakers-Setup-<version>.exe`** the same way (same SmartScreen
 steps). It installs separately in `%LOCALAPPDATA%\Programs\Ecoscribe Speakers` and Ecoscribe picks it up on its own.
 Updating Ecoscribe never touches it.
 

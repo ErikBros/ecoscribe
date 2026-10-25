@@ -61,7 +61,7 @@ A box says **Transcript ready** (Open). Open the meeting from the Meetings tab:
 
 ## Who said what (speaker add-on)
 
-With the speaker add-on installed and **Tell the other speakers apart** on (Settings > Meetings), the other side
+With the speaker add-on installed (Windows: download it from **[its release](https://github.com/ErikBros/ecoscribe/releases/tag/speakers-1.2.0)**, see [Windows](windows.md#1-what-to-download)) and **Tell the other speakers apart** on (Settings > Meetings), the other side
 becomes **Speaker 1, 2, 3...** Click a speaker's label to type their name; every line and every download updates. On a
 one-to-one call it stays "Others". On Windows the speakers pass runs during the call when the NVIDIA card has room,
 otherwise after it.
