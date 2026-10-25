@@ -250,6 +250,18 @@ async function load(query) {
   check(doc.querySelector("#update-note").hidden, "no new-version notice when there's none");
   check(errors.length === 0, "no JS errors: " + errors.join("; "));
 }
+{ // dictado-2xpp: each Settings section ends with its guide; Help and setup opens all guides and this platform's troubleshooting
+  const { window, doc, errors } = await load("page=ajustes&sec=meetings");
+  await sleep(50);
+  const shown = [...doc.querySelectorAll(".guide-foot")].filter((p) => !p.hidden);
+  check(shown.length === 1 && /Meetings guide/.test(shown[0].textContent), "the Meetings section ends with its guide");
+  shown[0].querySelector("a").click(); await sleep(20);
+  check(window.__guide === "meetings", "the link opens the Meetings guide");
+  window.__secShow("help"); await sleep(20);
+  doc.querySelector('[data-guide="troubleshooting#os"]').click(); await sleep(20);
+  check(window.__guide === "troubleshooting#windows", "Troubleshooting opens this platform's part");
+  check(errors.length === 0, "no JS errors: " + errors.join("; "));
+}
 { // dictado-cjk: a newer version is out
   const { window, doc, errors } = await load("page=inicio&update=1");
   await sleep(50);

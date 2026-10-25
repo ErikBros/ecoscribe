@@ -193,6 +193,7 @@ function demoApi() {
     },
     install_update_when_idle: async (v) => { window.__updInstall = v; return { ok: true }; },
     open_update: async () => { window.__updOpened = true; return { ok: true }; },
+    open_guide: async (p, s) => { window.__guide = p + (s ? "#" + s : ""); return { ok: true }; },
     dismiss_update: async (v) => { window.__updDismissed = v; return { ok: true }; },
     copy_debug_info: async () => ({ ok: true }), open_logs_folder: async () => ({ ok: true }),
     save_export: async (name, fmt) => { window.__exported = fmt; return { ok: true, path: "C:/x/Downloads/t." + fmt, name: "t." + fmt, folder: "Downloads" }; },
@@ -2567,6 +2568,13 @@ async function boot() {
   };
   secShow(params.get("sec") || store("ecoscribe.set-sec") || "dictation");  // ?sec=words: a screenshot of that section
   window.__secShow = secShow;
+  document.addEventListener("click", (e) => {  // a link to a user guide (dictado-2xpp); #os = this platform's part
+    const a = e.target.closest?.("[data-guide]");
+    if (!a) return;
+    e.preventDefault();
+    const [page, sec = ""] = a.dataset.guide.split("#");
+    api.open_guide(page, sec === "os" ? (MAC ? "mac" : "windows") : sec);
+  });
   $("#settings").addEventListener("change", dirty);
   $("#settings").addEventListener("input", (e) => { if (e.target.id === "f-vocabulary" || e.target.id === "f-calendar" || e.target.closest(".snip") || e.target.closest(".rep")) dirty(); });  // savebar while typing words
   $("#settings").addEventListener("submit", (e) => e.preventDefault());
