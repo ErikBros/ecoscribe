@@ -159,6 +159,9 @@ def _open_url(url: str) -> None:
         os.startfile(url)  # noqa: S606  (the shell's handler for mailto:)
 
 
+GUIDES = ("README", "windows", "mac", "dictation", "meetings", "claude", "insights", "settings", "troubleshooting")
+
+
 class Api:
     def __init__(self, data_dir: Path | None = None, config_path: Path | None = None, startup_mod=None,
                  signal_reload=None, list_mic_names=None, copy=None, send_command=None, downloads=None,
@@ -1233,6 +1236,15 @@ class Api:
         if not n:
             return {"ok": False}
         self._open_url(n["url"])  # the release page: the .exe and the .dmg are both there
+        return {"ok": True}
+
+    def open_guide(self, page: str, section: str = "") -> dict:
+        """A user guide in docs/ on GitHub, as of this version's release (dictado-2xpp). Only the guides
+        by name; the section is a heading's anchor (letters, digits, dashes)."""
+        from .updates import REPO
+        if page not in GUIDES or not re.fullmatch(r"[a-z0-9-]*", section or ""):
+            return {"ok": False}
+        self._open_url(f"https://github.com/{REPO}/blob/v{__version__}/docs/{page}.md" + (f"#{section}" if section else ""))
         return {"ok": True}
 
     def dismiss_update(self, version: str = "") -> dict:

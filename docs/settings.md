@@ -3,6 +3,8 @@
 ([All guides](README.md).) The Settings tab has five sections on its left. Changes wait for **Save** at the bottom
 (**Discard** drops them); a few apply the next time Ecoscribe starts, and the page says so.
 
+Under each Settings section, a line links to the guide that covers it.
+
 ## Dictation
 
 | Setting | What it does |
@@ -54,6 +56,7 @@ offline.
 
 ## Help and setup
 
+- **User guides:** **All guides** and **Troubleshooting** open these guides on GitHub, as of the version you have.
 - **Run setup again:** languages, speech models, mic and key, step by step, like the first time.
 - **Copy debug info for Claude:** version, settings (calendar link removed), the end of every log, recent crashes and
   freezes. Paste it to Claude.
