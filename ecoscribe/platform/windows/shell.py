@@ -18,7 +18,9 @@ import tkinter.font as tkfont
 from ctypes import wintypes as w
 from pathlib import Path
 
-from ... import meetui
+from PIL import ImageTk
+
+from ... import glyphs, meetui
 from ...notice import notice
 from ... import palette as P
 from . import pillart as art
@@ -338,24 +340,16 @@ PW = 360  # the prompt box's least width
 
 def _prompt_icon(c: tk.Canvas, x: float, y: float, kind: str) -> None:
     """A 38 px tile with a glyph for the box's kind: a call (the clay dot), silence (a clock),
-    a transcript (a page), no sound (a mic, struck through), a setting that is off (a switch)."""
+    a transcript (the window's document), no sound (the mic, struck through), a setting that is off
+    (a switch). The glyphs are the window's icons (glyphs.py, dictado-2yb), drawn smooth by pillart."""
     _round_rect(c, x, y, x + 38, y + 38, 11, fill=P.TILE_CALL if kind == "start" else P.TILE_NOTE)
-    cx, cy, g = x + 19, y + 19, P.AEGEAN_MUTED
+    cx, cy = x + 19, y + 19
     if kind == "start":
         c.create_oval(cx - 6, cy - 6, cx + 6, cy + 6, fill=P.CLAY_BRIGHT, outline="")
-    elif kind == "end?":
-        c.create_oval(cx - 8, cy - 8, cx + 8, cy + 8, outline=g, width=2)
-        c.create_line(cx, cy - 4, cx, cy, cx + 3, cy + 2, fill=g, width=2, capstyle="round")
-    elif kind == "nomic":
-        _round_rect(c, cx - 4, cy - 9, cx + 4, cy + 3, 4, fill="", outline=g, width=2)
-        c.create_line(cx - 9, cy - 9, cx + 9, cy + 9, fill=g, width=2, capstyle="round")
-    elif kind == "cmdoff":  # a switch, off (dictado-1b7)
-        _round_rect(c, cx - 10, cy - 6, cx + 10, cy + 6, 6, fill="", outline=g, width=2)
-        c.create_oval(cx - 7, cy - 3, cx - 1, cy + 3, fill=g, outline="")
-    else:  # done / failed: a page with lines
-        c.create_rectangle(cx - 7, cy - 9, cx + 7, cy + 9, outline=g, width=2)
-        for dy in (-3, 1, 5):
-            c.create_line(cx - 3, cy + dy, cx + 4, cy + dy, fill=g, width=2)
+        return
+    img = art.glyph_image(kind if kind in glyphs.GLYPHS else "doc", 38, 22, P.AEGEAN_MUTED, 1.8)  # done / failed: the document
+    c.glyph = ImageTk.PhotoImage(img, master=c)  # kept on the canvas, or Tk drops the picture
+    c.create_image(cx, cy, image=c.glyph)
 
 
 def _round_rect(c: tk.Canvas, x0, y0, x1, y1, r, **kw):

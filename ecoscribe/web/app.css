@@ -100,7 +100,7 @@
   --fs-hero: 36px;
   --fs-huge: 52px;
   /* icons: one stroke for every line icon */
-  --icon-stroke: 1.75;
+  --icon-stroke: 1.5;
   --icon-stroke-bold: 2.4;
   color-scheme: light;
 }
@@ -177,6 +177,9 @@ svg { display: block; }
 .nav-item svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: var(--icon-stroke); stroke-linecap: round; stroke-linejoin: round; }
 .nav-item:hover { background: var(--hover); color: var(--ink); }
 .nav-item.active { background: var(--aegean-soft); color: var(--aegean); }
+/* icon family A, Fluent (dictado-2yb): .t is an icon's main shape, .tf a fill-only one; the selected tab tints them */
+svg .tf { stroke: none; }
+.nav-item.active svg .t, .nav-item.active svg .tf { fill: currentColor; fill-opacity: .2; }
 .nav-item:focus-visible, .btn:focus-visible, select:focus-visible, input:focus-visible, .seg:focus-visible {
   outline: 2px solid var(--aegean); outline-offset: 2px;
 }

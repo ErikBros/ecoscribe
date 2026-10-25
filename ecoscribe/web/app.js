@@ -1020,8 +1020,8 @@ async function renderReuniones() {
     const li = document.createElement("li");
     li.className = "h-item r-row"; li.tabIndex = 0; li.dataset.name = row.name;
     li.insertAdjacentHTML("afterbegin", row.source === "import"
-      ? '<svg class="r-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7z"/><path d="M14 3v4h4"/></svg>'
-      : '<svg class="r-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg>');
+      ? '<svg class="r-ico" viewBox="0 0 24 24" aria-hidden="true"><path class="t" d="M6 4.5A1.5 1.5 0 0 1 7.5 3H13l5 5v11.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19.5z"/><path d="M13 3v3.5A1.5 1.5 0 0 0 14.5 8H18"/><path d="M9.5 13.5v2.5M12 11.5v6.5M14.5 13v3.5"/></svg>'
+      : '<svg class="r-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 10.5v3M8.25 8v8M12 4.5v15M15.75 8.5v7M19.5 10.5v3"/></svg>');
     const title = document.createElement("p");
     title.className = "h-text r-row-title"; title.textContent = row.title || "Untitled";
     const st = document.createElement("span");

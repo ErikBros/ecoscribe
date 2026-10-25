@@ -15,6 +15,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
+from ... import glyphs
 from ... import palette as P
 from ...notice import Notice
 
@@ -55,10 +56,12 @@ def measure(text: str, size: float, weight: int = 400) -> float:
 class Art:
     """A pill being drawn: logical coordinates (0, 0 is the pill's top left), SS-times canvas."""
 
-    def __init__(self, w: int, h: int, r: float | None = None):
+    def __init__(self, w: int, h: int, r: float | None = None, body: bool = True):
         self.w, self.h, self.r = w, h, RH / 2 if r is None else r
         self.img = Image.new("RGBA", (w * SS, h * SS), (0, 0, 0, 0))
         self.d = ImageDraw.Draw(self.img)
+        if not body:  # a bare sheet: an icon on its own
+            return
         self.d.rounded_rectangle(self._box(0, 0, w, h), radius=self.r * SS, fill=_rgba(P.INK, BODY_ALPHA))
         # a hairline of light along the top edge: the pill sits above the page, not on it
         self.d.rounded_rectangle(self._box(0, 0, w, h), radius=self.r * SS, outline=(255, 255, 255, 22), width=SS)
@@ -82,9 +85,29 @@ class Art:
 
     def line(self, x0, y0, x1, y1, color, width=2.0):
         """A line with round ends."""
+        self.poly([(x0, y0), (x1, y1)], color, width)
+
+    def glyph(self, name, cx, cy, size, color, width=1.6):
+        """One of the window's icons (glyphs.py), `size` px, centred on (cx, cy)."""
+        for part in glyphs.placed(name, cx, cy, size):
+            kind = part[0]
+            if kind == "rrect":
+                self.rrect(*part[1:5], part[5], outline=color, width=width)
+            elif kind == "circle":
+                self.ring(*part[1:4], color, width)
+            elif kind == "dot":
+                self.dot(*part[1:4], color)
+            elif kind == "arc":
+                self.arc(*part[1:4], part[4], part[5] - part[4], color, width)
+            else:
+                self.poly(part[2], color, width, part[1])
+
+    def poly(self, pts, color, width=2.0, closed=False):
+        """A line through the points with round ends and joins."""
         c, w_ = _rgba(color), width * SS
-        self.d.line([x0 * SS, y0 * SS, x1 * SS, y1 * SS], fill=c, width=round(w_))
-        for x, y in ((x0, y0), (x1, y1)):
+        pts = list(pts) + ([pts[0]] if closed else [])
+        self.d.line([(x * SS, y * SS) for x, y in pts], fill=c, width=round(w_), joint="curve")
+        for x, y in pts:
             self.d.ellipse([x * SS - w_ / 2, y * SS - w_ / 2, x * SS + w_ / 2, y * SS + w_ / 2], fill=c)
 
     def text(self, x, y, s, color, size=13.5, weight=400, anchor="lm"):
@@ -180,11 +203,8 @@ def notice(n: Notice) -> Image.Image:
     if n.icon == "lang":
         a.rrect(x, mid - 12, x + badge_w, mid + 12, 12, fill=P.AEGEAN)
         a.text(x + badge_w / 2, mid, n.badge, P.PAPER, 11, 700, anchor="mm")
-    elif n.icon == "nomic":
-        _mic_struck(a, x + 8, mid, P.CLAY_BRIGHT)
-    elif n.icon == "warn":
-        a.ring(x + 8, mid, 8, P.CLAY_BRIGHT)
-        a.text(x + 8, mid, "!", P.CLAY_BRIGHT, 11, 800, anchor="mm")
+    elif n.icon in ("nomic", "warn"):  # the window's struck mic and warning (dictado-2yb)
+        a.glyph(n.icon, x + 8, mid, 18, P.CLAY_BRIGHT)
     x += icon_w + (10 if icon_w else 0)
     if not n.icon:
         x = (a.w - tw) / 2
@@ -194,11 +214,11 @@ def notice(n: Notice) -> Image.Image:
     return a.done()
 
 
-def _mic_struck(a: Art, cx: float, cy: float, col: str) -> None:
-    a.rrect(cx - 3, cy - 7, cx + 3, cy + 2, 3, outline=col, width=1.6)
-    a.arc(cx, cy, 5, 0, 180, col, 1.6)
-    a.line(cx, cy + 5, cx, cy + 7, col, 1.6)
-    a.line(cx - 6, cy - 6, cx + 6, cy + 6, col, 1.6)
+def glyph_image(name: str, box: int, size: float, color: str, width: float = 1.6) -> Image.Image:
+    """One of the window's icons alone on a transparent `box` px square (the prompt box's tile)."""
+    a = Art(box, box, body=False)
+    a.glyph(name, box / 2, box / 2, size, color, width)
+    return a.img.convert("RGBa").reduce(SS).convert("RGBA")
 
 
 def meeting_chip(view: dict) -> Image.Image:
