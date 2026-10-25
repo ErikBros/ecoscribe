@@ -717,7 +717,9 @@ async function load(query) {
   check(!doc.querySelector("#savebar").hidden, "turning one on offers Save");
   const mac = await load("page=ajustes&mac=1");
   await sleep(200);
-  check(mac.doc.querySelector("#cm-block").hidden, "no command mode switch or keys on the Mac yet");
+  check(!mac.doc.querySelector("#cm-block").hidden, "the Mac has command mode too (dictado-waw)");
+  check(/\+ E$/.test(mac.doc.querySelector("#cm-press").textContent) && mac.doc.querySelector("#row-command-mode").textContent.includes("⌘Z"),
+        "with the Mac's keys: " + mac.doc.querySelector("#cm-press").textContent);
 }
 { // History > Edit, and learn the fixed name (dictado-1ph)
   const { window, doc } = await load("page=historial");

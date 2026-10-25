@@ -4,7 +4,7 @@ from __future__ import annotations
 import Quartz as Q
 
 MAGIC = 0x44494354  # "DICT" in kCGEventSourceUserData: ours, like LLKHF_INJECTED on Windows
-KC_V, KC_Z, KC_RETURN, KC_ESCAPE = 9, 6, 36, 53
+KC_C, KC_V, KC_Z, KC_RETURN, KC_ESCAPE = 8, 9, 6, 36, 53
 KC_CMD, KC_RCMD, KC_SHIFT, KC_OPTION, KC_CTRL = 55, 54, 56, 58, 59
 MOD_FLAGS = {"cmd": Q.kCGEventFlagMaskCommand, "shift": Q.kCGEventFlagMaskShift,
              "alt": Q.kCGEventFlagMaskAlternate, "ctrl": Q.kCGEventFlagMaskControl}
@@ -28,6 +28,10 @@ def send_keys(events: list[tuple[int, bool]], flags: int = 0) -> int:
 
 def paste() -> int:
     return send_keys([(KC_V, True), (KC_V, False)], flags=Q.kCGEventFlagMaskCommand)
+
+
+def copy() -> int:
+    return send_keys([(KC_C, True), (KC_C, False)], flags=Q.kCGEventFlagMaskCommand)
 
 
 def undo() -> int:

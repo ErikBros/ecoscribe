@@ -52,7 +52,7 @@ one of these phrases go to Claude.
 
 ## Command mode
 
-Settings > Dictation > With Claude > **Command mode** (off by default, Windows; Mac ticket dictado-waw). Change selected
+Settings > Dictation > With Claude > **Command mode** (off by default; on a Mac, Right Command + E). Change selected
 text by voice:
 
 1. Select text anywhere.

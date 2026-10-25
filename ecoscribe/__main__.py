@@ -551,12 +551,11 @@ def main(argv=None) -> int:
         from .platform.windows.hook import HookClient, spawn_hook_process
         hook_cls, hook_kw = HookClient, {"spawn": spawn_hook_process}
     hook_kw["numpad_enter"] = cfg.hotkey.numpad_enter  # the numpad's Enter as a second dictation key (5ph; Mac: 1k7)
-    if sys.platform != "darwin":  # Command mode's keys (dictado-a1d); the Mac has no command mode yet (dictado-waw)
-        from .hotkeys import normalize_command
-        try:
-            hook_kw["command_key"] = normalize_command(cfg.text.command_key, cfg.hotkey.key)
-        except ValueError as e:  # a hand-edited config.toml: the default keys, and say why in the log
-            log.warning("command_key %r not used (%s): dictation key + E", cfg.text.command_key, e)
+    from .hotkeys import normalize_command  # Command mode's keys (dictado-a1d; the Mac: dictado-waw)
+    try:
+        hook_kw["command_key"] = normalize_command(cfg.text.command_key, cfg.hotkey.key)
+    except ValueError as e:  # a hand-edited config.toml: the default keys, and say why in the log
+        log.warning("command_key %r not used (%s): dictation key + E", cfg.text.command_key, e)
     hook = hook_cls(app.on_action, cfg.hotkey.vk, cfg.hotkey.max_tap_s, **hook_kw,
                       combo=ComboMatcher(cfg.hotkey.key) if combo_vks(cfg.hotkey.key) else None,
                       accept_injected=args.test, reinstall_s=cfg.limits.hook_reinstall_s,

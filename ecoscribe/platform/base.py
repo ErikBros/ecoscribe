@@ -31,11 +31,11 @@ CAPABILITIES: dict[str, dict] = {
     },
     "Command mode (dictation key + E: say how to change the selection)": {
         "windows": "ecoscribe.platform.windows.deliver:copy_selection",  # + hook.VK_EDIT
-        "macos": ("ticket", "dictado-waw"),
+        "macos": "ecoscribe.platform.macos.deliver:copy_selection",  # Cmd+C; keyhook.HookThread.action_keys
     },
     "Command mode keys picked in Settings (the dictation key + a letter, or a combo)": {  # dictado-a1d
         "windows": "ecoscribe.platform.windows.hook:HookThread",  # HookThread.action_keys / edit_combo, --hook-edit
-        "macos": ("ticket", "dictado-waw"),  # the Mac has no command mode yet; it takes [text] command_key with it
+        "macos": "ecoscribe.platform.macos.keyhook:HookThread",  # HookThread.action_keys / edit_combo
     },
     "Numpad Enter as a second dictation key": {
         "windows": "ecoscribe.platform.windows.hook:HookThread",  # HookThread.numpad_alias
