@@ -42,3 +42,11 @@ def test_windows_reads_its_app_mode_and_never_fails_on_the_title_bar(tmp_path):
     assert isinstance(system_dark(), bool)
     assert dark_title_bar("no such window here", True) is False
     assert _api(tmp_path, []).window_theme(True) == {"ok": False}  # no window open in a test
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="AppKit")
+def test_mac_title_bar_follows_a_forced_look_and_never_fails(tmp_path):
+    """dictado-zkh: no window called that in a test process, so nothing to colour; never an error."""
+    from ecoscribe.platform.macos.desktop import dark_title_bar
+    assert dark_title_bar("no such window here", True) is False
+    assert _api(tmp_path, []).window_theme(False) == {"ok": False}

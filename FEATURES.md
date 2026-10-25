@@ -72,7 +72,7 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Numpad Enter as a second dictation key | done (Settings > Numpad Enter dictates too; swallowed, the main Enter untouched) | done (keypad Enter, keycode 76, on an external keyboard; swallowed, Return untouched) |
 | No text box at the stop: keep it on the clipboard, say so | done (UI Automation: desktop, file lists, buttons; unknown windows still get the paste) | done (Accessibility role: Finder icons and lists, buttons; unknown still pastes; the pill says ⌘V) |
 | Dark mode follows the system (Settings > Appearance: Match / Light / Dark) | done (Windows app mode) | done (macOS appearance) |
-| Title bar matches the window's light or dark look | done (Windows 11 dark title bar) | follows the system appearance; a forced Light or Dark: dictado-zkh |
+| Title bar matches the window's light or dark look | done (Windows 11 dark title bar) | done (the window's appearance, Aqua or Dark Aqua; not tried on a Mac yet) (dictado-zkh) |
 | Which app gets the paste, read just before it (Style per app) | done (process name + window title) | done (bundle id + window title through Accessibility) |
 | Paste text where the cursor is | done (clipboard + Ctrl+V) | done (NSPasteboard + Cmd+V) |
 | Names on your screen | done (UI Automation, one COM thread) | done (Accessibility API) |

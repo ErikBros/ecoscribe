@@ -18,7 +18,7 @@ Under each Settings section, a line links to the guide that covers it.
 ### Light or dark
 
 **Appearance:** *Match Windows* (Mac: *Match macOS*) follows your system's own setting; *Light* or *Dark* fixes it. On
-Windows 11 the title bar follows too.
+Windows 11 and on a Mac the title bar follows too.
 
 ### New versions
 

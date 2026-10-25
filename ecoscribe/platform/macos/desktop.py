@@ -36,3 +36,21 @@ def system_dark() -> bool:
         return out.stdout.strip().lower() == "dark"
     except Exception:
         return False
+
+
+def dark_title_bar(title: str, dark: bool) -> bool:
+    """dictado-zkh: this process's window called `title` takes the page's look, so a forced Light or Dark
+    (Settings > Appearance) colours its title bar too; with Match macOS the page asks for the system's.
+    AppKit wants the main thread: the change is queued there. False when no such window exists."""
+    from AppKit import NSAppearance, NSApplication
+    from PyObjCTools import AppHelper
+    wins = [w for w in NSApplication.sharedApplication().windows() if str(w.title() or "") == title]
+    if not wins:
+        return False
+    look = NSAppearance.appearanceNamed_("NSAppearanceNameDarkAqua" if dark else "NSAppearanceNameAqua")
+
+    def apply():
+        for w in wins:
+            w.setAppearance_(look)
+    AppHelper.callAfter(apply)
+    return True

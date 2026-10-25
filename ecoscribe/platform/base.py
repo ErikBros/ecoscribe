@@ -51,7 +51,7 @@ CAPABILITIES: dict[str, dict] = {
     },
     "Title bar matches the window's light or dark look": {  # dictado-u9h
         "windows": "ecoscribe.platform.windows.desktop:dark_title_bar",  # DWMWA_USE_IMMERSIVE_DARK_MODE
-        "macos": ("ticket", "dictado-zkh"),  # follows the system already; a forced theme needs NSApp.appearance
+        "macos": "ecoscribe.platform.macos.desktop:dark_title_bar",  # NSWindow.appearance Aqua / DarkAqua
     },
     "Which app gets the paste, read just before it (Style per app)": {  # dictado-h0m
         "windows": "ecoscribe.platform.windows.deliver:foreground_exe",  # + context.foreground_title for a browser tab
