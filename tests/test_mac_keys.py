@@ -181,6 +181,36 @@ def test_plain_r_and_left_command_r_pass_through():
     assert settle(acts, 1, 0.3) == []
 
 
+E = 14
+
+
+def test_right_command_plus_e_starts_command_mode_and_swallows_the_e():
+    """dictado-waw: like R, one "edit" per press; Cmd+E never reaches the app."""
+    h, acts = hook()
+    h.handle("flags", RCMD, CMD_BITS, False, t=0.0)
+    assert h.handle("down", E, CMD_BITS, False, t=0.05)
+    assert h.handle("up", E, CMD_BITS, False, t=0.1)
+    h.handle("flags", RCMD, 0, False, t=0.15)
+    assert settle(acts, 1, 0.3) == ["edit"]
+
+
+def test_command_mode_on_the_keys_the_user_picked():
+    """A letter of their own (dictation key + D), or a combo of its own (Ctrl+Shift+E): E is then plain."""
+    h, acts = hook(command_key="d")
+    h.handle("flags", RCMD, CMD_BITS, False, t=0.0)
+    assert not h.handle("down", E, CMD_BITS, False, t=0.05)
+    assert h.handle("down", D, CMD_BITS, False, t=0.1)
+    h.handle("up", D, CMD_BITS, False, t=0.15)
+    h.handle("flags", RCMD, 0, False, t=0.2)
+    assert settle(acts, 1, 0.3) == ["edit"]
+    h, acts = hook(command_key="ctrl+shift+e")
+    LCTRL = 59
+    h.handle("flags", LCTRL, 0x00040000 | 0x01, False, t=0.0)
+    h.handle("flags", LSHIFT, 0x00040000 | 0x00020000 | 0x01 | 0x02, False, t=0.02)
+    assert h.handle("down", E, 0x00040000 | 0x00020000 | 0x01 | 0x02, False, t=0.05)
+    assert "edit" in settle(acts, 1, 0.3)
+
+
 KP_ENTER, RETURN = 76, 36
 
 

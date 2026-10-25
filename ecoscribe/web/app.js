@@ -1973,7 +1973,6 @@ async function renderSettings() {
   $("#f-voice-commands").checked = !!s.values.voice_commands;
   $("#f-self-corrections").checked = !!s.values.self_corrections;  // dictado-bd6
   $("#f-command-mode").checked = !!s.values.command_mode;
-  $("#cm-block").hidden = MAC;  // the Mac has no command mode yet (dictado-waw)
   $("#f-command-key").value = s.values.command_key || "e";  // dictado-a1d
   cmPaint();
   $("#f-screen-names").checked = s.values.screen_names !== false;
@@ -2616,7 +2615,7 @@ function macify() {
   set("#theme-help", "Light or dark. Match macOS follows the Mac's own setting (System Settings, Appearance).");
   const unmute = $("#f-unmute"); if (unmute) unmute.closest("label").hidden = true;  // a PC fix (mics muted at 0)
   for (const el of $$("#page-ajustes .muted")) {  // dictado-p7c: Mac words in Settings
-    el.innerHTML = el.innerHTML.replaceAll("this PC", "this Mac")
+    el.innerHTML = el.innerHTML.replaceAll("this PC", "this Mac").replaceAll("Ctrl+Z", "⌘Z")
       .replace("(or the tray icon: Next dictation in)", "(or the menu bar icon: Dictation language)");
   }
   set("#s-done-sub", "Ecoscribe lives in the menu bar (the mic at the top right) and opens at login. Open this window any time from that menu or from Applications.");

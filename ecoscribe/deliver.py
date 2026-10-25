@@ -4,7 +4,8 @@ ecoscribe/platform/macos/deliver.py)."""
 import sys
 
 if sys.platform == "darwin":  # NSPasteboard + Cmd+V
-    from .platform.macos.deliver import (ClipboardBusy, DeliveryResult, deliver, foreground_exe,  # noqa: F401
+    from .platform.macos.deliver import (ClipboardBusy, DeliveryResult, copy_selection, deliver,  # noqa: F401
+                                         foreground_exe,
                                          foreground_window, get_clipboard_text, set_clipboard_text,
                                          undo_paste)
 else:  # clipboard + Ctrl+V, kept out of clipboard history

@@ -160,6 +160,34 @@ def deliver(text: str, restore_delay_s: float = 0.8) -> DeliveryResult:
     return DeliveryResult(True, exe, "ok", waited, window=foreground_window())
 
 
+def copy_selection(timeout_s: float = 0.5) -> str | None:
+    """The text selected in the front app, by Cmd+C; the clipboard text is put back after. None when Cmd+C
+    copied nothing (no selection) or synthetic keys can't be sent (command mode, dictado-waw)."""
+    _wait_modifiers_released()
+    if keys.modifiers_down() or secure_input() or not can_post():
+        return None
+    try:
+        prior, had_non_text = _read()
+        seq = change_count()
+    except Exception:
+        log.exception("clipboard read failed")
+        return None
+    keys.copy()
+    end = time.monotonic() + timeout_s
+    while time.monotonic() < end and change_count() == seq:
+        time.sleep(0.01)
+    if change_count() == seq:
+        return None
+    try:
+        text = get_clipboard_text()
+        if not had_non_text:
+            set_clipboard_text(prior, private=False)
+    except Exception:
+        log.exception("clipboard restore after copying the selection failed")
+        return None
+    return text or None
+
+
 def undo_paste() -> bool:
     """Cmd+Z in the app with focus: one paste is one undo step in text boxes (dictado-cp1)."""
     _wait_modifiers_released()

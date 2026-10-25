@@ -5,7 +5,8 @@ through; a consumer thread runs the same KeyState machine (tap, hold-to-talk, Es
 ComboMatcher. Two things are swallowed, as on Windows: the Esc of the cancel combo while recording, and
 a combo shortcut (the app under the cursor never sees it). Dictation key + L picks the next dictation's
 language ("lang", once per press; the L is swallowed so no app sees Cmd+L), and dictation key + R pastes the
-last dictation again ("repaste", the R swallowed the same way, dictado-cp1), as on Windows.
+last dictation again ("repaste", the R swallowed the same way, dictado-cp1) and dictation key + E (or the keys
+picked for Command mode) edits the selection ("edit", dictado-waw), as on Windows.
 
 Mac specifics:
 - Modifier keys (Right Command, Fn...) arrive as flagsChanged; down/up comes from their device bit.
@@ -35,7 +36,7 @@ KC_KEYPAD_ENTER = 76  # the numpad's Enter (the main Return is 36)
 class HookThread(threading.Thread):
     def __init__(self, on_action: Callable[[str], None], toggle_vk: int, max_tap_s: float,
                  accept_injected: bool = False, reinstall_s: float = 30.0,
-                 swallow_cancel: Callable[[], bool] = lambda: False, combo=None,
+                 swallow_cancel: Callable[[], bool] = lambda: False, combo=None, command_key: str = "e",
                  hold: bool = False, hold_s: float = 0.5, numpad_enter: bool = False):
         super().__init__(name="ecoscribe-hook", daemon=True)
         self.on_action = on_action
@@ -52,7 +53,10 @@ class HookThread(threading.Thread):
         self._toggle_down = False
         self._eat_esc_up = False
         self._lang_held = False  # L went down with the dictation key held: swallowed until it's up
-        self._repaste_held = False  # same for R
+        self._action_held: set[int] = set()  # same for R and E
+        from ...hotkeys import command_parts  # Command mode's keys (dictado-a1d): + a letter, or a combo of its own
+        edit_vk, self.edit_combo = command_parts(command_key)
+        self.action_keys = {keymap.to_vk(KC_REPASTE): "repaste", **({edit_vk: "edit"} if edit_vk else {})}
         self.numpad_enter = numpad_enter  # the numpad's Enter is a second dictation key (dictado-1k7, swallowed)
         self._alias_down = False  # the numpad's Enter is down as the dictation key
         self._q: queue.SimpleQueue = queue.SimpleQueue()
@@ -73,15 +77,16 @@ class HookThread(threading.Thread):
             self._lang_held = False
         return True
 
-    def repaste_key(self, keycode: int, down: bool, t: float) -> bool:
-        """Dictation key + R: emit "repaste" once per press and swallow the R, down and up, like L."""
-        if self.combo is not None or keycode != KC_REPASTE or not (self._toggle_down or self._repaste_held):
+    def action_key(self, vk: int, down: bool, t: float) -> bool:
+        """Dictation key + R (paste again) or + E (edit the selection): emit the action once per press and
+        swallow the key, down and up, like L."""
+        if self.combo is not None or vk not in self.action_keys or not (self._toggle_down or vk in self._action_held):
             return False
-        if down and not self._repaste_held:
-            self._repaste_held = True
-            self._q.put(("repaste", keymap.to_vk(keycode), t))
+        if down and vk not in self._action_held:
+            self._action_held.add(vk)
+            self._q.put((self.action_keys[vk], vk, t))
         elif not down:
-            self._repaste_held = False
+            self._action_held.discard(vk)
         return True
 
     def numpad_alias(self, kind: str, keycode: int) -> bool:
@@ -127,6 +132,13 @@ class HookThread(threading.Thread):
             self._q.put(("down" if down else "up", self.toggle_vk, t))
             return True
         vk = keymap.to_vk(keycode)
+        if self.edit_combo is not None:  # Command mode on a combo of its own (dictado-a1d)
+            fire, eat = self.edit_combo.key(vk, down)
+            if fire:
+                self._q.put(("edit", vk, t))
+            if eat:  # the app never sees it; the tap rule still hears "another key" (no toggle)
+                self._q.put(("down" if down else "up", vk, t))
+                return True
         if self.combo is not None:
             fire, eat = self.combo.key(vk, down)
             if fire:
@@ -136,8 +148,8 @@ class HookThread(threading.Thread):
         if vk == self.toggle_vk:
             self._toggle_down = down
         self._q.put(("down" if down else "up", vk, t))
-        if kind != "flags" and (self.lang_key(keycode, down, t) or self.repaste_key(keycode, down, t)):
-            return True  # the app under the cursor never sees this L or R
+        if kind != "flags" and (self.lang_key(keycode, down, t) or self.action_key(vk, down, t)):
+            return True  # the app under the cursor never sees this L, R or E
         return self.would_swallow(vk, down)
 
     # --- the real tap ---
@@ -229,7 +241,7 @@ class HookThread(threading.Thread):
                 return
             try:
                 if ev:
-                    action = {"combo": "toggle", "lang": "lang", "repaste": "repaste"}.get(ev[0]) or self.keys.feed(*ev)
+                    action = {"combo": "toggle", "lang": "lang", "repaste": "repaste", "edit": "edit"}.get(ev[0]) or self.keys.feed(*ev)
                     if action:
                         self.on_action(action)
                 action = self.keys.tick(time.monotonic())

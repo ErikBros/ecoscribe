@@ -49,7 +49,7 @@ SHOTS = {
        ("ajustes-idiomas", "page=ajustes&sec=words"))},
 }
 TALL = {"inicio-largo": "page=inicio", "ajustes-largo": "page=ajustes&dirty=1", "ajustes-frases": "page=ajustes&sc=1", "insights-largo": "page=insights&insights=1",
-        "insights-largo-oscuro": "page=insights&insights=1&theme=dark"}
+        "insights-largo-oscuro": "page=insights&insights=1&theme=dark", "ajustes-largo-mac": "page=ajustes&mac=1"}
 
 
 def shot(web: Path, query: str, out: Path, size=(980, 690), scale=1.0) -> Path:
