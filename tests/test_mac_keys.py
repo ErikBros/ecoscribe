@@ -157,6 +157,30 @@ def test_no_language_key_with_a_combo_shortcut():
     assert "lang" not in settle(acts, 1, 0.3)
 
 
+R = 15
+
+
+def test_right_command_plus_r_pastes_again_once_and_swallows_the_r():
+    """dictado-cp1: like L, one "repaste" per press, no app sees Cmd+R (a browser would reload)."""
+    h, acts = hook()
+    h.handle("flags", RCMD, CMD_BITS, False, t=0.0)
+    assert h.handle("down", R, CMD_BITS, False, t=0.05)
+    assert h.handle("down", R, CMD_BITS, False, t=0.10)  # auto-repeat
+    assert h.handle("up", R, CMD_BITS, False, t=0.15)
+    h.handle("flags", RCMD, 0, False, t=0.2)
+    assert settle(acts, 1, 0.3) == ["repaste"]
+
+
+def test_plain_r_and_left_command_r_pass_through():
+    h, acts = hook()
+    assert not h.handle("down", R, 0, False, t=0.0)
+    assert not h.handle("up", R, 0, False, t=0.05)
+    h.handle("flags", LCMD, LCMD_BITS, False, t=0.1)
+    assert not h.handle("down", R, LCMD_BITS, False, t=0.15)
+    h.handle("flags", LCMD, 0, False, t=0.25)
+    assert settle(acts, 1, 0.3) == []
+
+
 KP_ENTER, RETURN = 76, 36
 
 

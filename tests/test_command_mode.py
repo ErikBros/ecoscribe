@@ -4,7 +4,7 @@ import sys
 import pytest
 
 from ecoscribe import claude_cli, command_mode
-from ecoscribe.app import App
+from ecoscribe.app import UNDO_KEYS, App
 from ecoscribe.config import Config
 from ecoscribe.deliver import DeliveryResult
 from ecoscribe.engine import Result
@@ -79,7 +79,7 @@ def test_the_answer_replaces_the_selection(tmp_path, monkeypatch):
     monkeypatch.setattr(claude_cli, "ask", lambda *a, **k: "The shop opens at nine.")
     app, pasted = _app(tmp_path, "fix the spelling")
     _edit(app)
-    assert pasted == ["The shop opens at nine."] and "Changed: Ctrl+Z undoes it" in flashes(app)
+    assert pasted == ["The shop opens at nine."] and f"Changed: {UNDO_KEYS} undoes it" in flashes(app)
     assert app.last_text == ""  # an edit isn't a dictation: paste-again keeps the last dictation
 
 

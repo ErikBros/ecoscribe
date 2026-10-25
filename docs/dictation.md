@@ -17,8 +17,8 @@ icon for the tray icon.
 - While you talk you can switch apps or click around; it keeps recording and pastes where the cursor is when you stop.
 - **No text box at the stop** (the desktop, a file list, a button): the text stays on the clipboard and the pill says
   so. Paste it with Ctrl+V. Every dictation is also in **History**.
-- **Paste the last one again:** Right Ctrl + R pastes your last dictation once more at the cursor (Windows; Mac ticket
-  dictado-cp1).
+- **Paste the last one again:** Right Ctrl + R (Mac: Right Command + R) pastes your last dictation once more at the
+  cursor.
 
 ## The pill
 

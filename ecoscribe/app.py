@@ -26,6 +26,7 @@ from .routing import LANG_NAMES  # any language or mix (dictado-ehs)
 KEEP_AUDIO = 20  # dictations whose audio stays for Retry in History (dictado-a2r)
 SR = 16000
 PASTE_KEYS = "⌘V" if sys.platform == "darwin" else "Ctrl+V"  # dictado-cd2: the Mac's own words
+UNDO_KEYS = "⌘Z" if sys.platform == "darwin" else "Ctrl+Z"
 UNDO_S = 60.0  # dictado-ost: "scratch that" alone undoes the last paste this long after it, in the same window
 NOT_PASTED = {"clipboard_busy": "Couldn't paste",
               "no_text_box": f"No text box here: copied, paste with {PASTE_KEYS}"}  # dictado-bhe
@@ -451,7 +452,7 @@ class App:
             return False
         ok = bool(self.undo())
         log.info("scratch that: last paste undone=%s", ok)
-        self.ui.flash("Took back the last dictation" if ok else "Couldn't take it back: press Ctrl+Z", 2.0)
+        self.ui.flash("Took back the last dictation" if ok else f"Couldn't take it back: press {UNDO_KEYS}", 2.0)
         return ok
 
     def begin_edit(self) -> None:
@@ -507,7 +508,7 @@ class App:
                  dr.target_exe, dr.pasted, dr.reason)
         if dr.pasted:
             self._last_paste = (getattr(dr, "window", 0), time.monotonic(), new)
-            self.ui.flash("Changed: Ctrl+Z undoes it", 2.0)
+            self.ui.flash(f"Changed: {UNDO_KEYS} undoes it", 2.0)
         else:
             self.ui.flash(NOT_PASTED.get(dr.reason, f"Copied: paste with {PASTE_KEYS}"), 3.0)
         return None

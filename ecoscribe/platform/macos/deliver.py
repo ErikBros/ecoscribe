@@ -26,7 +26,7 @@ class DeliveryResult:
     target_exe: str
     reason: str
     waited_ms: int = 0
-    window: int = 0  # the window it was pasted into: set on Windows only so far (dictado-cp1)
+    window: int = 0  # the window it was pasted into (dictado-cp1: undo only there)
 
 
 class ClipboardBusy(Exception):
@@ -72,6 +72,26 @@ def foreground_exe() -> str:
     from AppKit import NSWorkspace
     app = NSWorkspace.sharedWorkspace().frontmostApplication()
     return str(app.localizedName() or app.bundleIdentifier() or "") if app else ""
+
+
+def foreground_window() -> int:
+    """The front app's frontmost window (its CGWindow number), or the app's pid when there is none on
+    screen: what "scratch that" checks it is still in before it undoes (dictado-cp1)."""
+    from AppKit import NSWorkspace
+    import Quartz as Q
+    app = NSWorkspace.sharedWorkspace().frontmostApplication()
+    if not app:
+        return 0
+    pid = int(app.processIdentifier())
+    try:
+        wins = Q.CGWindowListCopyWindowInfo(Q.kCGWindowListOptionOnScreenOnly | Q.kCGWindowListExcludeDesktopElements,
+                                            Q.kCGNullWindowID) or []
+        for w in wins:  # front to back: the first of this app's normal windows is the one in front
+            if int(w.get("kCGWindowOwnerPID", -1)) == pid and int(w.get("kCGWindowLayer", 1)) == 0:
+                return int(w["kCGWindowNumber"])
+    except Exception:
+        log.exception("window list failed")
+    return pid
 
 
 _carbon = None
@@ -137,7 +157,15 @@ def deliver(text: str, restore_delay_s: float = 0.8) -> DeliveryResult:
     keys.paste()
     if not had_non_text:
         threading.Timer(restore_delay_s, _restore, args=(prior, seq)).start()
-    return DeliveryResult(True, exe, "ok", waited)
+    return DeliveryResult(True, exe, "ok", waited, window=foreground_window())
+
+
+def undo_paste() -> bool:
+    """Cmd+Z in the app with focus: one paste is one undo step in text boxes (dictado-cp1)."""
+    _wait_modifiers_released()
+    if keys.modifiers_down() or secure_input() or not can_post():
+        return False
+    return keys.undo() == 2
 
 
 def _restore(prior: str | None, seq: int) -> None:

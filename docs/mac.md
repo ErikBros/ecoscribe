@@ -66,9 +66,9 @@ Settings > Dictation > Behaviour.
 
 Each has a ticket; [FEATURES.md](../FEATURES.md) has the full table.
 
-- Command mode (Right Command + E) and taking back the last paste (Right Command + R).
-- Not tried on a Mac yet: fix it when you correct yourself, call summaries and the to-dos built from them (they run
-  Claude Code from the app).
+- Command mode (Right Command + E).
+- Not tried on a Mac yet: taking back the last paste ("scratch that"), pasting it again (Right Command + R), fix it
+  when you correct yourself, call summaries and the to-dos built from them (they run Claude Code from the app).
 - Install new versions by itself (Home still offers Download).
 - Moving the meeting pill by dragging it, and the meeting following the call's mic and output.
 - The speakers pass during a call (it runs after the call).

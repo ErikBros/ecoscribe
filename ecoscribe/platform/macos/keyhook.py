@@ -4,7 +4,8 @@ Same contract as the Windows hook: the tap callback only timestamps the event, q
 through; a consumer thread runs the same KeyState machine (tap, hold-to-talk, Esc cancel) and the same
 ComboMatcher. Two things are swallowed, as on Windows: the Esc of the cancel combo while recording, and
 a combo shortcut (the app under the cursor never sees it). Dictation key + L picks the next dictation's
-language ("lang", once per press; the L is swallowed so no app sees Cmd+L), as on Windows.
+language ("lang", once per press; the L is swallowed so no app sees Cmd+L), and dictation key + R pastes the
+last dictation again ("repaste", the R swallowed the same way, dictado-cp1), as on Windows.
 
 Mac specifics:
 - Modifier keys (Right Command, Fn...) arrive as flagsChanged; down/up comes from their device bit.
@@ -27,6 +28,7 @@ from . import keymap
 
 log = logging.getLogger(__name__)
 KC_LANG = 37  # the L key (a key position: the same key on Swedish, Spanish and US layouts)
+KC_REPASTE = 15  # the R key: dictation key + R pastes the last dictation again (dictado-cp1)
 KC_KEYPAD_ENTER = 76  # the numpad's Enter (the main Return is 36)
 
 
@@ -50,6 +52,7 @@ class HookThread(threading.Thread):
         self._toggle_down = False
         self._eat_esc_up = False
         self._lang_held = False  # L went down with the dictation key held: swallowed until it's up
+        self._repaste_held = False  # same for R
         self.numpad_enter = numpad_enter  # the numpad's Enter is a second dictation key (dictado-1k7, swallowed)
         self._alias_down = False  # the numpad's Enter is down as the dictation key
         self._q: queue.SimpleQueue = queue.SimpleQueue()
@@ -68,6 +71,17 @@ class HookThread(threading.Thread):
             self._q.put(("lang", keymap.to_vk(keycode), t))
         elif not down:
             self._lang_held = False
+        return True
+
+    def repaste_key(self, keycode: int, down: bool, t: float) -> bool:
+        """Dictation key + R: emit "repaste" once per press and swallow the R, down and up, like L."""
+        if self.combo is not None or keycode != KC_REPASTE or not (self._toggle_down or self._repaste_held):
+            return False
+        if down and not self._repaste_held:
+            self._repaste_held = True
+            self._q.put(("repaste", keymap.to_vk(keycode), t))
+        elif not down:
+            self._repaste_held = False
         return True
 
     def numpad_alias(self, kind: str, keycode: int) -> bool:
@@ -122,8 +136,8 @@ class HookThread(threading.Thread):
         if vk == self.toggle_vk:
             self._toggle_down = down
         self._q.put(("down" if down else "up", vk, t))
-        if kind != "flags" and self.lang_key(keycode, down, t):
-            return True  # the app under the cursor never sees this L
+        if kind != "flags" and (self.lang_key(keycode, down, t) or self.repaste_key(keycode, down, t)):
+            return True  # the app under the cursor never sees this L or R
         return self.would_swallow(vk, down)
 
     # --- the real tap ---
@@ -215,7 +229,7 @@ class HookThread(threading.Thread):
                 return
             try:
                 if ev:
-                    action = {"combo": "toggle", "lang": "lang"}.get(ev[0]) or self.keys.feed(*ev)
+                    action = {"combo": "toggle", "lang": "lang", "repaste": "repaste"}.get(ev[0]) or self.keys.feed(*ev)
                     if action:
                         self.on_action(action)
                 action = self.keys.tick(time.monotonic())
