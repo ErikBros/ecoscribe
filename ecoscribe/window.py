@@ -90,10 +90,10 @@ if sys.platform == "darwin":  # ecoscribe/platform/macos/desktop.py + procs.py
     from .platform.macos.desktop import DEFAULT_MIC_LABEL, WEBVIEW_GUI
     from .platform.macos.desktop import input_names as _mme_input_names
     from .platform.macos.desktop import reveal as _reveal
+    from .platform.macos.desktop import dark_title_bar as _dark_title_bar
     from .platform.macos.desktop import startfile as _startfile
     from .platform.macos.desktop import system_dark as _system_dark
     from .platform.macos.procs import alive as _pid_alive
-    _dark_title_bar = None  # the title bar follows macOS; a forced theme there: dictado-zkh
 else:  # ecoscribe/platform/windows/desktop.py + procs.py
     from .platform.windows.desktop import DEFAULT_MIC_LABEL, WEBVIEW_GUI
     from .platform.windows.desktop import input_names as _mme_input_names
@@ -287,9 +287,7 @@ class Api:
         return {"theme": self._load().ui.theme}
 
     def window_theme(self, dark: bool) -> dict:
-        """dictado-u9h: the page went dark or light; the title bar follows (Windows 11). macOS: its own."""
-        if _dark_title_bar is None:
-            return {"ok": False}
+        """dictado-u9h: the page went dark or light; the title bar follows (Windows 11; macOS: dictado-zkh)."""
         try:
             return {"ok": bool(_dark_title_bar(ipc.UI_TITLE, bool(dark)))}
         except Exception:
