@@ -21,8 +21,6 @@ def _exe(pid: int) -> str:
 def sessions(flow: int) -> list[tuple[str, str, int]]:
     """[(device name, app exe, state)] for every app session on the active devices of `flow`
     (0 render, 1 capture)."""
-    from ctypes import POINTER, cast
-
     import comtypes
     from comtypes import CLSCTX_ALL, CoCreateInstance
     from pycaw.constants import CLSID_MMDeviceEnumerator
@@ -36,7 +34,9 @@ def sessions(flow: int) -> list[tuple[str, str, int]]:
         dev = col.Item(i)
         try:
             name = AudioUtilities.CreateDevice(dev).FriendlyName
-            mgr = cast(dev.Activate(IAudioSessionManager2._iid_, CLSCTX_ALL, None), POINTER(IAudioSessionManager2))
+            # QueryInterface, not cast: a cast pointer is released twice, and Windows crashed after
+            # about 50 reads once the detector polled this every 2 s (dictado-pprg)
+            mgr = dev.Activate(IAudioSessionManager2._iid_, CLSCTX_ALL, None).QueryInterface(IAudioSessionManager2)
             it = mgr.GetSessionEnumerator()
             for j in range(it.GetCount()):
                 ctl = it.GetSession(j).QueryInterface(IAudioSessionControl2)

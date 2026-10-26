@@ -17,8 +17,6 @@ _EPS = 0.01
 
 def list_capture_endpoints() -> list:
     """[(friendly_name, IAudioEndpointVolume)] for active capture devices."""
-    from ctypes import POINTER, cast
-
     from comtypes import CLSCTX_ALL, CoCreateInstance
     from pycaw.constants import CLSID_MMDeviceEnumerator
     from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume, IMMDeviceEnumerator
@@ -29,7 +27,8 @@ def list_capture_endpoints() -> list:
     for i in range(col.GetCount()):
         dev = col.Item(i)
         name = AudioUtilities.CreateDevice(dev).FriendlyName
-        vol = cast(dev.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None), POINTER(IAudioEndpointVolume))
+        # QueryInterface, not cast: a cast pointer is released twice (see audio_route.sessions)
+        vol = dev.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None).QueryInterface(IAudioEndpointVolume)
         out.append((name, vol))
     return out
 

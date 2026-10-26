@@ -1,4 +1,9 @@
-from ecoscribe.detect import Detector, MicUse, app_from_nonpackaged, app_from_packaged, uses_from_entries
+import sys
+
+import pytest
+
+from ecoscribe.detect import (Detector, MicUse, app_from_nonpackaged, app_from_packaged, uses_from_entries,
+                              with_sessions)
 
 
 def use(app, on=True):
@@ -256,3 +261,39 @@ def test_probe_command_line(monkeypatch):
     seen = {}
     monkeypatch.setattr(_d, "probe", lambda seconds, interval, raw, out: seen.update(s=seconds, raw=raw) or 0)
     assert _d.main(["--seconds", "5", "--raw"]) == 0 and seen == {"s": 5.0, "raw": True}
+
+
+# ---------- the live audio sessions (dictado-pprg): Windows can stop updating its consent store ----------
+def test_an_app_capturing_now_is_on_the_mic_when_the_consent_store_missed_it():
+    stale = MicUse(app="chrome", in_use=False, start=5, stop=6, nonpackaged=True)
+    uses = {u.app: u for u in with_sessions([stale, use("slack", False)], {"chrome", "msteams"}, set(), now=100)}
+    assert uses["chrome"].in_use and uses["chrome"].start == 100 and uses["chrome"].nonpackaged
+    assert uses["msteams"].in_use and uses["msteams"].start == 100  # not in the store at all
+    assert not uses["slack"].in_use  # no session: the store decides
+
+
+def test_a_browser_capturing_and_playing_talks_and_starts_a_meeting_without_a_title():
+    uses = with_sessions([], {"chrome"}, {"chrome", "spotify"}, now=100)
+    assert [(u.app, u.in_use, u.talking) for u in uses] == [("chrome", True, True)]
+    ev = Detector(debounce_polls=1).update(uses, ["Docs - Google Chrome"], 0.0)
+    assert ev.kind == "start" and ev.app == "chrome"
+
+
+def test_sessions_keep_what_the_consent_store_already_knew():
+    known = MicUse(app="zoom", in_use=True, start=7, stop=0, nonpackaged=True)
+    (u,) = with_sessions([known], {"zoom"}, set(), now=100)
+    assert (u.in_use, u.start, u.talking) == (True, 7, False)
+    assert with_sessions([known], set(), {"zoom"}, now=100) == [known]  # playing alone is not the mic
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="the Windows reader")
+def test_the_windows_reader_adds_the_sessions_and_survives_without_them(monkeypatch):
+    from ecoscribe.platform.windows import audio_route, detect as wd
+    monkeypatch.setattr(wd, "_entries", lambda *a: iter(()))
+    monkeypatch.setattr(audio_route, "sessions", lambda flow: [("Headset", "chrome", 1), ("Mic", "ecoscribe", 2)])
+    assert [(u.app, u.in_use, u.talking) for u in wd.read_consent()] == [("chrome", True, True)]
+
+    def broken(flow):
+        raise OSError("no audio service")
+    monkeypatch.setattr(audio_route, "sessions", broken)
+    assert wd.read_consent() == []
