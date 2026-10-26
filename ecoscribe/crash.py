@@ -326,6 +326,7 @@ class FreezeWatch:
         self.last = self.clock()
         self.frozen = False
         self.count = 0
+        self._lock = threading.Lock()  # beat() and check() run on different threads
         self._stop = threading.Event()
 
     def marker(self) -> Path:
@@ -333,11 +334,12 @@ class FreezeWatch:
         return self.dir / f"frozen-{self.pid}"
 
     def beat(self) -> None:
-        if self.frozen:
-            log.warning("main thread answering again after %.1f s", self.clock() - self.last)
-            self.frozen = False
-            self.marker().unlink(missing_ok=True)
-        self.last = self.clock()
+        with self._lock:
+            if self.frozen:
+                log.warning("main thread answering again after %.1f s", self.clock() - self.last)
+                self.frozen = False
+                self.marker().unlink(missing_ok=True)
+            self.last = self.clock()
 
     def request(self) -> Path:
         """The watchdog drops this file to ask for a last snapshot before it restarts the app."""
@@ -362,15 +364,19 @@ class FreezeWatch:
             self.request().unlink(missing_ok=True)
             log.error("FREEZE: last snapshot before the restart in %s", p)
             return p
-        if stale < self.limit or self.frozen:
-            return None
-        self.frozen = True
-        self.count += 1
-        self.dir.mkdir(parents=True, exist_ok=True)
+        # The marker goes down before the dump, under the lock: written after it, a beat that came
+        # during the dump had nothing to remove, and the watchdog killed a healthy app 60 s later.
+        with self._lock:
+            stale = self.clock() - self.last
+            if stale < self.limit or self.frozen:
+                return None
+            self.frozen = True
+            self.count += 1
+            self.dir.mkdir(parents=True, exist_ok=True)
+            self.marker().write_text(str(time.time() - stale), encoding="utf-8")
         p = self.dir / f"freeze-{self.pid}-{self.count}.log"
         self._dump(p, f"Main thread not answering for {stale:.1f} s at {time.strftime('%Y-%m-%d %H:%M:%S')}")
         log.error("FREEZE: main thread not answering for %.1f s; every thread's stack in %s", stale, p)
-        self.marker().write_text(str(time.time() - stale), encoding="utf-8")
         if self.version is not None:
             try:
                 record(self.data, self.version, "freezes")
