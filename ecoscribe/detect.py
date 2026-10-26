@@ -1,9 +1,9 @@
-"""Meeting detection: who uses the microphone (per platform: Windows' consent store in
-ecoscribe/platform/windows/detect.py, Core Audio on macOS) and the rules on top.
+"""Meeting detection: who uses the microphone (per platform: Windows' consent store and live audio
+sessions in ecoscribe/platform/windows/detect.py, Core Audio on macOS) and the rules on top.
 
 A call app holding the mic is a meeting. A browser holding the mic is a meeting
-only with a second signal: a meeting window title, or (macOS) the browser playing
-sound from the same process that captures the mic, i.e. two-way audio. A Chrome tab
+only with a second signal: a meeting window title, or the browser playing sound
+while it captures the mic, i.e. two-way audio. A Chrome tab
 can sit on the mic for hours with no call; the Meet tab's title is only in the window
 while that tab is in front. The meeting ends when its app has let go for
 grace_s in a row (mute toggles and quick rejoins must not end it). A start needs
@@ -99,6 +99,21 @@ def uses_from_entries(entries) -> list[MicUse]:
         prev = by.get(app)
         if prev is None or (u.in_use and not prev.in_use) or (u.in_use == prev.in_use and u.start > prev.start):
             by[app] = u
+    return list(by.values())
+
+
+def with_sessions(uses: list[MicUse], capturing: set[str], playing: set[str], now: int) -> list[MicUse]:
+    """Add what the live audio sessions show (Windows, dictado-pprg): an app with an active session on a
+    capture device is on the mic even when the consent store has nothing (Windows can stop updating it),
+    and one that also has an active session on an output device talks: two-way audio, as macOS reads it.
+    capturing / playing: exe names; now: a FILETIME, the start of a use the consent store missed."""
+    by = {u.app: u for u in uses}
+    for app in capturing:
+        u = by.get(app)
+        if u is None or not u.in_use:
+            u = MicUse(app=app, in_use=True, start=max(now, u.start if u else 0), stop=0,
+                       nonpackaged=u.nonpackaged if u else True)
+        by[app] = MicUse(u.app, u.in_use, u.start, u.stop, u.nonpackaged, talking=u.talking or app in playing)
     return list(by.values())
 
 

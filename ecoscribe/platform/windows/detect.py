@@ -1,16 +1,25 @@
-"""Call detection on Windows: Windows' own record of who uses the microphone, window titles and
-running apps (macOS: ecoscribe/platform/macos/detect.py). The rules live in ecoscribe/detect.py.
+"""Call detection on Windows: Windows' own record of who uses the microphone, the live audio sessions,
+window titles and running apps (macOS: ecoscribe/platform/macos/detect.py). The rules live in
+ecoscribe/detect.py.
 
 HKCU\\...\\CapabilityAccessManager\\ConsentStore\\microphone keeps, per app,
 LastUsedTimeStart / LastUsedTimeStop (FILETIME). Stop == 0 with a Start set
 means "using the mic right now". Packaged apps are subkeys named by package
 family (MSTeams_8wekyb3d8bbwe); desktop apps live under NonPackaged with the exe
 path as key name, '#' for '\\' (one key per installed version: slack app-4.x.y).
+Windows can stop updating that record (seen after a restart: nothing new for any app), so the
+audio sessions count too: an app with an active session on a capture device is on the mic, and
+one that also plays on an output device talks (dictado-pprg).
 Read-only: nothing here prompts, records or touches the desktop.
 """
 from __future__ import annotations
 
-from ...detect import MicUse, app_from_nonpackaged, uses_from_entries
+import logging
+import time
+
+from ...detect import MicUse, app_from_nonpackaged, uses_from_entries, with_sessions
+
+log = logging.getLogger(__name__)
 
 
 KEY = r"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone"
@@ -57,7 +66,15 @@ def foreground_app() -> str:
 def read_consent() -> list[MicUse]:
     import winreg
     hk = winreg.HKEY_CURRENT_USER
-    return uses_from_entries(list(_entries(hk, KEY, False)) + list(_entries(hk, KEY + r"\NonPackaged", True)))
+    uses = uses_from_entries(list(_entries(hk, KEY, False)) + list(_entries(hk, KEY + r"\NonPackaged", True)))
+    try:
+        from .audio_route import ACTIVE, sessions
+        capturing = {exe for _, exe, state in sessions(1) if exe and state == ACTIVE}
+        playing = {exe for _, exe, state in sessions(0) if exe and state == ACTIVE} if capturing else set()
+    except Exception:
+        log.debug("audio sessions not read", exc_info=True)
+        return uses
+    return with_sessions(uses, capturing, playing, int((time.time() + 11644473600) * 10_000_000))
 
 
 def _exe_of_pid(pid: int) -> str:
