@@ -78,6 +78,22 @@ def test_freeze_watch_dumps_once_per_freeze(tmp_path):
     assert fw.check().name == "freeze-7-2.log"  # a new freeze after it answered again
 
 
+def test_freeze_watch_answer_during_the_dump_leaves_no_marker(tmp_path):
+    """The main thread answered while check() wrote the dump; the marker came after and stayed, and the
+    watchdog killed the healthy app a minute later (seen after a Mac woke from hibernate)."""
+    t = [0.0]
+    fw = crash.FreezeWatch(tmp_path, 7, limit_s=3.0, clock=lambda: t[0])
+    dump = fw._dump
+
+    def dump_then_answer(p, head):
+        dump(p, head)
+        fw.beat()  # what the main thread did mid-dump
+
+    fw._dump = dump_then_answer
+    t[0] = 23.0
+    assert fw.check() is not None
+    assert not fw.frozen and not fw.marker().exists()
+
 def _api(tmp_path, copied):
     from ecoscribe.window import Api
     return Api(data_dir=tmp_path / "data", config_path=tmp_path / "config.toml", signal_reload=lambda: True,
