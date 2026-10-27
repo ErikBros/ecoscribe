@@ -97,6 +97,10 @@ class TextCfg:
     command_key: str = "e"
     command_model: str = "haiku"
     command_timeout_s: float = 20.0  # an edit the user asked for can wait longer than a dictation
+    # dictado-jq7p: the user's own writing style (a .md or .txt file), read on every edit and sent with it;
+    # with a style set the edit uses command_style_model, which follows a style better than Haiku
+    command_style_file: str = ""
+    command_style_model: str = "sonnet"
 
 
 @dataclass

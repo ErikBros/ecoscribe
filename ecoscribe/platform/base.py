@@ -37,6 +37,10 @@ CAPABILITIES: dict[str, dict] = {
         "windows": "ecoscribe.platform.windows.hook:HookThread",  # HookThread.action_keys / edit_combo, --hook-edit
         "macos": "ecoscribe.platform.macos.keyhook:HookThread",  # HookThread.action_keys / edit_combo
     },
+    "Command mode in the user's writing style (a .md or .txt style file)": {  # dictado-jq7p, shared code
+        "windows": "ecoscribe.command_mode:style_text",
+        "macos": "ecoscribe.command_mode:style_text",
+    },
     "Numpad Enter as a second dictation key": {
         "windows": "ecoscribe.platform.windows.hook:HookThread",  # HookThread.numpad_alias
         "macos": "ecoscribe.platform.macos.keyhook:HookThread",  # HookThread.numpad_alias (keycode 76)

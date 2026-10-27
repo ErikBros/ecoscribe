@@ -63,3 +63,16 @@ text by voice:
 Claude rewrites it in place; Ctrl+Z brings the old text back. **change** next to the keys picks other ones (your
 dictation key + a letter, or a combo of its own, pressed again to stop). Pressing the keys while it's off shows a box
 that takes you to the switch.
+
+### Your writing style
+
+How you speak isn't how you write. **Your writing style** (under the Command mode switch) takes a text or Markdown
+file that describes how you write: your tone, the words you use and avoid, how you write in Slack or email, how you
+write in each language. **Choose file**, then Save. Every command-mode edit then comes out in that style, translations
+included: "translate to Swedish" gives your Swedish, not a literal one.
+
+- Ecoscribe reads the file on every edit, so changes to it apply on the next one. **Open** opens it to edit,
+  **Remove** goes back to no style.
+- With a style set, edits use Claude Sonnet, which follows a style much better than Haiku; an edit takes a few
+  seconds.
+- The file stays on your computer; its text goes to Claude with each edit, like the selected text.

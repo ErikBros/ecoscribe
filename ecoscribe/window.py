@@ -248,6 +248,7 @@ class Api:
                 "voice_commands": c.text.voice_commands, "voice_phrases": c.text.voice_phrases,  # dictado-67v
                 "self_corrections": c.text.self_corrections, "command_mode": c.text.command_mode,  # dictado-bd6
                 "command_key": c.text.command_key, "command_key_label": self._command_label(c),  # dictado-a1d
+                "command_style_file": c.text.command_style_file,  # dictado-jq7p
                 "screen_names": c.text.screen_names,
                 "hold_to_talk": c.hotkey.hold_to_talk, "numpad_enter": c.hotkey.numpad_enter, "voice_memory": c.meetings.voice_memory,
                 "calendar_url": c.meetings.calendar_url, "my_name": c.meetings.my_name, "debug_log": c.ui.debug_log,
@@ -327,6 +328,8 @@ class Api:
                     c.hotkey.key = hotkeys.normalize(values["hotkey"])
                 except ValueError as e:
                     return {"ok": False, "error": str(e)}
+            if "command_style_file" in values:  # dictado-jq7p
+                c.text.command_style_file = str(values["command_style_file"] or "").strip()
             if "command_key" in values:  # dictado-a1d, checked against the (new) dictation key
                 try:
                     c.text.command_key = hotkeys.normalize_command(values["command_key"], c.hotkey.key)
@@ -862,6 +865,21 @@ class Api:
         kinds = ("Audio and video (*.mp3;*.m4a;*.wav;*.ogg;*.opus;*.flac;*.mp4;*.webm;*.mkv;*.mov)", "All files (*.*)")
         got = webview.windows[0].create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True, file_types=kinds)
         return {"paths": list(got or [])}
+
+    def pick_style_file(self) -> dict:
+        """dictado-jq7p: the writing style file for command mode (saved with the other settings)."""
+        import webview
+        kinds = ("Text (*.md;*.txt)", "All files (*.*)")
+        got = webview.windows[0].create_file_dialog(webview.FileDialog.OPEN, file_types=kinds)
+        path = (list(got) if isinstance(got, (list, tuple)) else [got] if got else [None])[0]
+        return {"path": str(path) if path else ""}
+
+    def open_style_file(self, path: str) -> dict:
+        p = Path(str(path or "")).expanduser()
+        if not p.is_file():
+            return {"ok": False, "error": "The file isn't there any more"}
+        _startfile(str(p))
+        return {"ok": True}
 
     def rename_session(self, name: str, title: str) -> dict:
         title = str(title or "").strip()

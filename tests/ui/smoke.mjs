@@ -721,6 +721,26 @@ async function load(query) {
   check(/\+ E$/.test(mac.doc.querySelector("#cm-press").textContent) && mac.doc.querySelector("#row-command-mode").textContent.includes("⌘Z"),
         "with the Mac's keys: " + mac.doc.querySelector("#cm-press").textContent);
 }
+{ // Command mode: your writing style file (dictado-jq7p)
+  const { window, doc } = await load("page=ajustes");
+  check(doc.querySelector("#row-cm-style").hidden, "the style row waits for Command mode to be on");
+  doc.querySelector("#f-command-mode").click(); await sleep(50);
+  check(!doc.querySelector("#row-cm-style").hidden && doc.querySelector("#cm-style-pick").textContent === "Choose file"
+        && doc.querySelector("#cm-style-open").hidden, "on: Choose file, nothing to open yet");
+  doc.querySelector("#cm-style-pick").click(); await sleep(50);
+  check(doc.querySelector("#cm-style-text b")?.textContent === "writing-style.md" && !doc.querySelector("#cm-style-clear").hidden
+        && doc.querySelector("#cm-style-pick").textContent === "Change", "a picked file shows its name, Open and Remove");
+  doc.querySelector("#cm-style-open").click(); await sleep(50);
+  check(window.__styleOpened === "C:/Users/you/Documents/writing-style.md", "Open opens that file");
+  let sent = null;
+  const api = window.__ecoscribe.api, orig = api.save_settings;
+  api.save_settings = async (x) => { sent = x; return orig(x); };
+  doc.querySelector("#save").click(); await sleep(100);
+  check(sent && sent.command_style_file === "C:/Users/you/Documents/writing-style.md" && sent.command_mode === true,
+        "Save sends the file with the switch: " + JSON.stringify(sent));
+  doc.querySelector("#cm-style-clear").click(); await sleep(50);
+  check(doc.querySelector("#cm-style-pick").textContent === "Choose file" && !doc.querySelector("#savebar").hidden, "Remove clears it and offers Save");
+}
 { // History > Edit, and learn the fixed name (dictado-1ph)
   const { window, doc } = await load("page=historial");
   await sleep(200);

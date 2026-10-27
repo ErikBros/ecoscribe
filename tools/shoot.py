@@ -28,6 +28,9 @@ SHOTS = {
     "ajustes-ayuda": "page=ajustes&sec=help", "ajustes-idiomas-es": "page=ajustes&sec=words&langs=en,sv,es",
     "ajustes-estilos-sin-comandos": "page=ajustes&styles=1&vc=0",  # the same with Voice commands off in Behaviour (dictado-lrm)
     "ajustes-estilos-oscuro": "page=ajustes&styles=1&theme=dark",  # Style per app in dark (dictado-lrm)
+    # Command mode's writing style file (dictado-jq7p): none set, one set, and in dark
+    "ajustes-claude": "page=ajustes&sec=dictation&cm=1", "ajustes-claude-estilo": "page=ajustes&sec=dictation&cm=1&cmstyle=1",
+    "ajustes-claude-estilo-oscuro": "page=ajustes&sec=dictation&cm=1&cmstyle=1&theme=dark",
     "reuniones": "page=reuniones", "reuniones-vacia": "page=reuniones&rec=0",
     "reunion-directo": "page=reuniones/2026-10-05_1400_retro",
     # what the meeting records (dictado-s1a): your mic silent, the call on another output, and in dark
