@@ -50,6 +50,25 @@ def test_browser_that_talks_starts_without_a_title():
     assert d.update([use("chrome")], [], 20.0).kind == "end"
 
 
+def test_not_calls_title_keeps_a_talking_page_from_being_a_call():
+    talk = MicUse(app="chrome", in_use=True, start=1, stop=0, talking=True)
+    d = Detector(debounce_polls=1, not_calls=["Practice"])
+    assert run(d, [([talk], [("Word practice - Google Chrome", "chrome")])] * 30) == []
+    # a meeting title still wins
+    assert d.update([talk], [("Word practice", "chrome"), ("Meet - Retro - Google Chrome", "chrome")], 100.0).kind == "start"
+    # the word only counts in a browser's window, and an empty list changes nothing
+    assert Detector(debounce_polls=1, not_calls=["practice"]).update([talk], [("practice.txt - Notepad", "notepad")], 0.0).kind == "start"
+    assert Detector(debounce_polls=1, not_calls=[""]).update([talk], [("Word practice", "chrome")], 0.0).kind == "start"
+
+
+def test_not_calls_ends_a_running_browser_call_when_only_the_page_is_left():
+    talk = MicUse(app="chrome", in_use=True, start=1, stop=0, talking=True)
+    d = Detector(debounce_polls=1, not_calls=["practice"])
+    assert d.update([talk], [("Docs - Google Chrome", "chrome")], 0.0).kind == "start"
+    d.update([talk], [("Word practice - Google Chrome", "chrome")], 2.0)
+    assert d.update([talk], [("Word practice - Google Chrome", "chrome")], 20.0).kind == "end"
+
+
 def test_a_call_app_that_talks_is_still_just_a_call_app():
     d = Detector(debounce_polls=1)
     ev = d.update([MicUse(app="spotify", in_use=True, start=1, stop=0, talking=True)], [], 0.0)

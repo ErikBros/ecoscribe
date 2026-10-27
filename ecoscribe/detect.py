@@ -145,8 +145,11 @@ else:  # the consent store, EnumWindows, the process list (ecoscribe/platform/wi
 class Detector:
     """Feed it a poll every couple of seconds; it returns start / end events."""
 
-    def __init__(self, grace_s: float = 10.0, own_apps=OWN_APPS, debounce_polls: int = 2):
+    def __init__(self, grace_s: float = 10.0, own_apps=OWN_APPS, debounce_polls: int = 2, not_calls=()):
         self.grace_s = grace_s
+        # dictado-34y0: words in a browser window title ([meetings] not_calls) that mark a page that talks back
+        # (a practice or voice page) as not a call; its mic + sound alone then doesn't start one
+        self.not_calls = [w.lower() for w in not_calls if w and w.strip()]
         # python/pythonw are excluded because Ecoscribe runs as Python in development; neither is a
         # call app nor a browser, so this can never hide a real meeting.
         self.own = {a.lower() for a in own_apps}
@@ -155,6 +158,12 @@ class Detector:
         self.released_at: float | None = None
         self._cand: str | None = None
         self._cand_n = 0
+
+    def _not_a_call(self, titles) -> bool:
+        """A browser window's title has one of the not_calls words. A meeting title wins over it (the caller checks)."""
+        return bool(self.not_calls) and any(
+            w in (t if isinstance(t, str) else t[0]).lower() for t in titles
+            if isinstance(t, str) or t[1] in BROWSERS for w in self.not_calls)
 
     def _active(self, app: str, in_use: set[str], titled: bool, talking: set[str]) -> bool:
         if app not in in_use:
@@ -168,6 +177,8 @@ class Detector:
                   and not (running is not None and u.nonpackaged and u.app not in running)}
         talking = {u.app for u in uses if u.in_use and u.talking}
         titled = meeting_titled(titles)
+        if not titled and self._not_a_call(titles):
+            talking -= BROWSERS
         if self.app is None:
             calls = sorted(a for a in in_use if is_call_app(a))
             browsers = sorted(a for a in in_use if a in BROWSERS and (titled or a in talking))

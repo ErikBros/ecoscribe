@@ -19,6 +19,7 @@ computer's sound). Everything stays on your computer.
   in a meeting? Take notes?"** with the app's name and a language chip. **Take notes** starts; **Not now** counts down
   10 seconds and is what happens if you ignore it.
 - **Settings > Meetings > When a call starts:** *Ask* (default), *Start by itself*, or *Don't detect*.
+- **A web page that uses the mic and talks back** (a language-practice or voice page) can look like a call in a browser. Add a word from its tab title to `not_calls` under `[meetings]` in `config.toml` (for example `not_calls = ["Practice"]`) and it isn't taken for a call; a Meet, Zoom or Teams tab still is.
 - **By hand:** Home > **Record a meeting**, the Meetings tab > **Record meeting**, or the tray icon > *Transcribe meeting
   now* / *Stop meeting*.
 - **The call ends** when the app has been off the mic for 10 seconds (Settings > Meetings > Stop recording after the

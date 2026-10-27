@@ -164,6 +164,7 @@ class MeetingsCfg:
     voice_memory: bool = True  # t0u.32: name a voice once, recognised in later calls (local voices.json)
     my_name: str = ""  # the user's own lines show this instead of "Me" (window, exports); empty = "Me"
     calendar_url: str = ""  # t0u.35: secret iCal link; names meetings from the event happening now
+    not_calls: list = field(default_factory=list)  # dictado-34y0: browser title words that mark a page as not a call
 
 
 @dataclass
