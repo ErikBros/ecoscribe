@@ -77,7 +77,7 @@ class MeetWatch(threading.Thread):
         self.ctl, self.cfg, self.ui_prompt = controller, cfg.meetings, ui_prompt
         self.read, self.clock, self.interval, self.health = read, clock, interval_s, health
         self.data = Path(data_dir) if data_dir else paths.data_dir()
-        self.detector = detect.Detector(grace_s=self.cfg.grace_s)
+        self.detector = detect.Detector(grace_s=self.cfg.grace_s, not_calls=self.cfg.not_calls)
         self.call: str | None = None  # app of the call the detector sees right now
         self.pending: str | None = None  # app whose start prompt is open
         self.suppressed: str | None = None  # "Not now" for this call
