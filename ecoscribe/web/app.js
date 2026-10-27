@@ -63,7 +63,7 @@ function demoApi() {
   const dl = { running: false, error: null, models: {} };  // the demo model download
   let settings = {
     values: { hotkey: "rctrl", mic: "Anker PowerConf", languages: demoLangs.join(","), extra_languages: demoLangs.filter((c) => !["en", "sv"].includes(c)), sounds: true, overlay: true, live_text: true, insights: params.get("insights") === "1", speech_feedback: false, unmute: true, startup: true,
-      meet_mode: "prompt", meet_end: "10", meet_lang: demoLangs[0], on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: params.get("styles") === "1" && params.get("vc") !== "0", self_corrections: false, command_mode: false, command_key: params.get("cmkey") || "e", voice_phrases: params.get("vp") === "1" ? { line: { en: ["new line", "next line"] }, enter: { en: ["send it", "press enter", "ship it"] } } : {}, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, update_check: true, auto_update: params.get("auto") === "1", theme: params.get("theme") || "system",
+      meet_mode: "prompt", meet_end: "10", meet_lang: demoLangs[0], on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: params.get("styles") === "1" && params.get("vc") !== "0", self_corrections: false, command_mode: params.get("cm") === "1", command_key: params.get("cmkey") || "e", command_style_file: params.get("cmstyle") === "1" ? "C:/Users/you/Documents/writing-style.md" : "", voice_phrases: params.get("vp") === "1" ? { line: { en: ["new line", "next line"] }, enter: { en: ["send it", "press enter", "ship it"] } } : {}, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, update_check: true, auto_update: params.get("auto") === "1", theme: params.get("theme") || "system",
       export_dir: "C:/x/Downloads", export_default: true,
       snippets: [{ trigger: "my email", text: "alex@example.com" }], replacements: [{ heard: "poll request", write: "pull request" }],
       per_app_styles: params.get("styles") === "1",
@@ -227,6 +227,8 @@ function demoApi() {
     stop_meeting: async () => { const s = find("2026-10-05_1400_retro"); if (s) s.status = "finalizing"; return { ok: true }; },
     import_files: async (paths) => { window.__imported = paths; return { ok: true, queued: paths.length }; },
     pick_files: async () => ({ paths: [] }),
+    pick_style_file: async () => ({ path: "C:/Users/you/Documents/writing-style.md" }),  // dictado-jq7p
+    open_style_file: async (p) => { window.__styleOpened = p; return { ok: true }; },
     rename_session: async (n, title) => { find(n).title = title; return { ok: true }; },
     rename_speaker: async (n, label, name) => { const s = find(n); s.speaker_names = { ...(s.speaker_names || {}) };
       if (name) s.speaker_names[label] = name; else delete s.speaker_names[label]; window.__renamed = [label, name]; return { ok: true, names: s.speaker_names }; },
@@ -1685,6 +1687,7 @@ function formValues() {
     speakers: $("#f-speakers").checked, voice_commands: $("#f-voice-commands").checked,
     voice_phrases: vcSaved(),  // dictado-67v
     self_corrections: $("#f-self-corrections").checked, command_mode: $("#f-command-mode").checked, command_key: $("#f-command-key").value,
+    command_style_file: $("#f-command-style-file").value,  // dictado-jq7p
     screen_names: $("#f-screen-names").checked, hold_to_talk: $("#f-hold").checked, numpad_enter: $("#f-numpad-enter").checked,
     theme: $("#f-theme").value || "system",
     voice_memory: $("#f-voice-memory").checked, debug_log: $("#f-debug-log").checked, update_check: $("#f-update-check").checked, auto_update: $("#f-auto-update").checked, calendar_url: $("#f-calendar").value.trim(), my_name: $("#f-my-name").value.trim(),
@@ -1974,7 +1977,8 @@ async function renderSettings() {
   $("#f-self-corrections").checked = !!s.values.self_corrections;  // dictado-bd6
   $("#f-command-mode").checked = !!s.values.command_mode;
   $("#f-command-key").value = s.values.command_key || "e";  // dictado-a1d
-  cmPaint();
+  $("#f-command-style-file").value = s.values.command_style_file || "";  // dictado-jq7p
+  cmPaint(); cmStylePaint();
   $("#f-screen-names").checked = s.values.screen_names !== false;
   $("#f-hold").checked = !!s.values.hold_to_talk; $("#f-numpad-enter").checked = !!s.values.numpad_enter;
   holdFits();
@@ -2011,6 +2015,7 @@ async function renderSettings() {
   $("#f-per-app").onchange = $("#f-voice-commands").onchange = () => { stylesState(); dirty(); };
   if (params.get("styles") === "1") $("#styles-card").scrollIntoView?.({ block: "start" });  // screenshot
   if (params.get("vc") === "1") $("#f-voice-commands").closest(".row").scrollIntoView?.({ block: "start" });  // screenshot
+  if (params.get("cm") === "1") $("#cm-block").scrollIntoView?.({ block: "center" });  // screenshot (dictado-jq7p)
   $("#f-speakers").checked = s.values.speakers && s.speakers_addon;
   $("#f-speakers").disabled = !s.speakers_addon;
   $("#f-speakers-help").textContent = s.speakers_addon
@@ -2250,6 +2255,28 @@ function cmPaint() {
   $("#cm-hint").textContent = bad ? CM_BAD : "";
   $("#cm-hint").classList.toggle("hk-bad", bad);
   $("#cm-hint").hidden = !bad;
+}
+// dictado-jq7p: the user's writing style file. The row shows with Command mode on; the file's name, never its text.
+const CM_STYLE_NONE = "A text file that says how you write: your tone, the words you use, how you write in each language. "
+  + "Claude then rewrites and translates in that style.";
+function cmStylePaint() {
+  const path = $("#f-command-style-file").value, name = path.split(/[\\/]/).pop();
+  const t = $("#cm-style-text");
+  if (path) {
+    const b = document.createElement("b"); b.textContent = name;
+    t.replaceChildren(b, ": Claude (Sonnet) rewrites and translates in this style.");
+  } else t.textContent = CM_STYLE_NONE;
+  t.title = path;
+  $("#cm-style-pick").textContent = path ? "Change" : "Choose file";
+  $("#cm-style-open").hidden = $("#cm-style-clear").hidden = !path;
+  $("#row-cm-style").hidden = !$("#f-command-mode").checked;
+}
+function cmStyleSet(path) { $("#f-command-style-file").value = path; cmStylePaint(); dirty(); }
+function cmStyleWire() {
+  $("#cm-style-pick").onclick = async () => { const r = await api.pick_style_file(); if (r.path) cmStyleSet(r.path); };
+  $("#cm-style-clear").onclick = () => cmStyleSet("");
+  $("#cm-style-open").onclick = async () => { const r = await api.open_style_file($("#f-command-style-file").value); if (!r.ok) toast(r.error); };
+  $("#f-command-mode").addEventListener("change", cmStylePaint);
 }
 function hkWire() {
   keyPicker({ label: $("#hk-label"), input: $("#f-hotkey"), button: $("#hk-change"), hint: $("#hk-hint"), lone: true,
@@ -2546,7 +2573,7 @@ async function boot() {
   };
   rWire();
   notesWire();
-  hkWire();
+  hkWire(); cmStyleWire();
   $("#search").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(renderHistory, 120); });
   for (const b of $$("#h-filter .seg")) b.onclick = () => {
     hKind = b.dataset.kind; $$("#h-filter .seg").forEach((x) => x.classList.toggle("active", x === b)); renderHistory();

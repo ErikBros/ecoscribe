@@ -30,6 +30,38 @@ def test_the_selection_and_the_instruction_go_to_haiku():
     assert seen["model"] == "haiku" and seen["timeout"] == 20.0
 
 
+def test_a_writing_style_file_goes_with_the_edit_and_uses_sonnet(tmp_path):
+    """dictado-jq7p: the user's own style guide (invented here), read on every edit."""
+    style = tmp_path / "style.md"
+    style.write_text("\ufeffShort sentences. Warm, never formal. Swedish: du, not ni.\n", encoding="utf-8")
+    c = _cfg()
+    c.text.command_style_file = str(style)
+    seen = {}
+
+    def ask(text, system, model, timeout, command):
+        seen.update(text=text, model=model)
+        return "Hej! Butiken öppnar nio."
+    assert command_mode.edit("The shop opens at nine.", "translate to Swedish", c, ask=ask) == "Hej! Butiken öppnar nio."
+    assert seen["model"] == "sonnet"
+    assert "<style>\nShort sentences. Warm, never formal. Swedish: du, not ni.\n</style>" in seen["text"]
+    assert seen["text"].index("never add facts") < seen["text"].index("<style>") < seen["text"].index("Selected text:")
+    style.write_text("Long and formal.", encoding="utf-8")  # edited: the next edit takes the new text
+    command_mode.edit("x", "make it shorter", c, ask=ask)
+    assert "<style>\nLong and formal.\n</style>" in seen["text"]
+
+
+def test_a_missing_style_file_edits_without_it(tmp_path):
+    c = _cfg()
+    c.text.command_style_file = str(tmp_path / "gone.md")
+    seen = {}
+
+    def ask(text, system, model, timeout, command):
+        seen.update(text=text, model=model)
+        return "ok"
+    assert command_mode.edit("x", "make it shorter", c, ask=ask) == "ok"
+    assert seen["model"] == "haiku" and "<style>" not in seen["text"]
+
+
 @pytest.mark.parametrize("instruction, answer, why", [
     ("", "x", "Didn't hear what to change"),
     ("make it shorter", claude_cli.ClaudeError("Not logged in"), "Claude didn't answer: Not logged in"),
