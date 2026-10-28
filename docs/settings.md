@@ -53,6 +53,8 @@ Windows 11 and on a Mac the title bar follows too.
 Ecoscribe picks the model for each language by itself. Each model shows what it's for and its size on disk; download
 it with progress, or delete one to free space (it downloads again when it's next needed). Both run on your computer,
 offline.
+On a Windows PC without an NVIDIA graphics card, a third one, **For this computer** (about 0.5 GB), is the one dictation
+uses; the other two are only for meetings and files there, and slow.
 
 ## Help and setup
 

@@ -30,7 +30,10 @@ From **[Releases](https://github.com/ErikBros/ecoscribe/releases/latest)**:
   (8 GB). Without one, Ecoscribe still works on the processor with a smaller model: slower and less accurate.
 - **Disk:** about 1 GB for the app, plus the speech models it downloads the first time each is needed: about 1.6 GB
   (English, Spanish and most languages) and about 3 GB more for the larger model (Swedish, Greek and some others).
-  On an NVIDIA card it also downloads the GPU libraries once, in the background. Add 4.6 GB for the speaker add-on.
+  On an NVIDIA card it also downloads the GPU libraries once, in the background. Without one, dictation runs on the
+  processor with a smaller model (about 0.5 GB): setup downloads it, or the app does at start and the pill says so.
+  A dictation that comes before it's there waits, the pill showing how far the download is, and is typed after.
+  Add 4.6 GB for the speaker add-on.
 - **Internet only for the first downloads** (speech models from Hugging Face, the GPU libraries from this project's
   Releases page; no account needed). After that it works offline.
 - A microphone. A headset works best for meetings.

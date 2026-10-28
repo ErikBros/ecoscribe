@@ -187,6 +187,82 @@ def test_setup_models_needed_one_is_required_by_the_languages():
     assert fast["size"] < big["size"]
 
 
+def test_setup_models_without_a_gpu_needs_the_cpu_model():
+    from ecoscribe.config import WhisperCfg
+    w = WhisperCfg()
+    cpu, fast, big = models.setup_models(w, ["en", "sv"], cpu=True)
+    assert (cpu["name"], cpu["required"]) == (models.CPU_MODEL, True) and cpu["size"] < fast["size"]
+    assert not fast["required"] and not big["required"] and fast["checked"] is False and big["checked"] is False
+    assert len(models.setup_models(w, ["en"])) == 2  # a GPU PC: unchanged
+
+
+def test_no_gpu_only_on_windows_without_an_nvidia_driver(monkeypatch):
+    from ecoscribe import gpu
+    from ecoscribe.config import WhisperCfg
+    monkeypatch.setattr(models.sys, "platform", "win32")
+    monkeypatch.setattr(gpu, "driver_cuda", lambda: None)
+    assert models.no_gpu(WhisperCfg(device="cuda"))
+    assert not models.no_gpu(WhisperCfg(device="cpu"))  # set by hand: that model runs on the CPU, not small
+    monkeypatch.setattr(gpu, "driver_cuda", lambda: 12040)
+    assert not models.no_gpu(WhisperCfg(device="cuda"))
+    monkeypatch.setattr(models.sys, "platform", "darwin")
+    monkeypatch.setattr(gpu, "driver_cuda", lambda: None)
+    assert not models.no_gpu(WhisperCfg(device="mlx"))
+
+
+class _Pill:
+    def __init__(self):
+        self.said = []
+
+    def flash(self, text, secs=0):
+        self.said.append(text)
+
+
+def test_start_cpu_model_fetches_with_a_word_on_the_pill(monkeypatch):
+    import logging
+    from ecoscribe import __main__ as main
+    from ecoscribe.config import Config
+    ui, got = _Pill(), []
+    monkeypatch.setattr(models, "no_gpu", lambda w: True)
+    monkeypatch.setattr(models, "is_ready", lambda n: False)
+    monkeypatch.setattr(models, "prepare", lambda n, **k: got.append(n))
+    main._start_cpu_model(Config(), ui, logging.getLogger("t")).join(5)
+    assert got == [models.CPU_MODEL]
+    assert ui.said[0].startswith("Getting the speech model for this computer (484 MB, once)") and ui.said[1].startswith("Speech model ready")
+
+    ui.said.clear()
+    monkeypatch.setattr(models, "prepare", lambda n, **k: (_ for _ in ()).throw(OSError("offline")))
+    main._start_cpu_model(Config(), ui, logging.getLogger("t")).join(5)
+    assert ui.said[-1].startswith("Couldn't get the speech model (OSError)")
+
+    monkeypatch.setattr(models, "is_ready", lambda n: True)  # already there, or a GPU PC: nothing happens
+    assert main._start_cpu_model(Config(), ui, logging.getLogger("t")) is None
+
+
+def test_a_dictation_before_the_cpu_model_waits_and_the_pill_shows_how_far(monkeypatch):
+    import threading
+    from ecoscribe import __main__ as main
+    ui, go, ready = _Pill(), threading.Event(), []
+
+    def prepare(n, progress=None, **k):
+        progress(120_000_000, 484_000_000)
+        go.wait(5)
+        ready.append(n)
+    monkeypatch.setattr(models, "is_ready", lambda n: bool(ready))
+    monkeypatch.setattr(models, "prepare", prepare)
+    wait = main._cpu_model_wait(ui)
+    w = threading.Thread(target=wait)
+    w.start()
+    w.join(0.5)
+    assert w.is_alive() and ui.said and ui.said[-1].startswith("Getting the speech model for this computer: 120 of 484 MB")
+    go.set()
+    w.join(5)
+    assert not w.is_alive() and ready == [models.CPU_MODEL]
+    n = len(ui.said)
+    wait()  # the model is there now: no wait, no word
+    assert len(ui.said) == n
+
+
 def test_prepare_reports_progress_and_finishes(tmp_path, monkeypatch):
     monkeypatch.setattr(models.sys, "platform", "win32")
     src = make_src(tmp_path)

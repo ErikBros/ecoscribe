@@ -61,6 +61,12 @@ function demoApi() {
   const now = new Date();
   const iso = (mins) => new Date(now - mins * 60000).toISOString().slice(0, 19);
   const dl = { running: false, error: null, models: {} };  // the demo model download
+  const DEMO_CPU_MODELS = () => [  // nogpu=1: a PC without an NVIDIA card, as models.setup_models(cpu=True) lists it
+    { name: "small", label: "For this computer", tag: "Needed on this computer", use: "Dictation on the processor: this computer has no NVIDIA graphics card",
+      size: 4.84e8, required: true, ready: false },
+    { name: "large-v3-turbo", label: "Fast", use: "For your English; finds the language in meetings and files; slow without a graphics card", size: 1.62e9, required: false, checked: false, ready: false },
+    { name: "Systran/faster-whisper-large-v3", label: "Most accurate", use: "Languages the fast one isn't good at; meetings and files in them; slow without a graphics card",
+      size: 3.09e9, required: false, checked: false, ready: false }];
   let settings = {
     values: { hotkey: "rctrl", mic: "Anker PowerConf", languages: demoLangs.join(","), extra_languages: demoLangs.filter((c) => !["en", "sv"].includes(c)), sounds: true, overlay: true, live_text: true, insights: params.get("insights") === "1", speech_feedback: false, unmute: true, startup: true,
       meet_mode: "prompt", meet_end: "10", meet_lang: demoLangs[0], on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: params.get("styles") === "1" && params.get("vc") !== "0", self_corrections: false, command_mode: params.get("cm") === "1", command_key: params.get("cmkey") || "e", command_style_file: params.get("cmstyle") === "1" ? "C:/Users/you/Documents/writing-style.md" : "", voice_phrases: params.get("vp") === "1" ? { line: { en: ["new line", "next line"] }, enter: { en: ["send it", "press enter", "ship it"] } } : {}, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, update_check: true, auto_update: params.get("auto") === "1", theme: params.get("theme") || "system",
@@ -316,6 +322,7 @@ function demoApi() {
     finish_welcome: async () => ({ ok: true }),
     setup_info: async (langs) => {
       const big = (langs || "").split(",").some((c) => c && !["en", "es", "de", "fr"].includes(c));
+      if (params.get("nogpu") === "1") return { models: DEMO_CPU_MODELS(), permissions: [] };
       return { models: [
         { name: "large-v3-turbo", label: "Fast", use: "For your English; finds the language in meetings and files", size: 1.62e9, required: !big, ready: params.get("models") === "ready" },
         { name: "Systran/faster-whisper-large-v3", label: "Most accurate", use: "Languages the fast one isn't good at; meetings and files in them", size: 3.09e9, required: big, ready: false }],
@@ -323,7 +330,7 @@ function demoApi() {
         { key: "input", label: "Input Monitoring", granted: false, ask: true }] : [] };
     },
     setup_models_start: async (names) => {
-      dl.models = Object.fromEntries(names.map((n) => [n, { done: 0, total: n.includes("turbo") ? 1.62e9 : 3.09e9, ready: false }]));
+      dl.models = Object.fromEntries(names.map((n) => [n, { done: 0, total: n === "small" ? 4.84e8 : n.includes("turbo") ? 1.62e9 : 3.09e9, ready: false }]));
       dl.running = true; dl.error = null;
       return JSON.parse(JSON.stringify(dl));
     },
@@ -340,7 +347,7 @@ function demoApi() {
       r.lang = lang || "en"; r.retried = true;
       return { ok: true, text: r.text, lang: r.lang };
     },
-    models_info: async () => ({ models: [
+    models_info: async () => (params.get("nogpu") === "1" ? { models: DEMO_CPU_MODELS().map((m) => ({ ...m, ready: m.required, disk: m.size })) } : { models: [
       { name: "large-v3-turbo", label: "Fast", use: "For your English; finds the language in meetings and files", size: 1.62e9, required: true, ready: !window.__deleted, disk: 1.62e9 },
       { name: "Systran/faster-whisper-large-v3", label: "Most accurate", use: "Languages the fast one isn't good at; meetings and files in them", size: 3.09e9, required: false,
         ready: !!(dl.models["Systran/faster-whisper-large-v3"] || {}).ready, disk: 3.09e9 }] }),
@@ -1923,16 +1930,21 @@ function fillSelect(sel, options, value) {
   sel.value = value;
 }
 /* Settings > Speech models (dictado-z4q): what each model is for, on disk or not, download / delete. */
+const CPU_HINT = "This computer has no NVIDIA graphics card, so dictation uses the smaller model made for it. "
+  + "The other two are optional: only meetings and files use them, and slowly here.";
+const modelTag = (m) => m.tag || (m.required ? null : m.checked === false ? "Optional" : "Recommended");
+
 async function renderModelsPage() {
   let info, p;
   try { [info, p] = [await api.models_info(), await api.setup_models_progress()]; } catch { return; }
   const box = $("#m-rows");
+  if (info.models.some((m) => m.tag)) $("#m-intro").textContent = CPU_HINT;
   box.innerHTML = info.models.map((m) => {
     const g = (p.models || {})[m.name] || {};
     const going = p.running && p.models[m.name] && !g.ready;
     const total = g.total || m.size;
     const pct = going && g.done ? Math.min(99, Math.round((100 * g.done) / total)) : 0;
-    const tag = m.required ? '<span class="s-tag req">In use</span>' : '<span class="s-tag">Recommended</span>';
+    const tag = m.required ? '<span class="s-tag req">In use</span>' : `<span class="s-tag">${modelTag(m)}</span>`;
     const state = m.ready ? `${gb(m.disk || m.size)} on this computer` : going ? (g.done ? `Downloading: ${gb(g.done)} of ${gb(total)}` : "Waiting…")
       : `Not downloaded · ${gb(m.size)}`;
     const act = m.ready ? `<button type="button" class="btn btn-ghost btn-sm" data-del="${m.name}">Delete</button>`
@@ -2379,7 +2391,8 @@ async function saveLangs() {
 async function paintModels() {
   const info = await api.setup_info(sx.langs.join(","));
   sx.models = info.models;
-  if (!sx.want.size || ![...sx.want].every((n) => sx.models.some((m) => m.name === n))) sx.want = new Set(sx.models.map((m) => m.name));
+  if (sx.models.some((m) => m.tag)) $("#s-models-hint").textContent = CPU_HINT;
+  if (!sx.want.size || ![...sx.want].every((n) => sx.models.some((m) => m.name === n))) sx.want = new Set(sx.models.filter((m) => m.checked !== false).map((m) => m.name));
   sx.models.filter((m) => m.required).forEach((m) => sx.want.add(m.name));
   const p = await api.setup_models_progress();
   renderModels(p);
@@ -2395,7 +2408,7 @@ function renderModels(p) {
     const going = p.running && g && !ready && sx.want.has(m.name);
     const first = sx.models.find((x) => p.running && (p.models || {})[x.name] && !(p.models[x.name] || {}).ready && sx.want.has(x.name));
     const queued = going && first && first.name !== m.name && !g.done;  // the one after: waits its turn
-    const tag = m.required ? "Needed for your languages" : "Recommended";
+    const tag = modelTag(m) || "Needed for your languages";
     const state = ready ? "Ready" : queued ? "Waiting…" : going ? (g.done ? `${gb(g.done)} of ${gb(total)}` : "Starting…") : gb(m.size);
     return `<div class="s-row s-model${ready ? " ready" : ""}">
       <input type="checkbox" data-model="${m.name}" ${sx.want.has(m.name) || ready ? "checked" : ""} ${m.required || ready || p.running ? "disabled" : ""} aria-label="${m.label}">

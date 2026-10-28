@@ -490,6 +490,18 @@ async function load(query) {
   check(window.__notes?.["2026-10-05_1400_retro"]?.endsWith("- budget") && doc.querySelector("#r-notes-state").textContent === "Saved.", "typing saves the notes");
   check(box.value.endsWith("- budget"), "a live poll doesn't overwrite the notes");
 }
+{ // dictado-7t38: a PC without an NVIDIA card needs the small model; the GPU two start unticked
+  const { window, doc } = await load("page=bienvenida&welcome=1&sstep=models&nogpu=1");
+  await sleep(200);
+  const rows = doc.querySelectorAll("#s-models .s-row");
+  const box = (i) => rows[i].querySelector("[data-model]");
+  check(rows.length === 3 && rows[0].textContent.includes("For this computer") && rows[0].textContent.includes("Needed on this computer"),
+    "no GPU: the small model is listed first, needed on this computer");
+  check(box(0).checked && box(0).disabled && !box(1).checked && !box(2).checked, "only the small model is ticked; the GPU models are optional");
+  check(doc.querySelector("#s-download").textContent.includes("484 MB"), "download offers only the small model (484 MB)");
+  check(doc.querySelector("#s-models-hint").textContent.includes("no NVIDIA graphics card") && rows[1].textContent.includes("Optional"),
+    "the hint and tags say the GPU models are optional here");
+}
 { // setup (dictado-zpz): every step on Windows, then the summary
   const { window, doc } = await load("page=bienvenida&welcome=1");
   const on = () => doc.querySelector(".sstep.on")?.dataset.step;

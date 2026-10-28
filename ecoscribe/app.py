@@ -70,6 +70,7 @@ class App:
         self._timer: threading.Timer | None = None
         self._t_start = 0.0
         self._warned_cpu = False
+        self.model_wait = None  # dictado-7t38: a PC without a GPU waits here for its model, the pill saying how far
         self._worker = threading.Thread(target=self._work, name="ecoscribe-worker", daemon=True)
 
     def start(self) -> None:
@@ -368,6 +369,8 @@ class App:
             kw["lang"] = forced
         elif multi and self.last_lang:
             kw["prefer"] = self.last_lang
+        if self.model_wait:
+            self.model_wait()
         res = self.engine.transcribe(audio, **kw)
         if getattr(self.engine, "device", "cuda") == "cpu" and not self._warned_cpu:
             self._warned_cpu = True
