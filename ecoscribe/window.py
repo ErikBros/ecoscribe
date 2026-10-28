@@ -1282,7 +1282,7 @@ class Api:
         from . import models
         c = self._load()
         langs = [x.strip() for x in str(languages).split(",") if x.strip()] or c.whisper.languages
-        rows = models.setup_models(c.whisper, langs)
+        rows = models.setup_models(c.whisper, langs, cpu=models.no_gpu(c.whisper))
         for m in rows:
             m["ready"] = models.is_ready(m["name"])
         perms = []
@@ -1333,7 +1333,7 @@ class Api:
         """Settings > Speech models (dictado-z4q): both models, what each is for, on disk or not."""
         from . import models
         c = self._load()
-        rows = models.setup_models(c.whisper, c.whisper.languages)
+        rows = models.setup_models(c.whisper, c.whisper.languages, cpu=models.no_gpu(c.whisper))
         for m in rows:
             m["ready"] = models.is_ready(m["name"])
             m["disk"] = models.disk_size(m["name"]) if m["ready"] else 0
@@ -1342,7 +1342,7 @@ class Api:
     def delete_model(self, name: str) -> dict:
         from . import models
         c = self._load()
-        if name not in (c.whisper.model, c.whisper.sv_model):
+        if name not in (c.whisper.model, c.whisper.sv_model, models.CPU_MODEL):
             return {"ok": False, "error": "unknown model"}
         try:
             return {"ok": models.delete(name)}

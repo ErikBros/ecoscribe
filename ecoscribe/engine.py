@@ -138,7 +138,8 @@ class Engine:
 
     def _cpu(self, reason: str) -> None:
         self.fallback_reason = reason
-        self.model = self._make("small", "cpu", "int8")
+        from .models import CPU_MODEL
+        self.model = self._make(CPU_MODEL, "cpu", "int8")
         self.device = "cpu"
         self._warmup()
 

@@ -173,6 +173,10 @@ CAPABILITIES: dict[str, dict] = {
         "windows": "ecoscribe.models:ensure_local,prepare,is_ready",  # progress from the HF blobs (dictado-zpz)
         "macos": "ecoscribe.platform.macos.mlx_engine:ensure_mlx,is_cached_mlx",  # bytes from the HF blobs (dictado-kuu)
     },
+    "No NVIDIA GPU: setup and the app fetch the CPU speech model, with a word on screen": {
+        "windows": "ecoscribe.models:no_gpu,CPU_MODEL,setup_models",  # dictado-7t38; the pill: __main__._start_cpu_model
+        "macos": ("not_needed", "every supported Mac has its GPU: mlx runs on Metal"),
+    },
     "GPU runtime: the CUDA libraries download once, not in every installer": {
         "windows": "ecoscribe.gpu_runtime:ensure,Fetcher,dll_root",  # %LOCALAPPDATA%\\ecoscribe\\runtime\\<version> (dictado-7e1)
         "macos": ("not_needed", "no CUDA: mlx runs on Metal, which comes with macOS"),

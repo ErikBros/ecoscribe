@@ -195,19 +195,30 @@ def for_transcribe(name: str, cfg, download=_hf_download, progress=None) -> Path
 
 # ---------------- first-run setup (dictado-zpz) ----------------
 # Approximate download sizes, shown before the real total is known.
-SIZES = {"large-v3-turbo": 1_620_000_000, "Systran/faster-whisper-large-v3": 3_090_000_000}
+CPU_MODEL = "small"  # dictation without an NVIDIA GPU (engine.py's CPU fallback); dictado-7t38
+SIZES = {"large-v3-turbo": 1_620_000_000, "Systran/faster-whisper-large-v3": 3_090_000_000, CPU_MODEL: 484_000_000}
 
 
-def setup_models(wcfg, languages) -> list[dict]:
+def no_gpu(wcfg) -> bool:
+    """True on a Windows PC with no NVIDIA driver: dictation runs on CPU_MODEL there (engine.py), so setup and the
+    app fetch that one. The Mac always has its GPU (mlx). dictado-7t38"""
+    if sys.platform != "win32" or wcfg.device != "cuda":
+        return False
+    from . import gpu
+    return gpu.driver_cuda() is None
+
+
+def setup_models(wcfg, languages, cpu: bool = False) -> list[dict]:
     """The two speech models Ecoscribe uses, fast first. `required`: the one dictation in
-    `languages` runs on; the other is recommended (meetings and files use both)."""
+    `languages` runs on; the other is recommended (meetings and files use both).
+    cpu (no_gpu): dictation runs on CPU_MODEL, listed first and needed; the GPU two are left unticked (dictado-7t38)."""
     from .languages import ALL, TURBO_OK, needs_big_model
     big = needs_big_model(languages)
     # dictado-607: named with the user's own languages, never a fixed "Swedish, Greek" for everyone
     names = lambda cs: " and ".join(filter(None, [", ".join(ALL.get(c, c) for c in cs[:-1]), ALL.get(cs[-1], cs[-1])]))  # noqa: E731
     fast = [c for c in languages or [] if c in TURBO_OK]
     slow = [c for c in languages or [] if c not in TURBO_OK]
-    return [
+    rows = [
         {"name": wcfg.model, "label": "Fast", "use": (f"For your {names(fast)}" if fast else "English, Spanish and similar")
          + "; finds the language in meetings and files",
          "size": SIZES.get(wcfg.model, 1_620_000_000), "required": not big},
@@ -215,6 +226,13 @@ def setup_models(wcfg, languages) -> list[dict]:
          + "; meetings and files in them",
          "size": SIZES.get(wcfg.sv_model, 3_090_000_000), "required": big},
     ]
+    if not cpu:
+        return rows
+    for r in rows:
+        r.update(required=False, checked=False, use=r["use"] + "; slow without a graphics card")
+    return [{"name": CPU_MODEL, "label": "For this computer", "tag": "Needed on this computer",
+             "use": "Dictation on the processor: this computer has no NVIDIA graphics card",
+             "size": SIZES[CPU_MODEL], "required": True}] + rows
 
 
 def _mlx():

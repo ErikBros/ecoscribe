@@ -205,6 +205,30 @@ def _start_gpu_runtime(cfg, data, status_path, ui, engine, log):
     return gpu_runtime.Fetcher(data, m, on_state, legacy=gpu_runtime.legacy_dir()).start()
 
 
+def _start_cpu_model(cfg, ui, log):
+    """dictado-7t38: without an NVIDIA GPU, dictation runs on the small model on the CPU. Fetch it at start with a
+    word on the pill, instead of silently inside the first dictation (which then looked like it hung)."""
+    from . import models
+    if not models.no_gpu(cfg.whisper) or models.is_ready(models.CPU_MODEL):
+        return None
+
+    def run():
+        ui.flash(f"Getting the speech model for this computer ({models.SIZES[models.CPU_MODEL] // 10**6} MB, once). "
+                 "Dictation waits for it.", 8.0)
+        try:
+            models.prepare(models.CPU_MODEL)
+        except Exception as e:
+            log.exception("CPU speech model download failed")
+            ui.flash(f"Couldn't get the speech model ({type(e).__name__}). Check the connection; "
+                     "the next dictation tries again.", 10.0)
+            return
+        log.info("CPU speech model ready")
+        ui.flash("Speech model ready: dictation works now.", 6.0)
+    t = threading.Thread(target=run, name="ecoscribe-cpu-model", daemon=True)
+    t.start()
+    return t
+
+
 def _start_meetings(cfg, data, ui, root, log, app=None):
     """Controller (one worker at a time), detector thread, prompt box, 1 s poll on the tk thread."""
     from . import ipc, meetui
@@ -451,6 +475,10 @@ def main(argv=None) -> int:
             _start_gpu_runtime(cfg, data, status_path, ui, engine, log)
         except Exception:
             log.exception("GPU runtime check failed; dictation runs on the CPU")
+        try:
+            _start_cpu_model(cfg, ui, log)
+        except Exception:
+            log.exception("CPU speech model check failed")
 
     pending_install: list = []  # dictado-nmo: (installer, asset, relaunch) to start as the app ends
 
