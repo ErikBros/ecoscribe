@@ -315,7 +315,7 @@ async function load(query) {
   doc.querySelector("#save").click(); await sleep(100);
   check(sent && sent.auto_update === true && Object.keys(sent).length === 1, "turning it on saves only that: " + JSON.stringify(sent));
   const { doc: mac } = await load("page=ajustes&mac=1");
-  check(!mac.querySelector("#f-updates [value=auto]"), "the Mac has no Install by itself (dictado-6gr)");
+  check(!!mac.querySelector("#f-updates [value=auto]"), "the Mac has Install by itself too (dictado-6gr)");
 }
 { // stopped
   const { doc } = await load("page=inicio&state=stopped");

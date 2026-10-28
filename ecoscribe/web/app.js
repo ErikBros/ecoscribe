@@ -95,7 +95,7 @@ function demoApi() {
     },
     can_startup: true,
     speakers_addon: params.get("addon") !== "0",
-    auto_update_supported: !MAC,
+    auto_update_supported: true,
     voice_command_list: [  // like window._voice_command_list: `builtin` per language; get_settings adds `phrases` (dictado-67v)
       { key: "paragraph", what: "Paragraph break", builtin: { en: ["new paragraph"], es: ["nuevo párrafo", "punto y aparte"], sv: ["nytt stycke"] } },
       { key: "line", what: "Line break", builtin: { en: ["new line"], es: ["nueva línea"], sv: ["ny rad"] } },
@@ -2017,7 +2017,7 @@ async function renderSettings() {
   $("#f-debug-log").checked = !!s.values.debug_log;
   $("#f-update-check").checked = s.values.update_check !== false;
   $("#f-auto-update").checked = !!s.values.auto_update;  // dictado-nmo: off by default
-  if (!s.auto_update_supported) $("#f-updates [value=auto]")?.remove();  // the Mac: Download only (dictado-6gr)
+  if (!s.auto_update_supported) $("#f-updates [value=auto]")?.remove();  // a copy that can't install itself: Tell me only
   fillSelect($("#f-theme"), s.options.themes || [{ value: "system", label: "Match Windows" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }],
              s.values.theme || "system");
   applyTheme(s.values.theme || "system");  // back to the saved one (Discard, or a preview left unsaved)

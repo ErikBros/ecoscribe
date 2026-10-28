@@ -183,7 +183,7 @@ CAPABILITIES: dict[str, dict] = {
     },
     "Install a new version by itself: when idle or at Quit, never in a call (Settings switch, off by default; Home > Install when idle)": {
         "windows": "ecoscribe.selfupdate:SelfUpdater,run_installer,input_idle_s",  # the Inno Setup installer, silent
-        "macos": ("ticket", "dictado-6gr"),  # the .dmg: replace Ecoscribe.app; until then Download only
+        "macos": "ecoscribe.platform.macos.selfinstall:command,app_bundle,requirement",  # the .dmg: swaps Ecoscribe.app
     },
     "Installer": {
         "windows": "file:packaging/windows/ecoscribe.iss",
