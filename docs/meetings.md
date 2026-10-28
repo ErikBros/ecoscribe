@@ -36,6 +36,8 @@ computer's sound). Everything stays on your computer.
   ("hearing them"). Hover one to see the device. If one stays silent while the call app uses another device, a warning
   says so with a button to record that device instead (**Record** + the device's name). On Windows Ecoscribe also
   follows the call by itself: a silent source switches to the device the call app uses.
+  The warning's × hides it for the rest of that meeting (useful in a room meeting, where nothing plays on the
+  computer); the meter still shows the source as silent.
 - **Your notes:** type in the notes box above the transcript, during or after the call. It saves itself, and Copy for
   Claude, the summary prompt and the .md download include it.
 
