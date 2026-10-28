@@ -211,22 +211,39 @@ def _start_cpu_model(cfg, ui, log):
     from . import models
     if not models.no_gpu(cfg.whisper) or models.is_ready(models.CPU_MODEL):
         return None
+    fetch = models.fetch_cpu_model()
 
-    def run():
+    def tell():
         ui.flash(f"Getting the speech model for this computer ({models.SIZES[models.CPU_MODEL] // 10**6} MB, once). "
                  "Dictation waits for it.", 8.0)
-        try:
-            models.prepare(models.CPU_MODEL)
-        except Exception as e:
-            log.exception("CPU speech model download failed")
-            ui.flash(f"Couldn't get the speech model ({type(e).__name__}). Check the connection; "
-                     "the next dictation tries again.", 10.0)
-            return
-        log.info("CPU speech model ready")
-        ui.flash("Speech model ready: dictation works now.", 6.0)
-    t = threading.Thread(target=run, name="ecoscribe-cpu-model", daemon=True)
+        fetch.join()
+        if err := models.cpu_fetch()["error"]:
+            ui.flash(f"Couldn't get the speech model ({err}). Check the connection; the next dictation tries again.", 10.0)
+        else:
+            log.info("CPU speech model ready")
+            ui.flash("Speech model ready: dictation works now.", 6.0)
+    t = threading.Thread(target=tell, name="ecoscribe-cpu-model-pill", daemon=True)
     t.start()
     return t
+
+
+def _cpu_model_wait(ui):
+    """App.model_wait on a PC without an NVIDIA GPU: a dictation that comes before the model waits for it, the pill
+    showing how far, then goes on (dictado-7t38). Fetches it when nothing is (setup skipped, an earlier try failed)."""
+    from . import models
+
+    def wait():
+        if models.is_ready(models.CPU_MODEL):
+            return
+        fetch = models.fetch_cpu_model()
+        while fetch.is_alive():
+            st = models.cpu_fetch()
+            ui.flash(f"Getting the speech model for this computer: {st['done'] // 10**6} of "
+                     f"{(st['total'] or models.SIZES[models.CPU_MODEL]) // 10**6} MB. Your dictation is typed when it's here.", 4.0)
+            fetch.join(2.0)
+        if err := models.cpu_fetch()["error"]:
+            ui.flash(f"Couldn't get the speech model ({err}). Check the connection.", 10.0)
+    return wait
 
 
 def _start_meetings(cfg, data, ui, root, log, app=None):
@@ -467,6 +484,13 @@ def main(argv=None) -> int:
               undo=getattr(_deliver, "undo_paste", None), window_now=getattr(_deliver, "foreground_window", None),
               copy_selection=getattr(_deliver, "copy_selection", None))
     app.ready = False
+    if not args.test:
+        try:
+            from . import models
+            if models.no_gpu(cfg.whisper):
+                app.model_wait = _cpu_model_wait(ui)
+        except Exception:
+            log.exception("CPU speech model check failed")
     app.start()
 
     meet_ctl, watch = _start_meetings(cfg, data, ui, root, log, app=app) if not args.test else (None, None)

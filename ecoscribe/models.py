@@ -208,6 +208,38 @@ def no_gpu(wcfg) -> bool:
     return gpu.driver_cuda() is None
 
 
+# The CPU model, fetched once in the background; the pill shows how far (dictado-7t38)
+_cpu = {"thread": None, "done": 0, "total": None, "error": None}
+_cpu_lock = threading.Lock()
+
+
+def fetch_cpu_model() -> threading.Thread:
+    """Start fetching CPU_MODEL in the background, or return the fetch already running. cpu_fetch() says how far."""
+    with _cpu_lock:
+        t = _cpu["thread"]
+        if t is not None and t.is_alive():
+            return t
+        _cpu.update(done=0, total=SIZES[CPU_MODEL], error=None)
+
+        def progress(done, total):
+            _cpu["done"], _cpu["total"] = done, total or _cpu["total"]
+
+        def run():
+            try:
+                prepare(CPU_MODEL, progress=progress)
+            except Exception as e:
+                log.exception("CPU speech model download failed")
+                _cpu["error"] = type(e).__name__
+        t = _cpu["thread"] = threading.Thread(target=run, name="ecoscribe-cpu-model", daemon=True)
+        t.start()
+        return t
+
+
+def cpu_fetch() -> dict:
+    """{done, total, error} of the latest fetch_cpu_model."""
+    return {k: _cpu[k] for k in ("done", "total", "error")}
+
+
 def setup_models(wcfg, languages, cpu: bool = False) -> list[dict]:
     """The two speech models Ecoscribe uses, fast first. `required`: the one dictation in
     `languages` runs on; the other is recommended (meetings and files use both).

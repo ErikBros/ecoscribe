@@ -92,6 +92,18 @@ def test_toggle_cycle_delivers(tmp_path):
     app.shutdown()
 
 
+def test_a_dictation_waits_for_the_model_before_it_is_transcribed(tmp_path):
+    """dictado-7t38: on a PC without a GPU, model_wait holds the dictation until the CPU model is there."""
+    eng, order = FakeEngine(), []
+    real = eng.transcribe
+    eng.transcribe = lambda audio: order.append("transcribe") or real(audio)
+    app, out = make(tmp_path, eng=eng)
+    app.model_wait = lambda: order.append("wait")
+    app.on_action("toggle"); app.on_action("toggle")
+    assert wait(lambda: out == ["text 1 "]) and order == ["wait", "transcribe"]
+    app.shutdown()
+
+
 def test_cancel_discards(tmp_path):
     rec = FakeRecorder()
     app, out = make(tmp_path, rec=rec)

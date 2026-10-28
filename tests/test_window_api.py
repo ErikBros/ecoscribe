@@ -297,6 +297,7 @@ def test_languages_are_add_ons(tmp_path):
 
 def test_setup_info_lists_both_models_and_no_permissions_off_mac(api, monkeypatch):
     monkeypatch.setattr("ecoscribe.window.sys.platform", "win32")
+    monkeypatch.setattr("ecoscribe.models.no_gpu", lambda w: False)  # a GPU PC (CI runners have none)
     monkeypatch.setattr("ecoscribe.models.is_ready", lambda name, root=None: name == "large-v3-turbo")
     info = api.setup_info("en")
     assert [m["label"] for m in info["models"]] == ["Fast", "Most accurate"]
@@ -361,7 +362,17 @@ def test_retry_goes_to_the_background_app(tmp_path):
     assert sent == [("retry", {"id": "b", "lang": "sv"}, {"wait_s": 120.0})]
 
 
+def test_setup_info_without_a_gpu_lists_the_cpu_model_first(api, monkeypatch):
+    monkeypatch.setattr("ecoscribe.models.no_gpu", lambda w: True)
+    monkeypatch.setattr("ecoscribe.models.is_ready", lambda name, root=None: False)
+    info = api.setup_info("en")
+    assert [(m["label"], m["required"]) for m in info["models"]] == [
+        ("For this computer", True), ("Fast", False), ("Most accurate", False)]
+    assert api.models_info()["models"][0]["name"] == "small"
+
+
 def test_models_info_and_delete(api, monkeypatch):
+    monkeypatch.setattr("ecoscribe.models.no_gpu", lambda w: False)
     monkeypatch.setattr("ecoscribe.models.is_ready", lambda name, root=None: name == "large-v3-turbo")
     monkeypatch.setattr("ecoscribe.models.disk_size", lambda name, root=None: 1_600_000_000)
     deleted = []
