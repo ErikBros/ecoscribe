@@ -114,6 +114,11 @@ class Engine:
                 log.info("%s: small/cpu until it is there", why)
                 self._cpu(why)
                 return
+            if self.cfg.device == "cuda" and self.card_too_small():  # dictado-5d6y: no doomed load on a small card
+                from .gpu import SMALL
+                log.info("%s: small/cpu", SMALL)
+                self._cpu(SMALL)
+                return
             try:
                 name, compute_type = dictation_model(self.cfg)
                 self.model = self._make(name, self.cfg.device, compute_type)
@@ -135,6 +140,12 @@ class Engine:
         """Why CUDA can't load yet on an installed app without the GPU runtime pack (gpu_runtime.py)."""
         from .gpu_runtime import missing
         return missing()
+
+    @staticmethod
+    def card_too_small() -> bool:
+        """The NVIDIA card can't hold the speech models (gpu.MIN_CARD_MB)."""
+        from .gpu import too_small
+        return bool(too_small())
 
     def _cpu(self, reason: str) -> None:
         self.fallback_reason = reason

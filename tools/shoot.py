@@ -22,6 +22,8 @@ SHOTS = {
     "gpu-descarga": "page=inicio&gpurt=downloading", "gpu-fallo": "page=inicio&gpurt=failed",  # dictado-7e1
     # a PC without an NVIDIA card: the small model for dictation (dictado-7t38)
     "setup-models-sin-gpu": "page=bienvenida&welcome=1&sstep=models&nogpu=1", "ajustes-modelos-sin-gpu": "page=ajustes&sec=models&nogpu=1",
+    "setup-models-tarjeta-pequena": "page=bienvenida&welcome=1&sstep=models&nogpu=small",  # a 2 GB card (dictado-5d6y)
+    "ajustes-modelos-tarjeta-pequena": "page=ajustes&sec=models&nogpu=small",
     "ajustes-cambios": "page=ajustes&dirty=1",
     "ajustes-estilos": "page=ajustes&styles=1",  # Style per app, switched on (dictado-h0m)
     # Voice commands and the language card, for an English-only user and one with Spanish added (dictado-607)

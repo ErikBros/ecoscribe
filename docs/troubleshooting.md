@@ -10,7 +10,7 @@ meeting text.
 | Problem | Try this |
 |---|---|
 | Nothing happens when I tap Right Ctrl | Look for the tray icon (near the clock, maybe under ^). If it's missing, start **Ecoscribe** from the Start menu. Home says "Ready" when it can dictate. |
-| Engine says "CPU · slow" | No NVIDIA card found, its driver is old, or the GPU libraries are still downloading (first start; it runs on the processor meanwhile). Update the NVIDIA driver and restart Ecoscribe. |
+| Engine says "CPU · slow" | No NVIDIA card found, the card has too little memory (under 3 GB), its driver is old, or the GPU libraries are still downloading (first start; it runs on the processor meanwhile). Update the NVIDIA driver and restart Ecoscribe. |
 | "Didn't hear you, twice" | Two dictations in a row heard nothing. **Check the mic** opens Settings: pick the right mic and press Test. A mic muted in Windows: turn on **Unmute the mic only while dictating**. |
 | Text is wrong or in the wrong language | Tick only the languages you speak (Settings > Languages and words). For one dictation, Right Ctrl + L picks the next language. A recent one: History > **Retry ▾** in the right language. |
 | A name keeps coming out wrong | Add it to **Your words**; if it's still wrong, add a **Replace** pair. Insights > **Words to add** suggests names. |

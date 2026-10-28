@@ -27,7 +27,8 @@ From **[Releases](https://github.com/ErikBros/ecoscribe/releases/latest)**:
 
 - **Windows 10 or 11, 64-bit.**
 - **An NVIDIA graphics card is strongly recommended**, with 6 GB of graphics memory or more. Tested on an RTX 3070 Ti
-  (8 GB). Without one, Ecoscribe still works on the processor with a smaller model: slower and less accurate.
+  (8 GB). Without one, or with a card under 3 GB, Ecoscribe still works on the processor with a smaller model: slower
+  and less accurate. Setup notices and picks that model for you.
 - **Disk:** about 1 GB for the app, plus the speech models it downloads the first time each is needed: about 1.6 GB
   (English, Spanish and most languages) and about 3 GB more for the larger model (Swedish, Greek and some others).
   On an NVIDIA card it also downloads the GPU libraries once, in the background. Without one, dictation runs on the

@@ -327,6 +327,27 @@ def test_dictation_goes_to_the_cpu_without_a_failure_note(monkeypatch):
     assert e.device == "cpu" and e.fallback_reason == rt.MISSING and made == ["cpu"]
 
 
+def test_dictation_on_a_card_too_small_goes_straight_to_the_cpu(monkeypatch):
+    """dictado-5d6y: no doomed CUDA load, no failure note; the pill says why."""
+    from ecoscribe.engine import Engine
+    made = []
+
+    def factory(name, device, compute_type, local_files_only=False):
+        made.append((name, device))
+        return SimpleNamespace(detect_language=lambda a, vad_filter=False: ("en", 0.9, [("en", 0.9)]),
+                               transcribe=lambda a, **k: (iter([]), SimpleNamespace(duration=1.0)))
+    monkeypatch.setattr(Engine, "runtime_missing", staticmethod(lambda: None))
+    monkeypatch.setattr(gpu, "card_mb", lambda: 2048)
+    e = Engine(WhisperCfg(device="cuda"), TextCfg(), model_factory=factory, resolve=lambda n: n)
+    e.load(fallback=False)
+    assert e.device == "cpu" and e.fallback_reason == gpu.SMALL and made == [("small", "cpu")]
+    assert "too little memory" in gpu.notice(gpu.SMALL, 12040) and "2 GB" in gpu.notice(gpu.SMALL, 12040)
+    monkeypatch.setattr(gpu, "card_mb", lambda: 8192)
+    made.clear()
+    Engine(WhisperCfg(device="cuda"), TextCfg(), model_factory=factory, resolve=lambda n: n).load(fallback=False)
+    assert made[0][1] == "cuda"
+
+
 def test_renew_retires_an_idle_worker_and_waits_for_a_busy_one():
     from ecoscribe.engine_proc import EngineProxy
     killed = []
