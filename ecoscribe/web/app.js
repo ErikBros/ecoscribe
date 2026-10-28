@@ -61,11 +61,14 @@ function demoApi() {
   const now = new Date();
   const iso = (mins) => new Date(now - mins * 60000).toISOString().slice(0, 19);
   const dl = { running: false, error: null, models: {} };  // the demo model download
-  const DEMO_CPU_MODELS = () => [  // nogpu=1: a PC without an NVIDIA card, as models.setup_models(cpu=True) lists it
-    { name: "small", label: "For this computer", tag: "Needed on this computer", use: "Dictation on the processor: this computer has no NVIDIA graphics card",
+  // nogpu=1: a PC without an NVIDIA card, nogpu=small: a 2 GB card, as models.setup_models(cpu=no_gpu(...)) lists them
+  const DEMO_CPU_WHY = params.get("nogpu") === "small" ? "this computer's graphics card has 2 GB of memory and the big models need 3 GB" : "this computer has no NVIDIA graphics card";
+  const DEMO_SLOW = params.get("nogpu") === "small" ? "; slow on this computer" : "; slow without a graphics card";
+  const DEMO_CPU_MODELS = () => [
+    { name: "small", label: "For this computer", tag: "Needed on this computer", use: "Dictation on the processor: " + DEMO_CPU_WHY, why: DEMO_CPU_WHY,
       size: 4.84e8, required: true, ready: false },
-    { name: "large-v3-turbo", label: "Fast", use: "For your English; finds the language in meetings and files; slow without a graphics card", size: 1.62e9, required: false, checked: false, ready: false },
-    { name: "Systran/faster-whisper-large-v3", label: "Most accurate", use: "Languages the fast one isn't good at; meetings and files in them; slow without a graphics card",
+    { name: "large-v3-turbo", label: "Fast", use: "For your English; finds the language in meetings and files" + DEMO_SLOW, size: 1.62e9, required: false, checked: false, ready: false },
+    { name: "Systran/faster-whisper-large-v3", label: "Most accurate", use: "Languages the fast one isn't good at; meetings and files in them" + DEMO_SLOW,
       size: 3.09e9, required: false, checked: false, ready: false }];
   let settings = {
     values: { hotkey: "rctrl", mic: "Anker PowerConf", languages: demoLangs.join(","), extra_languages: demoLangs.filter((c) => !["en", "sv"].includes(c)), sounds: true, overlay: true, live_text: true, insights: params.get("insights") === "1", speech_feedback: false, unmute: true, startup: true,
@@ -322,7 +325,7 @@ function demoApi() {
     finish_welcome: async () => ({ ok: true }),
     setup_info: async (langs) => {
       const big = (langs || "").split(",").some((c) => c && !["en", "es", "de", "fr"].includes(c));
-      if (params.get("nogpu") === "1") return { models: DEMO_CPU_MODELS(), permissions: [] };
+      if (["1", "small"].includes(params.get("nogpu"))) return { models: DEMO_CPU_MODELS(), permissions: [] };
       return { models: [
         { name: "large-v3-turbo", label: "Fast", use: "For your English; finds the language in meetings and files", size: 1.62e9, required: !big, ready: params.get("models") === "ready" },
         { name: "Systran/faster-whisper-large-v3", label: "Most accurate", use: "Languages the fast one isn't good at; meetings and files in them", size: 3.09e9, required: big, ready: false }],
@@ -347,7 +350,7 @@ function demoApi() {
       r.lang = lang || "en"; r.retried = true;
       return { ok: true, text: r.text, lang: r.lang };
     },
-    models_info: async () => (params.get("nogpu") === "1" ? { models: DEMO_CPU_MODELS().map((m) => ({ ...m, ready: m.required, disk: m.size })) } : { models: [
+    models_info: async () => (["1", "small"].includes(params.get("nogpu")) ? { models: DEMO_CPU_MODELS().map((m) => ({ ...m, ready: m.required, disk: m.size })) } : { models: [
       { name: "large-v3-turbo", label: "Fast", use: "For your English; finds the language in meetings and files", size: 1.62e9, required: true, ready: !window.__deleted, disk: 1.62e9 },
       { name: "Systran/faster-whisper-large-v3", label: "Most accurate", use: "Languages the fast one isn't good at; meetings and files in them", size: 3.09e9, required: false,
         ready: !!(dl.models["Systran/faster-whisper-large-v3"] || {}).ready, disk: 3.09e9 }] }),
@@ -1930,15 +1933,19 @@ function fillSelect(sel, options, value) {
   sel.value = value;
 }
 /* Settings > Speech models (dictado-z4q): what each model is for, on disk or not, download / delete. */
-const CPU_HINT = "This computer has no NVIDIA graphics card, so dictation uses the smaller model made for it. "
-  + "The other two are optional: only meetings and files use them, and slowly here.";
+// models.no_gpu's reason: no NVIDIA card (dictado-7t38) or one too small for the big models (dictado-5d6y)
+const cpuHint = (models) => {
+  const why = (models.find((m) => m.why) || {}).why || "this computer has no NVIDIA graphics card";
+  return why[0].toUpperCase() + why.slice(1) + ", so dictation uses the smaller model made for it. "
+    + "The other two are optional: only meetings and files use them, and slowly here.";
+};
 const modelTag = (m) => m.tag || (m.required ? null : m.checked === false ? "Optional" : "Recommended");
 
 async function renderModelsPage() {
   let info, p;
   try { [info, p] = [await api.models_info(), await api.setup_models_progress()]; } catch { return; }
   const box = $("#m-rows");
-  if (info.models.some((m) => m.tag)) $("#m-intro").textContent = CPU_HINT;
+  if (info.models.some((m) => m.tag)) $("#m-intro").textContent = cpuHint(info.models);
   box.innerHTML = info.models.map((m) => {
     const g = (p.models || {})[m.name] || {};
     const going = p.running && p.models[m.name] && !g.ready;
@@ -2391,7 +2398,7 @@ async function saveLangs() {
 async function paintModels() {
   const info = await api.setup_info(sx.langs.join(","));
   sx.models = info.models;
-  if (sx.models.some((m) => m.tag)) $("#s-models-hint").textContent = CPU_HINT;
+  if (sx.models.some((m) => m.tag)) $("#s-models-hint").textContent = cpuHint(sx.models);
   if (!sx.want.size || ![...sx.want].every((n) => sx.models.some((m) => m.name === n))) sx.want = new Set(sx.models.filter((m) => m.checked !== false).map((m) => m.name));
   sx.models.filter((m) => m.required).forEach((m) => sx.want.add(m.name));
   const p = await api.setup_models_progress();

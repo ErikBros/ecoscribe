@@ -199,13 +199,20 @@ CPU_MODEL = "small"  # dictation without an NVIDIA GPU (engine.py's CPU fallback
 SIZES = {"large-v3-turbo": 1_620_000_000, "Systran/faster-whisper-large-v3": 3_090_000_000, CPU_MODEL: 484_000_000}
 
 
-def no_gpu(wcfg) -> bool:
-    """True on a Windows PC with no NVIDIA driver: dictation runs on CPU_MODEL there (engine.py), so setup and the
-    app fetch that one. The Mac always has its GPU (mlx). dictado-7t38"""
+NO_CARD = "this computer has no NVIDIA graphics card"
+
+
+def no_gpu(wcfg) -> str | None:
+    """Why dictation runs on CPU_MODEL on this Windows PC (engine.py), so setup and the app fetch that one; None when
+    the GPU runs it. No NVIDIA driver (dictado-7t38), or a card too small for the models (dictado-5d6y).
+    The Mac always has its GPU (mlx)."""
     if sys.platform != "win32" or wcfg.device != "cuda":
-        return False
+        return None
     from . import gpu
-    return gpu.driver_cuda() is None
+    if gpu.driver_cuda() is None:
+        return NO_CARD
+    mb = gpu.too_small()
+    return gpu.small_why(mb) if mb else None
 
 
 # The CPU model, fetched once in the background; the pill shows how far (dictado-7t38)
@@ -240,10 +247,10 @@ def cpu_fetch() -> dict:
     return {k: _cpu[k] for k in ("done", "total", "error")}
 
 
-def setup_models(wcfg, languages, cpu: bool = False) -> list[dict]:
+def setup_models(wcfg, languages, cpu: str | bool = False) -> list[dict]:
     """The two speech models Ecoscribe uses, fast first. `required`: the one dictation in
     `languages` runs on; the other is recommended (meetings and files use both).
-    cpu (no_gpu): dictation runs on CPU_MODEL, listed first and needed; the GPU two are left unticked (dictado-7t38)."""
+    cpu (no_gpu's reason): dictation runs on CPU_MODEL, listed first and needed; the GPU two are left unticked (dictado-7t38)."""
     from .languages import ALL, TURBO_OK, needs_big_model
     big = needs_big_model(languages)
     # dictado-607: named with the user's own languages, never a fixed "Swedish, Greek" for everyone
@@ -260,10 +267,12 @@ def setup_models(wcfg, languages, cpu: bool = False) -> list[dict]:
     ]
     if not cpu:
         return rows
+    why = cpu if isinstance(cpu, str) else NO_CARD
     for r in rows:
-        r.update(required=False, checked=False, use=r["use"] + "; slow without a graphics card")
+        r.update(required=False, checked=False,
+                 use=r["use"] + ("; slow without a graphics card" if why == NO_CARD else "; slow on this computer"))
     return [{"name": CPU_MODEL, "label": "For this computer", "tag": "Needed on this computer",
-             "use": "Dictation on the processor: this computer has no NVIDIA graphics card",
+             "use": f"Dictation on the processor: {why}", "why": why,
              "size": SIZES[CPU_MODEL], "required": True}] + rows
 
 

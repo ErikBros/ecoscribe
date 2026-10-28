@@ -210,6 +210,28 @@ def test_no_gpu_only_on_windows_without_an_nvidia_driver(monkeypatch):
     assert not models.no_gpu(WhisperCfg(device="mlx"))
 
 
+def test_a_card_too_small_for_the_models_counts_as_no_gpu(monkeypatch):
+    """dictado-5d6y: a 2 GB card runs out at the first dictation; setup picks the CPU model and says why."""
+    from ecoscribe import gpu
+    from ecoscribe.config import WhisperCfg
+    monkeypatch.setattr(models.sys, "platform", "win32")
+    monkeypatch.setattr(gpu, "driver_cuda", lambda: 12040)
+    monkeypatch.setattr(gpu, "card_mb", lambda: 2048)
+    why = models.no_gpu(WhisperCfg(device="cuda"))
+    assert why and "2 GB" in why and "3 GB" in why
+    cpu, fast, big = models.setup_models(WhisperCfg(), ["en"], cpu=why)
+    assert cpu["required"] and cpu["why"] == why and cpu["use"].endswith(why)
+    assert fast["checked"] is False and fast["use"].endswith("slow on this computer")
+    monkeypatch.setattr(gpu, "card_mb", lambda: 4096)  # 4 GB holds them: today's two rows
+    assert models.no_gpu(WhisperCfg(device="cuda")) is None
+    assert len(models.setup_models(WhisperCfg(), ["en"], cpu=models.no_gpu(WhisperCfg(device="cuda")))) == 2
+
+
+def test_the_cut_off_sits_between_2_and_3_gb_cards():
+    from ecoscribe import gpu
+    assert 2048 < gpu.MIN_CARD_MB <= 3072 - 256  # a 3 GB card reports a little under 3072
+
+
 class _Pill:
     def __init__(self):
         self.said = []

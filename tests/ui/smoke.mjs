@@ -502,6 +502,15 @@ async function load(query) {
   check(doc.querySelector("#s-models-hint").textContent.includes("no NVIDIA graphics card") && rows[1].textContent.includes("Optional"),
     "the hint and tags say the GPU models are optional here");
 }
+{ // dictado-5d6y: a card too small for the big models gets the same three rows, with its own reason
+  const { doc } = await load("page=bienvenida&welcome=1&sstep=models&nogpu=small");
+  await sleep(200);
+  const rows = doc.querySelectorAll("#s-models .s-row");
+  const hint = doc.querySelector("#s-models-hint").textContent;
+  check(rows.length === 3 && hint.startsWith("This computer's graphics card has 2 GB") && !hint.includes("no NVIDIA"),
+    "small card: the hint names the card's memory, not a missing card");
+  check(rows[1].textContent.includes("slow on this computer"), "small card: the GPU rows say slow on this computer");
+}
 { // setup (dictado-zpz): every step on Windows, then the summary
   const { window, doc } = await load("page=bienvenida&welcome=1");
   const on = () => doc.querySelector(".sstep.on")?.dataset.step;
