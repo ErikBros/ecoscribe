@@ -1185,6 +1185,8 @@ function segLi(s, editable) {
 const SRC_SILENT_S = 30, SRC_LONG_S = 120;  // silent this long with the call on another device / with no better guess
 const SRC_WORD = { mic: "hearing you", system: "hearing them" };
 let srcPlaced = false, srcFix = null;
+// A warning closed with its ×: hidden for that meeting and source, also after the window reopens.
+const srcHidden = (() => { try { return JSON.parse(store("ecoscribe.srcwarn.hidden") || "[]"); } catch (e) { return []; } })();
 function srcPlace() {
   $("#r-d-live-actions").insertBefore($("#r-src"), $("#r-d-live-actions .r-lang"));  // small meters in the Stop row (look C, picked)
   $("#r-src-fix").onclick = async () => {
@@ -1192,6 +1194,12 @@ function srcPlace() {
     if (!srcFix.device) { await show("ajustes"); window.__secShow?.("dictation"); $("#f-mic")?.scrollIntoView?.({ block: "center" }); return; }
     const out = await api.use_meeting_source(srcFix.kind, srcFix.device).catch(() => ({ ok: false }));
     toast(out.ok ? `Recording ${srcFix.device} from now on.` : out.error || "Couldn't switch.");
+  };
+  $("#r-src-x").onclick = () => {
+    if (!srcFix) return;
+    srcHidden.push(`${r.open}:${srcFix.kind}`);
+    store("ecoscribe.srcwarn.hidden", JSON.stringify(srcHidden.slice(-20)));
+    srcFix = null; $("#r-src-warn").hidden = true;
   };
   srcPlaced = true;
 }
@@ -1222,7 +1230,7 @@ async function renderSources(recording) {
     const bar = $(".r-src-bar", row), state = w ? `silent ${fmtT(s.quiet_s)}` : pct >= 8 ? SRC_WORD[k] : "quiet";
     $("span", bar).style.width = `${pct}%`; bar.setAttribute("aria-valuenow", pct);
     row.title = `${k === "mic" ? "You" : "The others"}: ${s.name || "the default device"} · ${state}`;  // the device on hover
-    bad = bad || w;
+    if (w && !srcHidden.includes(`${r.open}:${k}`)) bad = bad || w;
   }
   srcFix = bad;
   warn.hidden = !bad;

@@ -868,6 +868,8 @@ async function load(query) {
   bad.doc.querySelector("#r-src-fix").click(); await sleep(50);
   check(JSON.stringify(bad.window.__srcSwitched) === '["mic","Microphone (Jabra Evolve2 65)"]' && bad.doc.querySelector("#toast").textContent.includes("from now on"),
     "the button records the call's mic from now on");
+  bad.doc.querySelector("#r-src-x").click(); await sleep(50);
+  check(warn.hidden && bad.doc.querySelector('[data-src="mic"]').classList.contains("bad"), "the × hides the warning; the row still says it's silent");
   const done = await load("page=reuniones/2026-10-05_0915_planering");
   await sleep(300);
   check(done.doc.querySelector("#r-src").hidden && done.doc.querySelector("#r-src-warn").hidden, "a finished meeting shows neither");
