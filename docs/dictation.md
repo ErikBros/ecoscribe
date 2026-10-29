@@ -45,7 +45,8 @@ can't use, for example).
 All in Settings > Languages and words.
 
 - **Your words:** names and terms, one per line, written the way you want them. Ecoscribe leans toward them when it
-  hears something close. Used for dictation, meetings and files.
+  hears something close. Used for dictation, meetings and files. With **Claude** in the list, a dictation that
+  comes out as "cloud" where you mean Claude is written Claude ("the cloud" and "cloud storage" stay).
 - **Names on your screen** (on by default): when you start dictating, Ecoscribe reads the names in the window you're
   typing into (an email's sender, the people in a chat) and spells them the same way. Read on your computer, never
   stored or sent.
