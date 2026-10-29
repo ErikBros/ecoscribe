@@ -16,7 +16,7 @@ import numpy as np
 
 from .choose import pick_language
 from .config import TextCfg, WhisperCfg
-from .text import clean, is_hallucination, only_credits, strip_credits, vocab_prompt
+from .text import clean, is_hallucination, only_credits, sound_alikes, strip_credits, vocab_prompt
 
 log = logging.getLogger(__name__)
 SR = 16000
@@ -276,6 +276,7 @@ class Engine:
                 log.error("whisper failed at runtime (%s: %s); reloading and retrying", type(e).__name__, e)
                 self.load()
                 text, lang, speech_s = self._run(audio, words, lang, prefer)
+        text = sound_alikes(text, self.text_cfg.vocabulary, lang)  # dictado-0qr5
         return Result(text=text, lang=lang, speech_s=speech_s, ms=int((time.perf_counter() - t0) * 1000))
 
     def preview(self, audio: np.ndarray, lang: str | None = None, prefer: str | None = None) -> Result | None:
@@ -292,6 +293,7 @@ class Engine:
             return None
         finally:
             self._busy.release()
+        text = sound_alikes(text, self.text_cfg.vocabulary, lang)
         return Result(text=text, lang=lang, speech_s=speech_s, ms=int((time.perf_counter() - t0) * 1000))
 
     def word_confidence(self, audio: np.ndarray, lang: str | None = None, words=None) -> list[tuple[str, float]] | None:

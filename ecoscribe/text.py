@@ -72,6 +72,57 @@ def vocab_prompt(words) -> str | None:
     return ", ".join(out) + "." if out else None
 
 
+# dictado-0qr5: a name Whisper hears as a common word even when the name is in Your words (the prompt alone
+# doesn't win). Fixed only for a name in Your words, and only where the word reads as the name: never after an
+# article or a word that makes it the common thing ("the cloud", "Google Cloud"), never before a word that does
+# ("cloud storage"), never the plural. {name: (heard as, keep after, keep before)}
+SOUND_ALIKES = {
+    "Claude": ("cloud",
+               {"the", "a", "an", "this", "that", "our", "your", "my", "his", "her", "their", "its", "any", "some",
+                "no", "each", "every", "one", "own", "public", "private", "hybrid", "dark", "rain", "storm", "white",
+                "big", "google", "oracle", "ibm", "microsoft", "aws", "azure", "alibaba", "salesforce", "tencent",
+                "el", "la", "un", "una", "del", "al", "en", "ett", "word", "point", "tag", "mushroom"},
+               {"storage", "computing", "service", "services", "provider", "providers", "platform", "platforms",
+                "server", "servers", "infrastructure", "native", "based", "backup", "backups", "cost", "costs",
+                "account", "accounts", "drive", "hosting", "console", "migration", "security", "environment",
+                "environments", "resources", "instance", "instances", "function", "functions", "run", "cover",
+                "burst", "formation", "formations", "nine", "bill", "billing", "data", "sync", "app", "apps",
+                "solution", "solutions", "version", "first", "engineer", "engineers", "architecture", "cluster"}),
+}
+_WORD_RE = re.compile(r"[\w'’-]+")
+
+
+def sound_alikes(s: str, vocabulary, lang: str = "") -> str:
+    """'I asked cloud to fix it' -> 'I asked Claude to fix it' when Claude is in Your words; 'the data is
+    in the cloud' stays. Spanish "a" is "to", not an article ("le pregunté a cloud")."""
+    if not s:
+        return s
+    have = {" ".join(str(v).split()).lower() for v in vocabulary or []}
+    for name, (heard, keep_after, keep_before) in SOUND_ALIKES.items():
+        if name.lower() not in have or heard not in s.lower():
+            continue
+        after = keep_after - {"a"} if "es" in lang.split("+") else keep_after
+        words = list(_WORD_RE.finditer(s))
+        out, last = [], 0
+        for i, m in enumerate(words):
+            w = m.group(0)
+            base, tail = (w[:-2], w[-2:]) if w.lower()[-2:] in ("'s", "’s") else (w, "")
+            if base.lower() != heard:
+                continue
+            prev = words[i - 1].group(0).lower() if i else ""
+            nxt = words[i + 1].group(0).lower() if i + 1 < len(words) else ""
+            joined = i + 1 < len(words) and s[m.end():words[i + 1].start()] in ("", "-")
+            if prev in after or (nxt in keep_before and not tail) or joined:
+                continue
+            end = m.end()
+            if nxt == "code" and not tail:  # "cloud code": Claude Code, the product
+                tail, end = s[m.end():words[i + 1].start()] + "Code", words[i + 1].end()
+            out.append(s[last:m.start()] + name + tail)
+            last = end
+        s = "".join(out) + s[last:]
+    return s
+
+
 # Spoken commands ([text] voice_commands, off by default). A command only counts as its own
 # clause: after the start or a punctuation mark, and before one or the end. "We need a new line
 # of products" and "did you send it to her" stay text.

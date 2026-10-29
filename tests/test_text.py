@@ -1,3 +1,6 @@
+import pytest
+
+from ecoscribe import text
 from ecoscribe.choose import pick_device, pick_language
 from ecoscribe.text import clean, is_hallucination, strip_credits
 
@@ -128,3 +131,28 @@ def test_replacements_anywhere_whole_words_any_case():
     assert replacements("a pr, not a prize or april", t) == "a PR, not a prize or april"  # whole words only
     assert replacements("nothing here", t) == "nothing here" and replacements("x", {}) == "x" and replacements("", t) == ""
     assert replacements("poll requests", {"poll request": "pull request", "poll requests": "pull requests"}) == "pull requests"
+
+
+# ---------------- dictado-0qr5: Claude heard as "cloud" ----------------
+@pytest.mark.parametrize("heard,written", [
+    ("I asked cloud to fix the test.", "I asked Claude to fix the test."),
+    ("Cloud wrote the summary.", "Claude wrote the summary."),
+    ("Open cloud code in the terminal.", "Open Claude Code in the terminal."),
+    ("That was cloud's idea.", "That was Claude's idea."),
+    ("Le pregunté a cloud.", "Le pregunté a Claude."),
+    ("The files are in the cloud.", "The files are in the cloud."),
+    ("We pay too much for cloud storage.", "We pay too much for cloud storage."),
+    ("It runs on Google Cloud.", "It runs on Google Cloud."),
+    ("There was a dark cloud over the hill.", "There was a dark cloud over the hill."),
+    ("The clouds are low today.", "The clouds are low today."),
+    ("A cloud-based tool.", "A cloud-based tool."),
+    ("Ask cloud about the cloud bill.", "Ask Claude about the cloud bill."),
+])
+def test_claude_heard_as_cloud_only_in_the_claude_sense(heard, written):
+    lang = "es" if heard.startswith("Le ") else "en"
+    assert text.sound_alikes(heard, ["Ecoscribe", "Claude"], lang) == written
+
+
+def test_cloud_stays_without_claude_in_your_words():
+    assert text.sound_alikes("I asked cloud to fix it.", ["Ecoscribe"]) == "I asked cloud to fix it."
+    assert text.sound_alikes("He drew a cloud.", ["claude"], "en") == "He drew a cloud."  # "a" is an article in English
