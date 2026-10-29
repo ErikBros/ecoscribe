@@ -161,3 +161,38 @@ def test_the_default_keys_say_tap_the_dictation_key(tmp_path):
     assert wait(lambda: app.state == "recording")
     assert "Say what to change, then tap Right Ctrl" in flashes(app) or sys.platform == "darwin"
     app.on_action("cancel")
+
+
+# ---------------- dictado-7rcc: "make this shorter" gets a word budget ----------------
+LONG = " ".join(["The new build is ready and the tests pass on both machines."] * 4)  # 48 words, invented
+
+
+@pytest.mark.parametrize("instruction,budget", [
+    ("make this shorter", 24), ("shorten it", 24), ("make it much shorter", 16), ("hazlo más corto", 24),
+    ("gör den kortare", 24), ("tighten this up", 24)])
+def test_a_shortening_instruction_gets_a_word_budget(instruction, budget):
+    assert command_mode.budget(instruction, LONG) == budget
+    rule = command_mode.length_rule(instruction, LONG)
+    assert "48 words" in rule and f"never more than {budget}" in rule
+
+
+@pytest.mark.parametrize("instruction", ["make it shorter, about 20 words", "translate to Swedish", "fix the typos",
+                                         "make it more formal"])
+def test_other_instructions_and_a_said_number_get_none(instruction):
+    assert command_mode.length_rule(instruction, LONG) == "" and command_mode.budget(instruction, LONG) is None
+
+
+def test_the_budget_goes_in_the_request():
+    asked = []
+    command_mode.edit(LONG, "make this shorter", _cfg(), ask=lambda text, system, **k: asked.append(text) or "Short.")
+    assert "never more than 24" in asked[0] and asked[0].index("never more than 24") < asked[0].index("Selected text:")
+
+
+def test_with_a_style_file_the_budget_comes_after_it(tmp_path):
+    style = tmp_path / "style.md"
+    style.write_text("Short sentences.", encoding="utf-8")
+    c = _cfg()
+    c.text.command_style_file = str(style)
+    asked = []
+    command_mode.edit(LONG, "make this shorter", c, ask=lambda text, system, **k: asked.append(text) or "Short.")
+    assert asked[0].index("</style>") < asked[0].index("never more than 24") < asked[0].index("Selected text:")

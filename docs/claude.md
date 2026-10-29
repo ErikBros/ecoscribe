@@ -60,7 +60,8 @@ text by voice:
 3. Say what to change: "make it shorter", "translate to Swedish".
 4. Tap Right Ctrl.
 
-Claude rewrites it in place; Ctrl+Z brings the old text back. **change** next to the keys picks other ones (your
+Claude rewrites it in place; Ctrl+Z brings the old text back. "Make it shorter" aims for about half the length,
+"much shorter" for about a third; say a number ("make it 50 words") to set it yourself. **change** next to the keys picks other ones (your
 dictation key + a letter, or a combo of its own, pressed again to stop). Pressing the keys while it's off shows a box
 that takes you to the switch.
 
