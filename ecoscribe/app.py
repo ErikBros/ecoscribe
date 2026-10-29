@@ -498,14 +498,17 @@ class App:
             return "tap the key"
 
     def _process_edit(self, audio, selection: str) -> None:
-        from .command_mode import EditError, edit
+        from .command_mode import EditError, edit, remember
         res = self.engine.transcribe(audio)  # the instruction
+        kept = self.history_path.parent if self.history_path else None  # dictado-kgjf: the data folder
         try:
             new = edit(selection, res.text, self.cfg)
         except EditError as e:
+            remember(kept, selection, res.text, error=str(e))
             log.info("command mode: nothing changed (%s)", e)
             self.ui.flash(f"{e}: nothing changed", 3.0)
             return None
+        remember(kept, selection, res.text, result=new)
         dr = self.deliver(new)  # pasted over the selection, which is still selected
         log.info("command mode: %d -> %d chars target=%s pasted=%s reason=%s", len(selection), len(new),
                  dr.target_exe, dr.pasted, dr.reason)

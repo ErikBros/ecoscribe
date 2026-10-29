@@ -118,9 +118,11 @@ def test_history_missing_file(api):
 
 def test_clear_history_keeps_a_backup(api):
     write_history(api, [{"text": "a "}])
+    (api._data_dir / "command-recent.json").write_text("[]", encoding="utf-8")
     api.clear_history()
     assert api.get_history()["items"] == []
     assert list(api._data_dir.glob("history-*.bak"))
+    assert not (api._data_dir / "command-recent.json").exists()
 
 
 def test_copy_text(api):

@@ -113,6 +113,9 @@ def test_the_answer_replaces_the_selection(tmp_path, monkeypatch):
     _edit(app)
     assert pasted == ["The shop opens at nine."] and f"Changed: {UNDO_KEYS} undoes it" in flashes(app)
     assert app.last_text == ""  # an edit isn't a dictation: paste-again keeps the last dictation
+    kept = command_mode.recent(tmp_path)  # dictado-kgjf: kept next to the history, to rerun exactly
+    assert [(k["selection"], k["instruction"], k["result"], k["error"]) for k in kept] == [
+        ("Teh shop opens at nine.", "fix the spelling", "The shop opens at nine.", None)]
 
 
 def test_a_failed_edit_pastes_nothing(tmp_path, monkeypatch):
@@ -122,6 +125,7 @@ def test_a_failed_edit_pastes_nothing(tmp_path, monkeypatch):
     app, pasted = _app(tmp_path, "fix the spelling")
     _edit(app)
     assert pasted == [] and any("nothing changed" in f for f in flashes(app))
+    assert "Not logged in" in command_mode.recent(tmp_path)[0]["error"]
 
 
 def test_off_or_nothing_selected_records_nothing(tmp_path):
@@ -196,3 +200,14 @@ def test_with_a_style_file_the_budget_comes_after_it(tmp_path):
     asked = []
     command_mode.edit(LONG, "make this shorter", c, ask=lambda text, system, **k: asked.append(text) or "Short.")
     assert asked[0].index("</style>") < asked[0].index("never more than 24") < asked[0].index("Selected text:")
+
+
+def test_only_the_last_five_edits_are_kept_and_never_logged(tmp_path, caplog):
+    for i in range(7):
+        command_mode.remember(tmp_path, f"Text {i}.", f"instruction {i}", result=f"Result {i}.")
+    kept = command_mode.recent(tmp_path)
+    assert [k["instruction"] for k in kept] == [f"instruction {i}" for i in range(2, 7)]
+    assert "instruction" not in caplog.text and "Text " not in caplog.text
+    command_mode.remember(None, "x", "y")  # no data folder (tests, --test): nothing kept, nothing raised
+    (tmp_path / command_mode.RECENT).write_text("not json", encoding="utf-8")
+    assert command_mode.recent(tmp_path) == []
