@@ -605,6 +605,8 @@ class Api:
         p = self._data_dir / "history.jsonl"
         if p.exists():
             p.replace(self._data_dir / f"history-{time.strftime('%Y%m%d-%H%M%S')}.bak")
+        from .command_mode import RECENT
+        (self._data_dir / RECENT).unlink(missing_ok=True)  # the last command-mode edits go with it (dictado-kgjf)
         return {"ok": True}
 
     # ---------------- reuniones ----------------

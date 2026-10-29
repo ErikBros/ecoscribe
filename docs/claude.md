@@ -61,8 +61,12 @@ text by voice:
 4. Tap Right Ctrl.
 
 Claude rewrites it in place; Ctrl+Z brings the old text back. "Make it shorter" aims for about half the length,
-"much shorter" for about a third; say a number ("make it 50 words") to set it yourself. **change** next to the keys picks other ones (your
-dictation key + a letter, or a combo of its own, pressed again to stop). Pressing the keys while it's off shows a box
+"much shorter" for about a third; say a number ("make it 50 words") to set it yourself. The last five edits (what
+you selected, what you said, what came back) stay in `command-recent.json` in Ecoscribe's data folder, on your
+computer only, so a wrong one can be looked into; **Clear history** removes them.
+
+**change** next to the keys picks other ones (your dictation key + a letter, or a combo of its own, pressed again
+to stop). Pressing the keys while it's off shows a box
 that takes you to the switch.
 
 ### Your writing style

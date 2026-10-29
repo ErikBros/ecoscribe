@@ -16,8 +16,11 @@ fact or an emoji; 2.3-3.7 s.
 """
 from __future__ import annotations
 
+import json
 import logging
+import os
 import re
+import time
 from pathlib import Path
 
 from . import claude_cli
@@ -74,6 +77,37 @@ def style_text(cfg) -> str:
     except OSError as e:
         log.warning("command mode: writing style file not read (%s)", type(e).__name__)
         return ""
+
+
+RECENT = "command-recent.json"  # dictado-kgjf: the last few edits, on this PC only
+RECENT_KEEP = 5
+
+
+def remember(folder, selection: str, instruction: str, result: str | None = None, error: str | None = None) -> None:
+    """Keep this edit (what was selected, the instruction as heard, what came back or why not) with the last
+    few before it, so a wrong edit can be rerun exactly. Only in the app's data folder: never in the log,
+    never sent anywhere. Best effort: a failure here never touches the edit."""
+    if folder is None:
+        return
+    path = Path(folder) / RECENT
+    try:
+        kept = recent(folder)
+        kept.append({"at": time.strftime("%Y-%m-%dT%H:%M:%S"), "instruction": instruction, "selection": selection,
+                     "result": result, "error": error})
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(kept[-RECENT_KEEP:], ensure_ascii=False, indent=1), encoding="utf-8")
+        os.replace(tmp, path)
+    except Exception as e:
+        log.warning("command mode: the edit wasn't kept (%s)", type(e).__name__)
+
+
+def recent(folder) -> list[dict]:
+    """The kept edits, oldest first; [] when there are none."""
+    try:
+        kept = json.loads((Path(folder) / RECENT).read_text(encoding="utf-8"))
+        return [k for k in kept if isinstance(k, dict)] if isinstance(kept, list) else []
+    except (OSError, ValueError):
+        return []
 
 
 class EditError(Exception):
