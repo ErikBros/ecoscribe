@@ -1,6 +1,6 @@
 # Insights and speech coaching
 
-([All guides](README.md).) Settings > Dictation > Behaviour > **Insights tab** adds a tab with what your dictations
+([All guides](README.md).) Settings > General > **Insights tab** adds a tab with what your dictations
 say about how you talk. Everything is worked out on your computer from your history; nothing is sent anywhere. Pick
 **7 days**, **30 days** or **All** at the top.
 
@@ -28,7 +28,7 @@ Hedges ("maybe", "I think", "kind of") and filler words ("like", "basically") pe
 dictate to people (chat, email), not in prompts to AI apps. Filler words are normal in speech; in a message, hedges
 can read as unsure.
 
-**Note filler words after a message** (Settings > Dictation > Behaviour): right after you dictate a message or an email
+**Note filler words after a message** (Settings > Dictation > While you dictate): right after you dictate a message or an email
 to someone, the pill shows the filler words and hedges you used.
 
 ## Pace and pauses

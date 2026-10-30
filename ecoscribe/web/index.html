@@ -357,16 +357,16 @@
     <!-- AJUSTES -->
     <section class="page" id="page-ajustes" hidden>
       <header class="page-head"><h1>Settings</h1></header>
-      <nav class="segs set-tabs" id="set-tabs" aria-label="Settings sections">  <!-- short sections instead of one long page (dictado-6oe.7) -->
+      <nav class="segs set-tabs" id="set-tabs" aria-label="Settings sections">  <!-- four tabs by what you're doing (dictado-o955) -->
         <button type="button" class="seg active" data-sec="dictation">Dictation</button>
-        <button type="button" class="seg" data-sec="words">Languages and words</button>
+        <button type="button" class="seg" data-sec="words">Words</button>
         <button type="button" class="seg" data-sec="meetings">Meetings</button>
-        <button type="button" class="seg" data-sec="models">Speech models</button>
-        <button type="button" class="seg" data-sec="help">Help and setup</button>
+        <button type="button" class="seg" data-sec="general">General</button>
       </nav>
       <form id="settings" class="settings" autocomplete="off">
+        <!-- DICTATION -->
         <div class="card group" data-sec="dictation">
-          <div class="group-head"><h3>Shortcut</h3><p class="muted">What starts and stops dictation. Click Change and press it.</p></div>
+          <div class="group-head"><h3>Shortcut</h3></div>
           <div class="row"><span class="row-label">Shortcut</span>
             <div class="hk">
               <kbd class="key hk-key" id="hk-label">Right Ctrl</kbd>
@@ -374,14 +374,13 @@
               <button type="button" class="btn btn-ghost btn-sm" id="hk-change">Change</button>
             </div></div>
           <p class="muted small hk-hint" id="hk-hint">Tap a lone key (Right Ctrl, F13-F24, Pause) or press a combo like Ctrl+L.</p>
-          <label class="row toggle-row"><span class="row-text"><span class="row-label">Hold to talk</span><span class="muted small" id="f-hold-help">Hold the key while you speak and let go to stop. A quick tap still starts hands-free dictation.</span></span>
+          <label class="row toggle-row"><span class="row-text"><span class="row-label">Hold to talk</span><span class="muted small" id="f-hold-help">Hold the key while you speak and let go to stop.</span></span>
             <input type="checkbox" class="switch" name="hold_to_talk" id="f-hold"></label>
-          <label class="row toggle-row"><span class="row-text"><span class="row-label">Numpad Enter dictates too</span><span class="muted small">The Enter key in the corner of the number pad works like your dictation key: tap to start, tap again to paste. It stops typing Enter; the big Enter key is unchanged.</span></span>
-            <input type="checkbox" class="switch" name="numpad_enter" id="f-numpad-enter"></label>
+          <input type="checkbox" name="numpad_enter" id="f-numpad-enter" hidden>  <!-- kept as it was; no longer shown (dictado-o955) -->
         </div>
 
         <div class="card group" data-sec="dictation">
-          <div class="group-head"><h3>Mic</h3><p class="muted">Ecoscribe finds it by name, so it isn't lost when you plug in other devices.</p></div>
+          <div class="group-head"><h3>Mic</h3></div>
           <label class="row"><span class="row-label">Mic</span>
             <select name="mic" id="f-mic"></select></label>
           <div class="row">
@@ -392,127 +391,45 @@
             </div>
           </div>
           <label class="row toggle-row"><span class="row-text"><span class="row-label">Unmute the mic only while dictating</span>
-            <span class="muted small">Your mic is muted in Windows. Ecoscribe unmutes it while you record and puts it back as it was.</span></span>
+            <span class="muted small">For a mic that's muted in Windows: on while you record, then back as it was.</span></span>
             <input type="checkbox" class="switch" name="unmute" id="f-unmute"></label>
         </div>
 
-        <div class="card group" data-sec="words">
-          <div class="group-head"><h3>Languages you dictate in</h3><p class="muted">Each dictation, Ecoscribe picks among these by itself, and the pill shows which one it heard. Wrong guess? Hold <kbd id="lang-key">Right Ctrl</kbd> and press <kbd>L</kbd> to choose the next dictation's language (or the tray icon: Next dictation in). Many languages besides English use the larger model for dictation: still under a second, about twice as slow.</p></div>
-          <div class="lang-checks" id="f-languages" role="group" aria-label="Languages you dictate in"></div>
-          <div class="lang-add-row"><select id="lang-add" aria-label="Add a language"></select>
-            <span class="muted small">Added languages also appear for meetings and files; nothing is downloaded.</span></div>
-        </div>
-
-        <div class="card group" data-sec="words">
-          <div class="group-head"><h3>Your words</h3><p class="muted"><strong>A hint while it listens.</strong> Names and terms written the way you want them, one per line: Ecoscribe leans toward them when it hears something close, so "Ecoscribe" usually comes out as Ecoscribe, not "eco scribe". Start here with a new name. For dictation and meetings.</p></div>
-          <textarea name="vocabulary" id="f-vocabulary" class="vocab" rows="5" spellcheck="false" placeholder="Göteborg&#10;pyannote&#10;Kristineberg"></textarea>
-          <label class="row toggle-row"><span class="row-text"><span class="row-label">Names on your screen</span><span class="muted small">When you start dictating, Ecoscribe reads the names in the window you're typing into (an email's sender, a chat's people) and spells them the same way. Read on this PC, never stored or sent.</span></span>
-            <input type="checkbox" class="switch" name="screen_names" id="f-screen-names"></label>
-        </div>
-
-        <div class="card group" data-sec="words">
-          <div class="group-head"><h3>Replace</h3><p class="muted"><strong>A fix after it writes, every time.</strong> When the text has the words on the left, they become the ones on the right. For a word Your words didn't fix, or that keeps coming out wrong the same way. In dictations and meeting transcripts, in any case, as whole words.</p></div>
-          <div id="reps" class="reps"></div>
-          <button type="button" class="btn btn-ghost btn-sm" id="rep-add">Add a replacement</button>
-        </div>
-
-        <div class="card group" data-sec="words" id="snips-card">
-          <div class="group-head"><h3>Snippets</h3><p class="muted"><strong>A phrase that types saved text.</strong> Say a snippet's name on its own ("my email.") and Ecoscribe types the saved text instead. Inside a sentence ("what's my email?") it stays as you said it. For an action instead, like a new line or pressing Enter, use <button type="button" class="go-link" data-go="dictation" data-to="#row-voice-commands">Voice commands</button>.</p></div>
-          <div id="snips" class="snips"></div>
-          <button type="button" class="btn btn-ghost btn-sm" id="snip-add">Add snippet</button>
-        </div>
-
-        <div class="card group" data-sec="meetings">
-          <div class="group-head"><h3>Meetings</h3><p class="muted">When a call app (Teams, Slack, Zoom, Meet…) starts using the mic.</p></div>
-          <label class="row"><span class="row-label">When a call starts</span>
-            <select name="meet_mode" id="f-meet-mode"></select></label>
-          <label class="row"><span class="row-text"><span class="row-label">Stop recording after the call ends</span>
-            <span class="muted small">How long the call app has to be off the mic before Ecoscribe stops. Longer keeps one recording through a quick rejoin.</span></span>
-            <select name="meet_end" id="f-meet-end"></select></label>
-          <label class="row"><span class="row-text"><span class="row-label">Your name</span>
-            <span class="muted small">Your own lines show this name instead of "Me", in the window and in what you download or copy. Leave empty for "Me".</span></span>
-            <input type="text" class="cal-url my-name" name="my_name" id="f-my-name" maxlength="40" placeholder="Me" spellcheck="false" autocomplete="off"></label>
-          <label class="row"><span class="row-label">Language when the app doesn't have one yet</span>
-            <select name="meet_lang" id="f-meet-lang"></select></label>
-          <label class="row toggle-row"><span class="row-text"><span class="row-label">Tell the other speakers apart</span>
-            <span class="muted small" id="f-speakers-help"></span></span>
-            <input type="checkbox" class="switch" name="speakers" id="f-speakers"></label>
-          <label class="row toggle-row"><span class="row-text"><span class="row-label">Remember voices</span>
-            <span class="muted small" id="voices-help">Name a speaker once and Ecoscribe recognises that voice in later calls. Voices are kept on this PC only.</span></span>
-            <input type="checkbox" class="switch" name="voice_memory" id="f-voice-memory"></label>
-          <div class="row" id="voices-row" hidden><span class="muted small" id="voices-known"></span>
-            <button type="button" class="btn btn-ghost btn-sm danger" id="voices-forget">Forget all voices</button></div>
-          <div class="row cal-row"><span class="row-text"><span class="row-label">Name meetings from your calendar</span>
-            <span class="muted small">Paste your calendar's secret address in iCal format (Google Calendar: Settings, your calendar, Integrate calendar). A recorded call takes the name of the event happening then, and its attendees help spell names. Read on this PC only; leave empty to turn it off.</span>
-            <span class="cal-field"><input type="password" class="cal-url" id="f-calendar" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics" spellcheck="false" autocomplete="off">
-            <button type="button" class="btn btn-ghost btn-sm" id="cal-test">Test</button></span>
-            <span class="muted small" id="cal-result"></span></span></div>
-          <div class="row"><span class="row-text"><span class="row-label">Downloads go to</span>
-            <span class="muted small export-dir" id="export-dir"></span></span>
-            <span class="cal-field"><button type="button" class="btn btn-ghost btn-sm" id="export-change">Change…</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="export-reset" hidden>Use Downloads</button></span></div>
-          <div class="row" id="gcal-row" hidden><span class="row-text"><span class="row-label">Google Calendar</span>
-            <span class="muted small">No secret address on a work account? Sign in instead, once and read-only: calls take their event's name, and its guests help spell names and fill Email participants.</span>
-            <span class="muted small" id="gcal-result"></span></span>
-            <button type="button" class="btn btn-ghost btn-sm" id="gcal-connect">Connect</button></div>
-          <div class="row"><span class="row-text"><span class="row-label">Claude app</span>
-            <span class="muted small" id="claude-help">Let the Claude desktop app read your meetings: "summarize yesterday's call", "what did Ana say about the budget?". Read-only, through a small server on this PC.</span></span>
-            <button type="button" class="btn btn-ghost btn-sm" id="claude-connect">Connect</button></div>
-        </div>
-
         <div class="card group" data-sec="dictation">
-          <div class="group-head"><h3>Behaviour</h3></div>
-          <label class="row"><span class="row-text"><span class="row-label">Appearance</span><span class="muted small" id="theme-help">Light or dark. Match Windows follows Windows' own setting (Personalisation, Colours).</span></span>
-            <select name="theme" id="f-theme"></select></label>
-          <label class="row toggle-row"><span class="row-text"><span class="row-label">Free the GPU when you're not dictating</span>
-            <span class="muted small">The model loads when you tap the key (while you talk) and unloads after 10 minutes without dictating.</span></span>
-            <input type="checkbox" class="switch" name="on_demand" id="f-on-demand"></label>
+          <div class="group-head"><h3>While you dictate</h3></div>
+          <label class="row"><span class="row-text"><span class="row-label">On-screen pill</span>
+            <span class="muted small">At the bottom of the screen while you record.</span></span>
+            <select id="f-pill" aria-label="On-screen pill">
+              <option value="live">Timer and live text</option><option value="timer">Timer only</option><option value="off">Off</option>
+            </select></label>
+          <input type="checkbox" name="overlay" id="f-overlay" hidden><input type="checkbox" name="live_text" id="f-live-text" hidden>
           <label class="row toggle-row"><span class="row-text"><span class="row-label">Sounds</span><span class="muted small">A short sound when it starts and stops.</span></span>
             <input type="checkbox" class="switch" name="sounds" id="f-sounds"></label>
-          <label class="row toggle-row" id="row-voice-commands"><span class="row-text"><span class="row-label">Voice commands</span><span class="muted small"><strong>A phrase that does an action.</strong> <span id="vc-help">Say "new line" or "new paragraph" for a break, and end with "send it" to press Enter after the text (handy in Claude Code).</span> Quotes work even with this off: "quote, your words, end quote" writes "your words". For saved text instead, use <button type="button" class="go-link" data-go="words" data-to="#snips-card">Snippets</button>.</span></span>
-            <input type="checkbox" class="switch" name="voice_commands" id="f-voice-commands"></label>
-          <details class="vc-list" id="vc-list"><summary>See all commands</summary>
-            <table class="vc-table"><thead><tr id="vc-head"><th>What it does</th><th>English</th></tr></thead>
-              <tbody id="vc-rows"></tbody></table>
-            <p class="muted small">A command only counts on its own: at the start, or after a pause or punctuation, and before one or the end. "We need a new line of products" stays text. Saying only "send it" presses Enter on what's already in the box.</p>
-            <div class="vc-foot"><span class="muted small">Type a phrase and press Enter to add it; × removes one. Every phrase works whichever of your languages you speak.</span>
-              <button type="button" class="btn btn-ghost btn-sm" id="vc-reset-all" hidden>Back to the built-in phrases</button></div>
-          </details>
-          <label class="row toggle-row"><span class="row-text"><span class="row-label">On-screen pill</span><span class="muted small">"Dictating 0:07" at the bottom center while you record.</span></span>
-            <input type="checkbox" class="switch" name="overlay" id="f-overlay"></label>
-          <label class="row toggle-row"><span class="row-text"><span class="row-label">Live text on the pill</span><span class="muted small">Shows what Ecoscribe hears while you talk, a few seconds behind. A quick draft: the careful transcription is still what gets pasted.</span></span>
-            <input type="checkbox" class="switch" name="live_text" id="f-live-text"></label>
-          <label class="row toggle-row"><span class="row-text"><span class="row-label">Insights tab</span><span class="muted small">A tab with what your dictations say: time saved, when and where you talk, your languages, filler words, names to add. Worked out on this computer.</span></span>
-            <input type="checkbox" class="switch" name="insights" id="f-insights"></label>
-          <label class="row toggle-row"><span class="row-text"><span class="row-label">Note filler words after a message</span><span class="muted small">Right after you dictate a message or an email to someone, the pill shows the filler words and hedges you used ("like ×3 · maybe"). Never after prompts to AI apps.</span></span>
+          <label class="row toggle-row"><span class="row-text"><span class="row-label">Note filler words after a message</span><span class="muted small">After a message to a person, the pill lists your fillers ("like ×3 · maybe").</span></span>
             <input type="checkbox" class="switch" name="speech_feedback" id="f-speech-feedback"></label>
-          <label class="row toggle-row" id="row-startup"><span class="row-text"><span class="row-label">Start with Windows</span><span class="muted small" id="startup-hint">Ecoscribe starts by itself when you sign in.</span></span>
-            <input type="checkbox" class="switch" name="startup" id="f-startup"></label>
-          <label class="row toggle-row"><span class="row-text"><span class="row-label">Check for new versions</span><span class="muted small">Once a day Ecoscribe asks GitHub for the newest version number and says so on Home when there is one. Nothing from your dictations or meetings is sent.</span></span>
-            <input type="checkbox" class="switch" name="update_check" id="f-update-check"></label>
-          <label class="row toggle-row" id="row-auto-update"><span class="row-text"><span class="row-label">Install new versions by itself</span><span class="muted small">Gets a new version in the background and installs it when you step away from the computer or quit Ecoscribe. Never during a call, while a meeting is being saved or while you dictate.</span></span>
-            <input type="checkbox" class="switch" name="auto_update" id="f-auto-update"></label>
         </div>
+
         <div class="card group" data-sec="dictation" id="styles-card">  <!-- dictado-h0m: per-app styles -->
-          <div class="group-head"><h3>Style per app</h3><p class="muted">Write differently depending on the app. A command in a terminal ("git status") needs no capital and no full stop; a chat line usually ends without a full stop. Pick how sentences come out in each kind of app.</p></div>
-          <label class="row toggle-row"><span class="row-text"><span class="row-label">Different style per app</span><span class="muted small">Off: every app gets a capital at the start and a full stop at the end.</span></span>
+          <div class="group-head"><h3>Style per app</h3><p class="muted">How sentences come out in each kind of app: a terminal command needs no capital and no full stop.</p></div>
+          <label class="row toggle-row"><span class="row-text"><span class="row-label">Different style per app</span><span class="muted small">Off: a capital at the start and a full stop at the end everywhere.</span></span>
             <input type="checkbox" class="switch" name="per_app_styles" id="f-per-app"></label>
           <div class="st-wrap" id="st-wrap">
             <div class="st-rows" id="st-rows"></div>
           </div>
         </div>
+
         <div class="card group" data-sec="dictation" data-card="claude">
-          <div class="group-head"><h3>With Claude</h3><p class="muted">These send the text to Claude through your Claude Code login on this PC, and nothing else. Off until you turn them on.</p></div>
+          <div class="group-head"><h3>With Claude</h3><p class="muted">These send the text through your Claude Code login on this PC. Off until you turn them on.</p></div>
           <!-- dictado-bd6: the two features that send text to Claude, through the user's own Claude Code login -->
-          <label class="row toggle-row"><span class="row-text"><span class="row-label">Fix it when you correct yourself</span><span class="muted small">Say "scratch that" to drop the sentence before it. Say "no wait" or "sorry, I mean" and Claude fixes that dictation before it's pasted: "on Tuesday, no wait, on Thursday" becomes "on Thursday", about 3 seconds later. If Claude doesn't answer in 5 seconds, the text goes in as you said it.</span></span>
+          <label class="row toggle-row"><span class="row-text"><span class="row-label">Fix it when you correct yourself</span><span class="muted small">"On Tuesday, no wait, on Thursday" is pasted as "on Thursday", about 3 seconds later.</span></span>
             <input type="checkbox" class="switch" name="self_corrections" id="f-self-corrections"></label>
           <details class="vc-list" id="sc-list"><summary>See all phrases</summary>
             <table class="vc-table"><thead><tr id="sc-head"><th>What it does</th><th>English</th></tr></thead>
               <tbody id="sc-rows"></tbody></table>
-            <p class="muted small">A phrase only counts on its own, after a pause or punctuation: "scratch that itch" stays text. Only dictations with one of these phrases go to Claude.</p>
+            <p class="muted small">A phrase only counts on its own, after a pause or punctuation: "scratch that itch" stays text. Only dictations with one of these phrases go to Claude; if Claude doesn't answer in 5 seconds, the text goes in as you said it.</p>
           </details>
           <div id="cm-block">  <!-- dictado-a1d: Command mode by its name; its keys in the sentence, with "change" (look B, picked) -->
-          <label class="row toggle-row" id="row-command-mode"><span class="row-text"><span class="row-label">Command mode</span><span class="muted small">Change selected text by voice. Select text anywhere, press <kbd class="cm-key" id="cm-press">Right Ctrl + E</kbd> <button type="button" class="cm-change" id="cm-change">change</button>, say what to change ("make it shorter", "translate to Swedish") and <span id="cm-stop">tap <kbd class="cm-key">Right Ctrl</kbd></span>. Claude rewrites it in place; Ctrl+Z brings the old text back.</span></span>
+          <label class="row toggle-row" id="row-command-mode"><span class="row-text"><span class="row-label">Command mode</span><span class="muted small">Select text, press <kbd class="cm-key" id="cm-press">Right Ctrl + E</kbd> <button type="button" class="cm-change" id="cm-change">change</button>, say what to change and <span id="cm-stop">tap <kbd class="cm-key">Right Ctrl</kbd></span>. Ctrl+Z brings the old text back.</span></span>
             <input type="checkbox" class="switch" name="command_mode" id="f-command-mode"></label>
           <input type="hidden" name="command_key" id="f-command-key">
           <p class="muted small hk-hint cm-hint" id="cm-hint" hidden></p>
@@ -525,34 +442,143 @@
           </div>
         </div>
 
-        <div class="card group" data-sec="models">
-          <div class="group-head"><h3>Speech models</h3><p class="muted" id="m-intro">Ecoscribe picks the model for each language by itself. Both are downloaded once and then run on this computer, offline. Delete one to free space: it downloads again when it's next needed.</p></div>
+        <!-- WORDS -->
+        <div class="card group" data-sec="words">
+          <div class="group-head"><h3>Languages you dictate in</h3><p class="muted">Ecoscribe picks among these each time. Wrong one? Hold <kbd id="lang-key">Right Ctrl</kbd> and press <kbd>L</kbd> for the next dictation.</p></div>
+          <div class="lang-checks" id="f-languages" role="group" aria-label="Languages you dictate in"></div>
+          <div class="lang-add-row"><select id="lang-add" aria-label="Add a language"></select>
+            <span class="muted small">Also used for meetings and files.</span></div>
+        </div>
+
+        <div class="card group" data-sec="words">
+          <div class="group-head"><h3>Your words</h3><p class="muted"><strong>A hint while it listens.</strong> Names and terms spelled your way, one per line.</p></div>
+          <textarea name="vocabulary" id="f-vocabulary" class="vocab" rows="5" spellcheck="false" placeholder="Göteborg&#10;pyannote&#10;Kristineberg"></textarea>
+          <label class="row toggle-row"><span class="row-text"><span class="row-label">Names on your screen</span><span class="muted small">Spells names the way the window you type into does. Read on this PC, never stored.</span></span>
+            <input type="checkbox" class="switch" name="screen_names" id="f-screen-names"></label>
+        </div>
+
+        <div class="card group" data-sec="words">
+          <div class="group-head"><h3>Replace</h3><p class="muted"><strong>A fix after it writes.</strong> The words on the left always become the ones on the right.</p></div>
+          <div id="reps" class="reps"></div>
+          <button type="button" class="btn btn-ghost btn-sm" id="rep-add">Add a replacement</button>
+        </div>
+
+        <div class="card group" data-sec="words" id="snips-card">
+          <div class="group-head"><h3>Snippets</h3><p class="muted"><strong>Say a name, get saved text.</strong> "My email." on its own types your saved email.</p></div>
+          <div id="snips" class="snips"></div>
+          <button type="button" class="btn btn-ghost btn-sm" id="snip-add">Add snippet</button>
+        </div>
+
+        <div class="card group" data-sec="words">
+          <div class="group-head"><h3>Voice commands</h3><p class="muted"><strong>Say a phrase, get an action.</strong></p></div>
+          <label class="row toggle-row" id="row-voice-commands"><span class="row-text"><span class="row-label">Use voice commands</span><span class="muted small" id="vc-help">"New line" makes a break; ending with "send it" presses Enter.</span></span>
+            <input type="checkbox" class="switch" name="voice_commands" id="f-voice-commands"></label>
+          <details class="vc-list" id="vc-list"><summary>See all commands</summary>
+            <table class="vc-table"><thead><tr id="vc-head"><th>What it does</th><th>English</th></tr></thead>
+              <tbody id="vc-rows"></tbody></table>
+            <p class="muted small">A command only counts on its own: at the start, or after a pause or punctuation, and before one or the end. "We need a new line of products" stays text. Saying only "send it" presses Enter on what's already in the box. Quotes work even with this off: "quote, your words, end quote".</p>
+            <div class="vc-foot"><span class="muted small">Type a phrase and press Enter to add it; × removes one. Every phrase works whichever of your languages you speak.</span>
+              <button type="button" class="btn btn-ghost btn-sm" id="vc-reset-all" hidden>Back to the built-in phrases</button></div>
+          </details>
+        </div>
+
+        <!-- MEETINGS -->
+        <div class="card group" data-sec="meetings">
+          <div class="group-head"><h3>Recording</h3><p class="muted">When a call app (Teams, Slack, Zoom, Meet…) starts using the mic.</p></div>
+          <label class="row"><span class="row-label">When a call starts</span>
+            <select name="meet_mode" id="f-meet-mode"></select></label>
+          <label class="row"><span class="row-text"><span class="row-label">Stop recording after the call ends</span>
+            <span class="muted small">Longer keeps one recording through a quick rejoin.</span></span>
+            <select name="meet_end" id="f-meet-end"></select></label>
+          <label class="row"><span class="row-text"><span class="row-label">Meeting language</span>
+            <span class="muted small">When the call app doesn't say.</span></span>
+            <select name="meet_lang" id="f-meet-lang"></select></label>
+        </div>
+
+        <div class="card group" data-sec="meetings">
+          <div class="group-head"><h3>People</h3></div>
+          <label class="row"><span class="row-text"><span class="row-label">Your name</span>
+            <span class="muted small">Your lines show this instead of "Me".</span></span>
+            <input type="text" class="cal-url my-name" name="my_name" id="f-my-name" maxlength="40" placeholder="Me" spellcheck="false" autocomplete="off"></label>
+          <label class="row toggle-row"><span class="row-text"><span class="row-label">Tell the other speakers apart</span>
+            <span class="muted small" id="f-speakers-help"></span></span>
+            <input type="checkbox" class="switch" name="speakers" id="f-speakers"></label>
+          <label class="row toggle-row"><span class="row-text"><span class="row-label">Remember voices</span>
+            <span class="muted small" id="voices-help">Name a speaker once and later calls know that voice. Kept on this PC only.</span></span>
+            <input type="checkbox" class="switch" name="voice_memory" id="f-voice-memory"></label>
+          <div class="row" id="voices-row" hidden><span class="muted small" id="voices-known"></span>
+            <button type="button" class="btn btn-ghost btn-sm danger" id="voices-forget">Forget all voices</button></div>
+        </div>
+
+        <div class="card group" data-sec="meetings">
+          <div class="group-head"><h3>Calendar</h3><p class="muted">A recorded call takes the name of the event happening then, and its guests help spell names.</p></div>
+          <div class="row" id="gcal-row" hidden><span class="row-text"><span class="row-label">Google Calendar</span>
+            <span class="muted small">Sign in once, read-only.</span>
+            <span class="muted small" id="gcal-result"></span></span>
+            <button type="button" class="btn btn-ghost btn-sm" id="gcal-connect">Connect</button></div>
+          <div class="row cal-row"><span class="row-text"><span class="row-label">Calendar address</span>
+            <span class="muted small">Or paste its secret iCal address (Google Calendar: Settings, your calendar, Integrate calendar). Empty turns it off.</span>
+            <span class="cal-field"><input type="password" class="cal-url" id="f-calendar" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics" spellcheck="false" autocomplete="off">
+            <button type="button" class="btn btn-ghost btn-sm" id="cal-test">Test</button></span>
+            <span class="muted small" id="cal-result"></span></span></div>
+        </div>
+
+        <div class="card group" data-sec="meetings">
+          <div class="group-head"><h3>Files and apps</h3></div>
+          <div class="row"><span class="row-text"><span class="row-label">Downloads go to</span>
+            <span class="muted small export-dir" id="export-dir"></span></span>
+            <span class="cal-field"><button type="button" class="btn btn-ghost btn-sm" id="export-change">Change…</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="export-reset" hidden>Use Downloads</button></span></div>
+          <div class="row"><span class="row-text"><span class="row-label">Claude app</span>
+            <span class="muted small" id="claude-help">Lets the Claude desktop app read your meetings. Read-only, on this PC.</span></span>
+            <button type="button" class="btn btn-ghost btn-sm" id="claude-connect">Connect</button></div>
+        </div>
+
+        <!-- GENERAL -->
+        <div class="card group" data-sec="general">
+          <div class="group-head"><h3>App</h3></div>
+          <label class="row"><span class="row-text"><span class="row-label">Appearance</span><span class="muted small" id="theme-help">Match Windows follows Windows' own setting.</span></span>
+            <select name="theme" id="f-theme"></select></label>
+          <label class="row toggle-row" id="row-startup"><span class="row-text"><span class="row-label">Start with Windows</span><span class="muted small" id="startup-hint">Ecoscribe starts by itself when you sign in.</span></span>
+            <input type="checkbox" class="switch" name="startup" id="f-startup"></label>
+          <label class="row" id="row-updates"><span class="row-text"><span class="row-label">New versions</span><span class="muted small" id="updates-help">Never during a call or while you dictate. Nothing of yours is sent.</span></span>
+            <select id="f-updates" aria-label="New versions">
+              <option value="auto">Install by itself</option><option value="tell">Tell me on Home</option><option value="off">Don't check</option>
+            </select></label>
+          <input type="checkbox" name="update_check" id="f-update-check" hidden><input type="checkbox" name="auto_update" id="f-auto-update" hidden>
+          <label class="row toggle-row"><span class="row-text"><span class="row-label">Insights tab</span><span class="muted small">What your dictations say: time saved, languages, filler words. Worked out on this PC.</span></span>
+            <input type="checkbox" class="switch" name="insights" id="f-insights"></label>
+          <input type="checkbox" name="on_demand" id="f-on-demand" hidden>  <!-- kept as it was; no longer shown (dictado-o955) -->
+        </div>
+
+        <div class="card group" data-sec="general">
+          <div class="group-head"><h3>Speech models</h3><p class="muted" id="m-intro">Ecoscribe picks the model for each language and runs it on this computer, offline. Delete one to free space: it downloads again when needed.</p></div>
           <div class="m-rows" id="m-rows"></div>
         </div>
-        <div class="card group" data-sec="help">
-          <div class="group-head"><h3>Troubleshooting</h3><p class="muted">When something goes wrong: hand Claude what it needs to find the cause.</p></div>
+
+        <div class="card group" data-sec="general">
+          <div class="group-head"><h3>Help</h3></div>
           <div class="row"><span class="row-text"><span class="row-label">User guides</span>
-            <span class="muted small">How each part of Ecoscribe works, and what to try when something doesn't. They open on GitHub.</span></span>
+            <span class="muted small">How each part works and what to try when it doesn't.</span></span>
             <span class="row-btns"><button type="button" class="btn btn-ghost btn-sm" data-guide="README">All guides</button>
             <button type="button" class="btn btn-ghost btn-sm" data-guide="troubleshooting#os">Troubleshooting</button></span></div>
           <div class="row"><span class="row-text"><span class="row-label">Setup</span>
-            <span class="muted small">Languages, speech models, mic and key, step by step, like the first time.</span></span>
+            <span class="muted small">Languages, models, mic and key, like the first time.</span></span>
             <button type="button" class="btn btn-ghost btn-sm" id="setup-again">Run setup again</button></div>
           <div class="row"><span class="row-text"><span class="row-label">Debug info</span>
-            <span class="muted small">Version, settings (calendar link removed), the end of every log, recent crashes and freezes. Paste it to Claude.</span></span>
+            <span class="muted small">Version, settings and recent logs, ready to paste to Claude.</span></span>
             <button type="button" class="btn btn-ghost btn-sm" id="dbg-copy">Copy debug info for Claude</button></div>
           <div class="row"><span class="row-text"><span class="row-label">Logs and crash reports</span>
-            <span class="muted small">The folder with ecoscribe.log, crash reports (crashes) and freeze traces.</span></span>
+            <span class="muted small">The folder with the log, crash reports and freeze traces.</span></span>
             <button type="button" class="btn btn-ghost btn-sm" id="dbg-open">Open folder</button></div>
           <label class="row toggle-row"><span class="row-text"><span class="row-label">Detailed logging</span>
-            <span class="muted small">Writes much more to the log. Turn it on while chasing a problem, off after.</span></span>
+            <span class="muted small">Only while chasing a problem.</span></span>
             <input type="checkbox" class="switch" name="debug_log" id="f-debug-log"></label>
         </div>
         <p class="group guide-foot" data-sec="dictation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 5H19v5.5M19 5l-8.5 8.5"/><path d="M17 14.5v4a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 4 18.5v-10A1.5 1.5 0 0 1 5.5 7h4"/></svg><span>More about these settings in the <a href="#" data-guide="dictation">Dictation guide</a>.</span></p>
         <p class="group guide-foot" data-sec="words"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 5H19v5.5M19 5l-8.5 8.5"/><path d="M17 14.5v4a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 4 18.5v-10A1.5 1.5 0 0 1 5.5 7h4"/></svg><span>More about these settings in the <a href="#" data-guide="dictation#languages">Languages and words guide</a>.</span></p>
         <p class="group guide-foot" data-sec="meetings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 5H19v5.5M19 5l-8.5 8.5"/><path d="M17 14.5v4a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 4 18.5v-10A1.5 1.5 0 0 1 5.5 7h4"/></svg><span>More about these settings in the <a href="#" data-guide="meetings">Meetings guide</a>.</span></p>
-        <p class="group guide-foot" data-sec="models"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 5H19v5.5M19 5l-8.5 8.5"/><path d="M17 14.5v4a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 4 18.5v-10A1.5 1.5 0 0 1 5.5 7h4"/></svg><span>More about these settings in the <a href="#" data-guide="settings#speech-models">Speech models guide</a>.</span></p>
-        <p class="group guide-foot" data-sec="help"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 5H19v5.5M19 5l-8.5 8.5"/><path d="M17 14.5v4a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 4 18.5v-10A1.5 1.5 0 0 1 5.5 7h4"/></svg><span>More about these settings in the <a href="#" data-guide="troubleshooting#os">Troubleshooting guide</a>.</span></p>
+        <p class="group guide-foot" data-sec="general"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 5H19v5.5M19 5l-8.5 8.5"/><path d="M17 14.5v4a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 4 18.5v-10A1.5 1.5 0 0 1 5.5 7h4"/></svg><span>More about these settings in the <a href="#" data-guide="settings">Settings guide</a>.</span></p>
       </form>
       <div class="savebar" id="savebar" hidden>
         <span id="savebar-text">You have unsaved changes.</span>

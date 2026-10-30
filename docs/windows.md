@@ -67,7 +67,7 @@ The first time, Ecoscribe walks you through it step by step:
    (`Ctrl+L`). Right Alt isn't allowed: on many keyboards it's AltGr.
 5. **A first dictation** into a box on the page, so you see it work.
 
-You can run it again any time: Settings > Help and setup > **Run setup again**.
+You can run it again any time: Settings > General > Help > **Run setup again**.
 
 Then look at **Settings > Meetings > When a call starts**: *Ask* (default), *Start by itself*, or *Don't detect*.
 

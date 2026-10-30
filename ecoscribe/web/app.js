@@ -1766,7 +1766,7 @@ function stylesState() {
     $(".st-out", row).textContent = stSample(...cur);
     for (const b of $$(".seg", row)) b.disabled = !on;
     $(".st-vc input", row).disabled = !on || !vc;
-    $(".st-vc span", row).textContent = on && !vc ? "Voice commands (off in Behaviour)" : "Voice commands";
+    $(".st-vc span", row).textContent = on && !vc ? "Voice commands (off in Words)" : "Voice commands";
   }
 }
 // Languages you dictate in (dictado-ehs): English, plus the ones the user added from "Add a language".
@@ -1832,7 +1832,7 @@ function phraseTables() {
   const first = (key, c) => { const p = vcPhrases(vcList.find((r) => r.key === key) || {}, c)[0]; return p && `"${p}"`; };
   const more = cols.filter((c) => c !== "en" && vcList.some((r) => vcPhrases(r, c).length));
   const eg = more.flatMap((c) => [first("line", c), first("enter", c)]).filter(Boolean);
-  $("#vc-help").textContent = 'Say "new line" or "new paragraph" for a break, and end with "send it" to press Enter after the text (handy in Claude Code).'
+  $("#vc-help").textContent = '"New line" makes a break; ending with "send it" presses Enter.'
     + (more.length ? ` ${andList(more.map(label))} work${more.length === 1 ? "s" : ""} too: ${eg.join(", ")}.` : "");
 }
 // Voice commands > See all commands (dictado-67v): the phrases are the user's to change, per action and
@@ -2017,7 +2017,7 @@ async function renderSettings() {
   $("#f-debug-log").checked = !!s.values.debug_log;
   $("#f-update-check").checked = s.values.update_check !== false;
   $("#f-auto-update").checked = !!s.values.auto_update;  // dictado-nmo: off by default
-  $("#row-auto-update").hidden = !s.auto_update_supported;  // the Mac: Download only (dictado-6gr)
+  if (!s.auto_update_supported) $("#f-updates [value=auto]")?.remove();  // the Mac: Download only (dictado-6gr)
   fillSelect($("#f-theme"), s.options.themes || [{ value: "system", label: "Match Windows" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }],
              s.values.theme || "system");
   applyTheme(s.values.theme || "system");  // back to the saved one (Discard, or a preview left unsaved)
@@ -2046,7 +2046,7 @@ async function renderSettings() {
   $("#f-speakers").checked = s.values.speakers && s.speakers_addon;
   $("#f-speakers").disabled = !s.speakers_addon;
   $("#f-speakers-help").textContent = s.speakers_addon
-    ? "After a call, the other side is split into Speaker 1, 2, 3… Click a name in a transcript to rename that person."
+    ? "Splits the other side into Speaker 1, 2, 3… Click a name in a transcript to rename."
     : MAC ? "Needs the speaker add-on (Ecoscribe Speakers, drag it to Applications), which isn't installed." : "Needs the speaker add-on (Ecoscribe-Speakers-Setup), which isn't installed.";
   extraLangs = [...(s.values.extra_languages || [])];
   langNames = Object.fromEntries([...s.options.languages, ...(s.options.all_languages || [])].map((o) => [o.value, o.label]));
@@ -2056,11 +2056,26 @@ async function renderSettings() {
   $("#lang-key").textContent = hotkeyLabel(s.values.hotkey || "rctrl");
   $("#f-sounds").checked = s.values.sounds; $("#f-overlay").checked = s.values.overlay; $("#f-live-text").checked = s.values.live_text !== false; $("#f-insights").checked = !!s.values.insights; $("#f-speech-feedback").checked = !!s.values.speech_feedback;
   $("#nav-insights").hidden = !s.values.insights;
+  menusPaint();
   $("#f-unmute").checked = s.values.unmute; $("#f-startup").checked = s.values.startup;
   $("#f-startup").disabled = !s.can_startup;
   $("#startup-hint").textContent = s.can_startup ? "Ecoscribe starts by itself when you sign in." : "Available in the installed version.";
   saved = formValues();
   dirty();
+}
+// One menu each for the pill and for new versions (dictado-o955); the switches they set stay as they were.
+function menusPaint() {
+  $("#f-pill").value = !$("#f-overlay").checked ? "off" : $("#f-live-text").checked ? "live" : "timer";
+  $("#f-updates").value = !$("#f-update-check").checked ? "off" : $("#f-auto-update").checked && $("#f-updates [value=auto]") ? "auto" : "tell";
+  $("#f-pill").onchange = () => {
+    const v = $("#f-pill").value;
+    $("#f-overlay").checked = v !== "off";
+    if (v !== "off") $("#f-live-text").checked = v === "live";
+  };
+  $("#f-updates").onchange = () => {
+    const v = $("#f-updates").value;
+    $("#f-update-check").checked = v !== "off"; $("#f-auto-update").checked = v === "auto";
+  };
 }
 function dirty() {
   if (!saved) return;
@@ -2196,7 +2211,7 @@ function holdFits() {  // hold-to-talk needs a lone key: a combo fires on its pr
   $("#f-hold").disabled = combo;
   if (combo) $("#f-hold").checked = false;
   $("#f-hold-help").textContent = combo ? `Needs a lone key like ${MAC ? "Right Command" : "Right Ctrl"}: a combo can't be held.`
-    : "Hold the key while you speak and let go to stop. A quick tap still starts hands-free dictation.";
+    : "Hold the key while you speak and let go to stop.";
 }
 const hk = { other: false };  // the setup's key step (sKeyRecord)
 function hkName(e) {
@@ -2611,6 +2626,7 @@ async function boot() {
     await api.clear_history(); renderHistory(); toast("History cleared.");
   };
   const secShow = (k) => {  // Settings in short sections (dictado-6oe.7); the save bar covers them all
+    if (k === "models" || k === "help") k = "general";  // the old tabs, now in General (dictado-o955)
     $$("#set-tabs .seg").forEach((b) => b.classList.toggle("active", b.dataset.sec === k));
     $$("#settings .group[data-sec]").forEach((g) => (g.hidden = g.dataset.sec !== k));
     store("ecoscribe.set-sec", k);
@@ -2667,7 +2683,7 @@ function macify() {
   set("#hk-hint", HK_HINT);
   for (const el of $$(".tip .keys kbd.key")) if (el.textContent === "Ctrl") el.textContent = "⌘";
   const startup = $("#row-startup .row-label"); if (startup) startup.textContent = "Open at login";
-  set("#theme-help", "Light or dark. Match macOS follows the Mac's own setting (System Settings, Appearance).");
+  set("#theme-help", "Match macOS follows the Mac's own setting.");
   const unmute = $("#f-unmute"); if (unmute) unmute.closest("label").hidden = true;  // a PC fix (mics muted at 0)
   for (const el of $$("#page-ajustes .muted")) {  // dictado-p7c: Mac words in Settings
     el.innerHTML = el.innerHTML.replaceAll("this PC", "this Mac").replaceAll("Ctrl+Z", "⌘Z")

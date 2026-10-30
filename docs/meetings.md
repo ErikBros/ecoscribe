@@ -79,7 +79,7 @@ and fill Email participants. Two ways, both in Settings > Meetings:
 
 - **Google Calendar > Connect:** sign in once, read-only. Works on work accounts that hide the secret address. A call
   recorded before you connected looks its event up when you press Email participants.
-- **Name meetings from your calendar:** paste your calendar's secret address in iCal format (Google Calendar:
+- **Calendar address:** paste your calendar's secret address in iCal format (Google Calendar:
   Settings, your calendar, Integrate calendar) and press **Test**.
 
 No event? A call in a Google Meet tab takes the tab's meeting name.
