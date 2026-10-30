@@ -11,6 +11,12 @@ from ecoscribe.window import Api
 DAY = updates.EVERY_S
 
 
+@pytest.fixture(autouse=True)
+def any_release(monkeypatch):
+    """Announced whatever its files (the Mac's "only with a .dmg": tests/test_selfupdate_mac.py)."""
+    monkeypatch.setattr(updates, "NEED_INSTALLER", False)
+
+
 class Fetch:
     def __init__(self, *answers):
         self.answers = list(answers)

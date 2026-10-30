@@ -1,6 +1,7 @@
 """Is a newer Ecoscribe out? (dictado-cjk) Asks GitHub's public API for the latest release at most
 once a day, from a background thread of the app; the window's Home shows a quiet notice with a
-Download link to the release page (the .exe and the .dmg are both there).
+Download link to the release page. The Mac hears only of releases that have a .dmg (a Windows-only
+release isn't offered there).
 
 State lives in <data dir>/update.json: when we last asked, what the latest release was (and its
 installer, `asset`, for selfupdate.py), and the version the user dismissed (hidden until a newer one
@@ -13,6 +14,7 @@ import json
 import logging
 import os
 import re
+import sys
 import threading
 import time
 import urllib.request
@@ -27,6 +29,7 @@ EVERY_S = 24 * 3600  # once a day at most
 FIRST_DELAY_S = 60   # after start: never in the way of loading the model
 TICK_S = 60          # how often the thread looks whether a day has passed (and at the self-update)
 TIMEOUT_S = 5.0
+NEED_INSTALLER = sys.platform == "darwin"  # Mac builds trail Windows: announce only what has a .dmg
 _TAG = re.compile(r"^v?(\d+)\.(\d+)(?:\.(\d+))?$")
 
 
@@ -54,7 +57,7 @@ def due(state: dict, now: float, every: float = EVERY_S) -> bool:
 
 
 def fetch_release(timeout: float = TIMEOUT_S, opener=urllib.request.urlopen) -> dict | None:
-    """The latest release: {"tag", "asset"} (asset: its checked Windows installer, or None), or None
+    """The latest release: {"tag", "asset"} (asset: its checked installer for this platform, or None), or None
     (offline, rate limited, no release, a bad answer). Never raises."""
     req = urllib.request.Request(API_URL, headers={"Accept": "application/vnd.github+json",
                                                    "User-Agent": "Ecoscribe-update-check"})
@@ -115,12 +118,17 @@ def check(data_dir: Path, now: float | None = None, fetch=fetch_release, every: 
     return _update(data_dir, **keys)
 
 
-def notice(state: dict, current: str) -> dict | None:
+def notice(state: dict, current: str, need_installer: bool | None = None) -> dict | None:
     """What Home shows: {"version", "url"} when the latest release is newer than this one and newer
-    than the version the user dismissed; else None."""
+    than the version the user dismissed (and, need_installer, has this platform's installer); else None."""
     latest = state.get("latest")
     if not is_newer(latest, current):
         return None
+    if NEED_INSTALLER if need_installer is None else need_installer:
+        from .selfupdate import installer_name
+        a = state.get("asset")
+        if not isinstance(a, dict) or a.get("name") != installer_name(str(latest).lstrip("v")):
+            return None
     dismissed = state.get("dismissed")
     if dismissed and not is_newer(latest, dismissed):
         return None

@@ -28,7 +28,14 @@ def release(**kw):
     return r
 
 
-ASSET = selfupdate.pick_asset(release())
+ASSET = selfupdate.pick_asset(release(), mac=False)
+
+
+@pytest.fixture(autouse=True)
+def windows_installer(monkeypatch):
+    """These tests are about the Windows installer on any OS; tests/test_selfupdate_mac.py has the Mac's."""
+    monkeypatch.setattr(selfupdate, "MAC", False)
+    monkeypatch.setattr(updates, "NEED_INSTALLER", False)
 
 
 class Resp(io.BytesIO):

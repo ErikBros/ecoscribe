@@ -1,10 +1,11 @@
-"""Self-update that never runs during a call (dictado-nmo). Windows only: it runs the Inno Setup installer.
+"""Self-update that never runs during a call (dictado-nmo). Windows runs the Inno Setup installer; the Mac
+swaps the app in from the release's .dmg (platform/macos/selfinstall.py).
 
 updates.py's daily check also saves the latest release's installer (`asset`). When the user allowed it,
 by Settings > Install new versions by itself (`[ui] auto_update`, off by default) or by Home > Install
 when idle for that one version (`install` in update.json), the background app:
 
-1. downloads it: only Ecoscribe-Setup-<version>.exe of the latest app release of ErikBros/ecoscribe
+1. downloads it: only Ecoscribe-Setup-<version>.exe (the Mac: Ecoscribe-<version>.dmg) of the latest app release of ErikBros/ecoscribe
    (the address is built here from the checked tag and name, never taken from the answer), into
    <data>/updates/, in the background. It pauses while a meeting records or saves (and goes on later
    from where it was, with a Range request), skips when the disk is short, and keeps the file only
@@ -39,7 +40,7 @@ from . import updates
 log = logging.getLogger(__name__)
 
 FOLDER = "updates"
-NAME = re.compile(r"^Ecoscribe-Setup-(\d+\.\d+\.\d+)\.exe$")
+NAME = re.compile(r"^Ecoscribe-(?:Setup-)?(\d+\.\d+\.\d+)\.(?:exe|dmg)$")
 DOWNLOAD_HOSTS = {"github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com"}
 SPARE = 2 * 1024 ** 3   # free space kept besides the installer: installing needs room too
 MIN_SIZE = 1024 ** 2     # an "installer" smaller than this is not one
@@ -48,24 +49,35 @@ TIMEOUT_S = 30.0
 IDLE_S = 15 * 60         # no dictation and nobody at the computer for this long: install now
 RETRY_S = 30 * 60        # after a download that failed (not paused): wait this long before the next try
 INSTALL_ARGS = ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-"]
-SUPPORTED = sys.platform == "win32"
+MAC = sys.platform == "darwin"
+SUPPORTED = sys.platform == "win32" or MAC
 
 
 def download_url(tag: str, name: str) -> str:
     return f"https://github.com/{updates.REPO}/releases/download/{tag}/{name}"
 
 
-def pick_asset(release: dict) -> dict | None:
-    """The app installer of this release, or None: a version tag (so never gpu-runtime-1), not a draft or
-    pre-release, an asset named Ecoscribe-Setup-<that version>.exe, uploaded, served from this repo's own
-    release, with a size (and the SHA-256 when GitHub lists one)."""
+def installer_name(version: str, mac: bool | None = None) -> str:
+    return f"Ecoscribe-{version}.dmg" if (MAC if mac is None else mac) else f"Ecoscribe-Setup-{version}.exe"
+
+
+def _installers(d: Path):
+    """The installers (and half downloads) in d, of either platform."""
+    return [p for p in d.glob("Ecoscribe-*") if NAME.match(p.name.removesuffix(".part"))]
+
+
+def pick_asset(release: dict, mac: bool | None = None) -> dict | None:
+    """The app installer of this release for this platform, or None: a version tag (so never gpu-runtime-1),
+    not a draft or pre-release, an asset named Ecoscribe-Setup-<that version>.exe (the Mac:
+    Ecoscribe-<that version>.dmg), uploaded, served from this repo's own release, with a size (and the
+    SHA-256 when GitHub lists one)."""
     if not isinstance(release, dict) or release.get("draft") or release.get("prerelease"):
         return None
     tag = release.get("tag_name")
     ver = updates.parse(tag)
     if not ver:
         return None
-    want = "Ecoscribe-Setup-{}.{}.{}.exe".format(*ver)
+    want = installer_name("{}.{}.{}".format(*ver), mac)
     for a in release.get("assets") or []:
         if not isinstance(a, dict) or a.get("name") != want:
             continue
@@ -193,7 +205,7 @@ def download(data_dir: Path, asset: dict, opener=urllib.request.urlopen, pause=l
         log.warning("self-update: %s didn't match its SHA-256: deleted", asset["name"])
         return None
     os.replace(part, final)
-    for old in d.glob("Ecoscribe-Setup-*.exe*"):
+    for old in _installers(d):
         if old != final:
             old.unlink(missing_ok=True)
     updates._update(data_dir, downloaded={k: asset[k] for k in ("version", "name", "size")}, update_progress=None,
@@ -219,7 +231,12 @@ def blockers(meetings: dict, app_busy: bool) -> list[str]:
     return out
 
 
-def installer_args(path: Path, data_dir: Path, relaunch: bool) -> list[str]:
+def installer_args(path: Path, data_dir: Path, relaunch: bool) -> list[str] | None:
+    """The command that installs. The Mac: a script that waits for Ecoscribe to end, checks the new app's
+    signature against this one's and swaps it in (None: this copy can't be replaced, e.g. not an .app)."""
+    if MAC:
+        from .platform.macos import selfinstall
+        return selfinstall.command(Path(path), folder(data_dir), relaunch)
     args = [str(path), *INSTALL_ARGS, f"/LOG={folder(data_dir) / 'install.log'}"]
     if not relaunch:
         args.append("/LAUNCH=0")  # installed at Quit: stays closed (ecoscribe.iss reads it)
@@ -231,7 +248,8 @@ def _popen(args: list[str]):
     if sys.platform == "win32":  # outlives this app, which the installer stops
         flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP | 0x01000000  # BREAKAWAY_FROM_JOB
     return subprocess.Popen(args, close_fds=True, creationflags=flags, stdin=subprocess.DEVNULL,
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                            start_new_session=sys.platform != "win32")  # the Mac: outlives the app too
 
 
 def run_installer(data_dir: Path, path: Path, asset: dict, relaunch: bool, popen=_popen, now: float | None = None) -> bool:
@@ -241,8 +259,13 @@ def run_installer(data_dir: Path, path: Path, asset: dict, relaunch: bool, popen
         updates._update(data_dir, downloaded=None, update_error="The downloaded installer didn't check out; fetching it again")
         log.warning("self-update: %s failed its check before running: deleted", Path(path).name)
         return False
+    args = installer_args(path, data_dir, relaunch)
+    if not args:
+        log.warning("self-update: this copy of Ecoscribe can't be replaced; Home offers the download")
+        updates._update(data_dir, install_failed=asset["version"], update_error="This copy can't update itself")
+        return False
     try:
-        popen(installer_args(path, data_dir, relaunch))
+        popen(args)
     except OSError:
         log.exception("self-update: the installer didn't start")
         return False
@@ -261,14 +284,14 @@ def after_start(data_dir: Path, current: str) -> None:
         if updates.is_newer(v, current):
             log.warning("self-update: the install of %s didn't happen; Home offers the download", v)
             updates._update(data_dir, install_started=None, install_failed=v, downloaded=None)
-            for p in folder(data_dir).glob("Ecoscribe-Setup-*.exe*"):  # half a GB not to leave lying around
+            for p in _installers(folder(data_dir)):  # half a GB not to leave lying around
                 p.unlink(missing_ok=True)
         else:
             updates._update(data_dir, install_started=None, install=None, downloaded=None, update_progress=None,
                             update_error=None)
     d = folder(data_dir)
     if d.exists():  # installers of this version or older: done with
-        for p in d.glob("Ecoscribe-Setup-*.exe*"):
+        for p in _installers(d):
             m = NAME.match(p.name.removesuffix(".part"))
             if m and not updates.is_newer(m.group(1), current):
                 p.unlink(missing_ok=True)
@@ -276,6 +299,14 @@ def after_start(data_dir: Path, current: str) -> None:
 
 def input_idle_s() -> float | None:
     """Seconds since the last key or mouse input anywhere on this PC (None: unknown, never idle)."""
+    if MAC:
+        try:
+            out = subprocess.run(["ioreg", "-c", "IOHIDSystem", "-d", "4"], capture_output=True, text=True,
+                                 timeout=5).stdout
+        except (OSError, subprocess.SubprocessError):
+            return None
+        m = re.search(r'"HIDIdleTime" = (\d+)', out)
+        return int(m.group(1)) / 1e9 if m else None
     if sys.platform != "win32":
         return None
     import ctypes

@@ -261,7 +261,7 @@ class Api:
                 "app_styles": _app_style_rows(c.text.app_styles),
             },
             "speakers_addon": diarize.addon_exe().is_file(),
-            "auto_update_supported": sys.platform == "win32",  # dictado-nmo: the Inno Setup installer
+            "auto_update_supported": sys.platform in ("win32", "darwin"),  # dictado-nmo: Inno Setup / the .dmg
             "voice_command_list": _voice_command_list(c.text.voice_phrases),
             "correction_list": _correction_list(),
             "options": {
