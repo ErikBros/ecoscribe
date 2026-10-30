@@ -53,11 +53,11 @@ async function load(query) {
   doc.querySelector("#save").click(); await sleep(100);
   check(sent && sent.vocabulary === "Göteborg\npyannote\nKristineberg" && Object.keys(sent).length === 1, "saves only the word list, trimmed: " + JSON.stringify(sent));
 }
-{ // ajustes: Check for new versions (dictado-cjk), on by default
+{ // ajustes: Check for new versions (dictado-cjk), on by default; one New versions menu (dictado-o955)
   const { window, doc } = await load("page=ajustes");
-  const sw = doc.querySelector("#f-update-check");
-  check(sw?.checked === true, "Check for new versions is on by default");
-  sw.checked = false; sw.dispatchEvent(new window.Event("change", { bubbles: true }));
+  const sw = doc.querySelector("#f-update-check"), menu = doc.querySelector("#f-updates");
+  check(sw?.checked === true && menu.value === "tell", "Check for new versions is on by default: the menu says Tell me");
+  menu.value = "off"; menu.dispatchEvent(new window.Event("change", { bubbles: true }));
   let sent = null;
   const api = window.__ecoscribe.api, orig = api.save_settings;
   api.save_settings = async (x) => { sent = x; return orig(x); };
@@ -105,7 +105,7 @@ async function load(query) {
   check(segs(1).map((b) => b.textContent).join("|") === "Normal|No full stop|Lower case" && on(0).textContent === "Lower case"
     && out(0) === "check the logs first" && out(3) === "Check the logs first.", "each row names its choices and shows what a sentence becomes");
   sw.checked = true; sw.dispatchEvent(new window.Event("change", { bubbles: true }));
-  check(!segs(1)[0].disabled && vcOf(1).disabled && rows()[1].querySelector(".st-vc span").textContent === "Voice commands (off in Behaviour)",
+  check(!segs(1)[0].disabled && vcOf(1).disabled && rows()[1].querySelector(".st-vc span").textContent === "Voice commands (off in Words)",
     "on: the choices work; a greyed voice commands switch says why");
   segs(1)[0].click();
   check(on(1).textContent === "Normal" && out(1) === "Check the logs first.", "picking Normal shows the full stop come back");
@@ -257,7 +257,8 @@ async function load(query) {
   check(shown.length === 1 && /Meetings guide/.test(shown[0].textContent), "the Meetings section ends with its guide");
   shown[0].querySelector("a").click(); await sleep(20);
   check(window.__guide === "meetings", "the link opens the Meetings guide");
-  window.__secShow("help"); await sleep(20);
+  window.__secShow("help"); await sleep(20);  // an old tab name lands on General (dictado-o955)
+  check(doc.querySelector('#set-tabs .seg.active').dataset.sec === "general", "the old Help tab opens General");
   doc.querySelector('[data-guide="troubleshooting#os"]').click(); await sleep(20);
   check(window.__guide === "troubleshooting#windows", "Troubleshooting opens this platform's part");
   check(errors.length === 0, "no JS errors: " + errors.join("; "));
@@ -305,16 +306,16 @@ async function load(query) {
 }
 { // ajustes: Install new versions by itself (dictado-nmo), off by default, Windows only
   const { window, doc } = await load("page=ajustes");
-  const sw = doc.querySelector("#f-auto-update");
-  check(sw?.checked === false && !doc.querySelector("#row-auto-update").hidden, "Install new versions by itself is there and off");
-  sw.checked = true; sw.dispatchEvent(new window.Event("change", { bubbles: true }));
+  const sw = doc.querySelector("#f-auto-update"), menu = doc.querySelector("#f-updates");
+  check(sw?.checked === false && menu.querySelector("[value=auto]"), "Install by itself is in the menu and off");
+  menu.value = "auto"; menu.dispatchEvent(new window.Event("change", { bubbles: true }));
   let sent = null;
   const api = window.__ecoscribe.api, orig = api.save_settings;
   api.save_settings = async (x) => { sent = x; return orig(x); };
   doc.querySelector("#save").click(); await sleep(100);
   check(sent && sent.auto_update === true && Object.keys(sent).length === 1, "turning it on saves only that: " + JSON.stringify(sent));
   const { doc: mac } = await load("page=ajustes&mac=1");
-  check(mac.querySelector("#row-auto-update").hidden, "the Mac hides it (dictado-6gr)");
+  check(!mac.querySelector("#f-updates [value=auto]"), "the Mac has no Install by itself (dictado-6gr)");
 }
 { // stopped
   const { doc } = await load("page=inicio&state=stopped");
@@ -649,18 +650,26 @@ async function load(query) {
   doc.querySelector("#save").click(); await sleep(100);
   check(sent && sent.languages === "en,es" && !("extra_languages" in sent), "saves the ticks without Swedish: " + JSON.stringify(sent));
 }
-{ // dictado-pcz: Snippets and Voice commands say how they differ and point at each other
-  const { doc } = await load("page=ajustes");
+{ // dictado-pcz: Snippets and Voice commands say how they differ; side by side on Words (dictado-o955)
+  const { doc } = await load("page=ajustes&sec=words");
   await sleep(200);
   const snipHead = doc.querySelector("#snips-card .group-head").textContent;
-  const vcRow = doc.querySelector("#row-voice-commands").textContent;
-  check(snipHead.includes("A phrase that types saved text.") && vcRow.includes("A phrase that does an action."), "one line on each says what it is");
-  doc.querySelector('#row-voice-commands .go-link').click(); await sleep(20);
-  check(!doc.querySelector("#snips-card").hidden && doc.querySelector('#set-tabs .seg.active').dataset.sec === "words"
-    && !doc.querySelector("#f-voice-commands").checked, "Snippets link opens Languages and words, the switch untouched");
-  doc.querySelector('#snips-card .go-link').click(); await sleep(20);
-  check(!doc.querySelector("#row-voice-commands").closest(".group").hidden && doc.querySelector('#set-tabs .seg.active').dataset.sec === "dictation",
-    "Voice commands link opens Dictation");
+  const vcCard = doc.querySelector("#row-voice-commands").closest(".group");
+  check(snipHead.includes("Say a name, get saved text.") && vcCard.textContent.includes("Say a phrase, get an action."), "one line on each says what it is");
+  check(!vcCard.hidden && !doc.querySelector("#snips-card").hidden, "both on the Words tab");
+}
+{ // dictado-o955: one On-screen pill menu sets the pill and live text switches
+  const { window, doc } = await load("page=ajustes");
+  await sleep(50);
+  const menu = doc.querySelector("#f-pill");
+  check(menu.value === "live", "pill on with live text by default");
+  menu.value = "off"; menu.dispatchEvent(new window.Event("change", { bubbles: true }));
+  let sent = null;
+  const api = window.__ecoscribe.api, orig = api.save_settings;
+  api.save_settings = async (x) => { sent = x; return orig(x); };
+  doc.querySelector("#save").click(); await sleep(100);
+  check(sent && sent.overlay === false && Object.keys(sent).length === 1, "Off saves only the pill switch: " + JSON.stringify(sent));
+  check(["dictation", "words", "meetings", "general"].join() === [...doc.querySelectorAll("#set-tabs .seg")].map((b) => b.dataset.sec).join(), "four tabs");
 }
 { // dictado-67v: the voice command phrases are the user's to change, per language, with Reset
   const { window, doc } = await load("page=ajustes");

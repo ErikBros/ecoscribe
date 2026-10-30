@@ -1,6 +1,6 @@
 # Troubleshooting
 
-([All guides](README.md).) First stop for anything: Settings > Help and setup > **Copy debug info for Claude** and paste
+([All guides](README.md).) First stop for anything: Settings > General > Help > **Copy debug info for Claude** and paste
 it to Claude together with the [last section of this page](#for-your-claude-paste-this-section-when-asking-for-help).
 It holds the version, settings (calendar link removed), the end of every log and recent crashes; no dictation or
 meeting text.
@@ -12,7 +12,7 @@ meeting text.
 | Nothing happens when I tap Right Ctrl | Look for the tray icon (near the clock, maybe under ^). If it's missing, start **Ecoscribe** from the Start menu. Home says "Ready" when it can dictate. |
 | Engine says "CPU · slow" | No NVIDIA card found, the card has too little memory (under 3 GB), its driver is old, or the GPU libraries are still downloading (first start; it runs on the processor meanwhile). Update the NVIDIA driver and restart Ecoscribe. |
 | "Didn't hear you, twice" | Two dictations in a row heard nothing. **Check the mic** opens Settings: pick the right mic and press Test. A mic muted in Windows: turn on **Unmute the mic only while dictating**. |
-| Text is wrong or in the wrong language | Tick only the languages you speak (Settings > Languages and words). For one dictation, Right Ctrl + L picks the next language. A recent one: History > **Retry ▾** in the right language. |
+| Text is wrong or in the wrong language | Tick only the languages you speak (Settings > Words). For one dictation, Right Ctrl + L picks the next language. A recent one: History > **Retry ▾** in the right language. |
 | A name keeps coming out wrong | Add it to **Your words**; if it's still wrong, add a **Replace** pair. Insights > **Words to add** suggests names. |
 | The text didn't appear | No text box had the cursor: it's on the clipboard (Ctrl+V) and in **History**. |
 | "Command mode is off" | You pressed Right Ctrl + E: turn on Command mode in Settings > Dictation > With Claude. |
@@ -22,7 +22,7 @@ meeting text.
 | The meeting pill is in the way | Drag it somewhere else; double-click puts it back. |
 | Installing an update says a meeting is recording | Stop the meeting first, wait for it to show Ready, then click Retry. Setup won't cut a recording. **Install when idle** waits by itself. |
 | A crash card on Home | Ecoscribe restarted itself and kept the dictation you were in. **Copy crash report for Claude** and paste it. |
-| Anything else | Open the log: tray icon > **Open log**, or Settings > Help and setup > Logs and crash reports > Open folder. |
+| Anything else | Open the log: tray icon > **Open log**, or Settings > General > Help > Logs and crash reports > Open folder. |
 
 ## Mac
 

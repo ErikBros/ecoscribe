@@ -35,7 +35,7 @@ is listed at the end of this page.
 
 **Updating:** quit Ecoscribe, drag the new one over the old one in Applications, then Open Anyway once more (step 2).
 Your settings, history and transcripts stay, and so do the permissions (same signing certificate). Home tells you
-when a new version is out (Settings > Dictation > Behaviour > Check for new versions).
+when a new version is out (Settings > General > New versions).
 
 ## 3. First-run setup
 
@@ -52,8 +52,8 @@ when a new version is out (Settings > Dictation > Behaviour > Check for new vers
 **Screen & System Audio Recording** is asked for at your first meeting (to hear the other side of the call). It isn't
 needed for dictation.
 
-Run the setup again any time: Settings > Help and setup > **Run setup again**. **Open at login** is a switch in
-Settings > Dictation > Behaviour.
+Run the setup again any time: Settings > General > Help > **Run setup again**. **Open at login** is a switch in
+Settings > General.
 
 ## 4. Where your files are
 

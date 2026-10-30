@@ -28,7 +28,7 @@ To disconnect, remove the `ecoscribe` entry under `mcpServers` in Claude's `clau
 
 On any meeting page, **Copy ▾ > Copy for Claude** copies the transcript with its date, app and language (and your
 notes), ready to paste into any Claude chat. **Copy a summary prompt** adds a request for decisions and action items.
-Settings > Help and setup > **Copy debug info for Claude** does the same for a problem with Ecoscribe itself.
+Settings > General > Help > **Copy debug info for Claude** does the same for a problem with Ecoscribe itself.
 
 ## Fix it when you correct yourself
 

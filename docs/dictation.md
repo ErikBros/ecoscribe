@@ -12,8 +12,9 @@ icon for the tray icon.
   A quick tap still starts hands-free dictation.
 - **Another key:** Settings > Dictation > Shortcut > **Change**, then press a lone key (Right Ctrl, F13-F24, Pause) or
   a combo like `Ctrl+L`.
-- **Numpad Enter dictates too** (Settings > Dictation > Shortcut): the Enter key in the corner of the number pad works
-  like your dictation key. It stops typing Enter; the main Enter is untouched.
+- **Numpad Enter** (`[hotkey] numpad_enter = true` in [config.toml](settings.md#in-configtoml-only), off by default): the
+  Enter key in the corner of the number pad works like your dictation key. It stops typing Enter; the main Enter is
+  untouched.
 - While you talk you can switch apps or click around; it keeps recording and pastes where the cursor is when you stop.
 - **No text box at the stop** (the desktop, a file list, a button): the text stays on the clipboard and the pill says
   so. Paste it with Ctrl+V. Every dictation is also in **History**.
@@ -26,13 +27,13 @@ A small dark capsule at the bottom of the screen shows what's happening: a dot a
 turning arc while it writes it down, the language it heard, and a short notice when something needs you (a mic it
 can't use, for example).
 
-- **Live text on the pill** (Settings > Dictation > Behaviour, on by default): the pill shows what it hears while you
+- **Live text on the pill** (Settings > Dictation > While you dictate > On-screen pill, on by default): the pill shows what it hears while you
   talk, a few seconds behind. It's a quick draft; the careful transcription is what gets pasted.
 - **On-screen pill** (same place) turns the pill off. **Sounds** plays a short sound at start and stop.
 
 ## Languages
 
-- Settings > Languages and words > **Languages you dictate in**: tick the ones you speak. Each dictation, Ecoscribe
+- Settings > Words > **Languages you dictate in**: tick the ones you speak. Each dictation, Ecoscribe
   picks among them by itself and the pill shows which one it heard. English and Swedish are built in; **Add a
   language** has any of Whisper's 100. An added language also appears for meetings and files.
 - **Wrong guess?** Hold Right Ctrl and press L: the next dictation is in the next language. The tray icon > **Next
@@ -42,7 +43,7 @@ can't use, for example).
 
 ## Getting names and words right
 
-All in Settings > Languages and words.
+All in Settings > Words.
 
 - **Your words:** names and terms, one per line, written the way you want them. Ecoscribe leans toward them when it
   hears something close. Used for dictation, meetings and files. With **Claude** in the list, a dictation that
@@ -58,7 +59,7 @@ All in Settings > Languages and words.
 
 ## Voice commands
 
-Settings > Dictation > Behaviour > **Voice commands** (off by default). A command only counts on its own: at the
+Settings > Words > **Voice commands** (off by default). A command only counts on its own: at the
 start, or after a pause or punctuation, and before one or the end. "We need a new line of products" stays text.
 
 | What it does | English | Spanish | Swedish |
@@ -102,6 +103,6 @@ The **History** tab has every dictation (and meeting), newest first, with the ap
 
 ## Memory and speed
 
-**Free the GPU when you're not dictating** (Settings > Dictation > Behaviour, on by default): the model loads when you
-tap (while you talk) and unloads after 10 minutes without dictating. The first dictation after a pause loads it while
-you talk.
+**The GPU is freed when you're not dictating:** the model loads when you tap (while you talk) and unloads after 10
+minutes without dictating. The first dictation after a pause loads it while you talk. To keep it loaded all day, set
+`[whisper] on_demand = false` in [config.toml](settings.md#in-configtoml-only).

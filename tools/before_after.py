@@ -40,7 +40,7 @@ from shoot import APP, SHOTS, TALL, shot  # noqa: E402
 PAGES = {**SHOTS, **TALL}  # a tall page shows what's below the fold (only when named in --pages)
 TALL_H = 2300
 TALL_HEIGHT = {"insights-largo": 3700, "insights-largo-oscuro": 3700,  # the whole Insights page (dictado-9bl)
-               "ajustes-largo-mac": 3600}  # the Mac Dictation section down to With Claude (dictado-waw)
+               "ajustes-largo-mac": 3600, "ajustes-dictado-largo": 3800}  # the Mac Dictation section down to With Claude (dictado-waw)
 
 SIZES = {980: 690, 1470: 920, 1920: 1080}
 NOISE = 16  # a channel difference below this is font smoothing, not a change

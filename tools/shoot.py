@@ -56,7 +56,11 @@ SHOTS = {
        ("ajustes-idiomas", "page=ajustes&sec=words"))},
 }
 TALL = {"inicio-largo": "page=inicio", "ajustes-largo": "page=ajustes&dirty=1", "ajustes-frases": "page=ajustes&sc=1", "insights-largo": "page=insights&insights=1",
-        "insights-largo-oscuro": "page=insights&insights=1&theme=dark", "ajustes-largo-mac": "page=ajustes&mac=1"}
+        "insights-largo-oscuro": "page=insights&insights=1&theme=dark", "ajustes-largo-mac": "page=ajustes&mac=1",
+        # each Settings tab, whole (dictado-o955); the old Speech models and Help tabs open General
+        "ajustes-dictado-largo": "page=ajustes&sec=dictation", "ajustes-palabras-largo": "page=ajustes&sec=words",
+        "ajustes-reuniones-largo": "page=ajustes&sec=meetings", "ajustes-modelos-largo": "page=ajustes&sec=models",
+        "ajustes-ayuda-largo": "page=ajustes&sec=help"}
 
 
 def shot(web: Path, query: str, out: Path, size=(980, 690), scale=1.0) -> Path:
