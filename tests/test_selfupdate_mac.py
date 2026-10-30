@@ -74,7 +74,7 @@ def test_run_installer_starts_the_swap_script(tmp_path, monkeypatch):
     assert selfupdate.run_installer(tmp_path, p, a, relaunch=True, popen=started.append, now=5.0)
     [args] = started
     s = Path(args[1]).read_text()
-    assert args[0] == "/bin/sh" and "/Applications/Ecoscribe.app" in s and str(p) in s
+    assert args[0] == "/bin/sh" and str(Path("/Applications/Ecoscribe.app")) in s and str(p) in s  # Windows CI: backslashes
     assert "-R=\"$req\"" in s and 'open "$app"' in s
     assert selfupdate.run_installer(tmp_path, p, a, relaunch=False, popen=started.append)
     assert 'open "$app"' not in Path(started[1][1]).read_text()  # at Quit: stays closed
