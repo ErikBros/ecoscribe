@@ -1,0 +1,6 @@
+# Findings gitleaks may skip in `tools/privacy_guard.py history` (dictado-vah).
+# Two commits of the first public release had a build machine's WSL home folder in tests/ui/smoke.mjs;
+# the line was removed long ago. Rewriting the public history is the owner's call, so the history check
+# skips exactly these two fingerprints. Never add a new commit here: take the leak out instead.
+a260152da5e97103ffda9138245dd3ef314fd0ab:tests/ui/smoke.mjs:personal-home-path:9
+c8b2bc064579d97ab32f7e7ff6a5f68be34c46ba:tests/ui/smoke.mjs:personal-home-path:9
