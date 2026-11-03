@@ -67,8 +67,8 @@ A box says **Transcript ready** (Open). Open the meeting from the Meetings tab:
 
 With the speaker add-on installed (Windows: download it from **[its release](https://github.com/ErikBros/ecoscribe/releases/tag/speakers-1.2.0)**, see [Windows](windows.md#1-what-to-download)) and **Tell the other speakers apart** on (Settings > Meetings), the other side
 becomes **Speaker 1, 2, 3...** Click a speaker's label to type their name; every line and every download updates. On a
-one-to-one call it stays "Others". On Windows the speakers pass runs during the call when the NVIDIA card has room,
-otherwise after it.
+one-to-one call it stays "Others". The speakers pass runs during the call when there's room (on Windows the NVIDIA
+card's memory, on a Mac 6 GB of free memory), otherwise after it.
 
 **Remember voices** (on by default): once you've named a speaker, Ecoscribe recognises that voice in later calls and
 names them by itself. Voices are kept on your computer only; **Forget all voices** deletes them.

@@ -69,4 +69,3 @@ Each has a ticket; [FEATURES.md](../FEATURES.md) has the full table.
 - Not tried on a Mac yet: command mode (Right Command + E), taking back the last paste ("scratch that"), pasting it
   again (Right Command + R).
 - Moving the meeting pill by dragging it.
-- The speakers pass during a call (it runs after the call).
