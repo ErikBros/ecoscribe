@@ -14,6 +14,11 @@ langkey: Right Command + L twice -> the next dictation's language goes auto -> E
 no "l" reaches the window.
 added: languages added in Settings (German, Finnish: dictado-tjn): clips spoken by `say` in each, the app
 restarted with English + German + Finnish ticked; Finnish in the set puts dictation on large-v3.
+repaste (dictado-cp1): a dictation, Right Command + R pastes it again (no "r" typed), then "scratch that" said
+alone takes that last paste back with ⌘Z.
+edit (dictado-waw): command mode. The window's text selected (⌘A), Right Command + E, an instruction spoken by
+`say`, Right Command: Claude's answer replaces the selection, and ⌘Z brings the old text back. Uses Claude Code:
+ECOSCRIBE_E2E_CLAUDE (a JSON list, as [claude] command in config.toml) picks the login, else the default one.
 """
 from __future__ import annotations
 
@@ -164,6 +169,110 @@ SAID = "Hello there. New line. This is a voice command test. Send it."
 def make_say_clip(dst: Path, text: str) -> None:
     """A 16 kHz mono 16-bit wav spoken by macOS (no mic, no person needed)."""
     subprocess.run(["say", "-o", str(dst), "--file-format=WAVE", "--data-format=LEI16@16000", text], check=True)
+
+
+def rcmd_plus(keycode: int) -> None:
+    """Right Command held, `keycode` tapped, Right Command let go (tagged: the guard ignores it)."""
+    from ecoscribe.platform.macos import keys
+    import Quartz as Q
+    cmd = Q.kCGEventFlagMaskCommand | 0x10
+    keys._post(RCMD, True, cmd)
+    time.sleep(0.08)
+    keys._post(keycode, True, cmd)
+    time.sleep(0.06)
+    keys._post(keycode, False, cmd)
+    time.sleep(0.06)
+    keys._post(RCMD, False, 0)
+
+
+def cmd_plus(keycode: int) -> None:
+    """Left Command + a key, as the user's own shortcut (⌘A, ⌘Z) into the target window."""
+    from ecoscribe.platform.macos import keys
+    import Quartz as Q
+    keys._post(keys.KC_CMD, True, Q.kCGEventFlagMaskCommand)
+    keys._post(keycode, True, Q.kCGEventFlagMaskCommand)
+    keys._post(keycode, False, Q.kCGEventFlagMaskCommand)
+    keys._post(keys.KC_CMD, False, 0)
+
+
+def wait_text(r: "Run", before: str, secs: float = 15) -> str:
+    end = time.monotonic() + secs
+    while time.monotonic() < end and r.text() == before:
+        time.sleep(0.1)
+    time.sleep(0.5)  # a paste and a key after it settle
+    return r.text()
+
+
+def dictate(r: "Run", clip: Path, wait: bool = True) -> str:
+    """Right Command, the clip as the mic, Right Command; the window's text once it changed."""
+    r.use(clip.name)
+    before = r.text()
+    tap_rcmd()
+    time.sleep(clip.stat().st_size / 32000 + 0.6)
+    tap_rcmd()
+    return wait_text(r, before) if wait else before
+
+
+KC_A, KC_E, KC_R, KC_Z = 0, 14, 15, 6
+
+
+def scenario_repaste(r: Run) -> dict:
+    make_say_clip(r.clips / "say_scratch.wav", "Scratch that.")
+    first = dictate(r, r.clips / "en_fox.wav")
+    pasted = first
+    rcmd_plus(KC_R)
+    again = wait_text(r, first, 10)
+    out = {"first": recall(first, EXPECTED["en_fox.wav"]) >= 0.85,
+           "pasted_again": again.count("fox") == 2 * first.count("fox") and again.startswith(pasted),
+           "no_r_typed": not again[len(first):].lower().startswith("r")}
+    seen = r._log().count("undo")
+    r.use("say_scratch.wav")
+    tap_rcmd()
+    time.sleep((r.clips / "say_scratch.wav").stat().st_size / 32000 + 0.6)
+    tap_rcmd()
+    back = wait_text(r, again, 10)
+    out["scratch_took_it_back"] = back.strip() == first.strip()
+    out["undo_logged"] = r._log().count("undo") > seen
+    return out
+
+
+EDIT_SAID = "Make all of it upper case."
+
+
+def scenario_edit(r: Run) -> dict:
+    import os
+    claude = os.environ.get("ECOSCRIBE_E2E_CLAUDE")
+    extra = f"[claude]\ncommand = {claude}\n" if claude else ""
+    cfg = r.data / "config.toml"
+    cfg.write_text(cfg.read_text(encoding="utf-8").replace("[text]\n", "[text]\ncommand_mode = true\n", 1) + extra,
+                   encoding="utf-8")
+    r.app.terminate()
+    r.app.wait(10)
+    r.start_app()
+    make_say_clip(r.clips / "say_edit.wav", EDIT_SAID)
+    start = dictate(r, r.clips / "en_fox.wav")
+    cmd_plus(KC_A)
+    time.sleep(0.5)
+    r.use("say_edit.wav")
+    began, done = r._log().count("command mode: recording"), r._log().count("command mode: ")
+    rcmd_plus(KC_E)
+    end = time.monotonic() + 5  # the selection copied, then the instruction records
+    while time.monotonic() < end and r._log().count("command mode: recording") <= began:
+        time.sleep(0.05)
+    recording = r._log().count("command mode: recording") > began
+    time.sleep((r.clips / "say_edit.wav").stat().st_size / 32000 + 0.6)
+    tap_rcmd()
+    end = time.monotonic() + 40  # the instruction transcribed, Claude's answer, the paste
+    while time.monotonic() < end and r._log().count("command mode: ") <= done + 1:
+        time.sleep(0.1)
+    edited = wait_text(r, start, 3)
+    cmd_plus(KC_Z)
+    undone = wait_text(r, edited, 5)
+    r.edit_texts = {"start": start, "edited": edited, "undone": undone}  # printed with --verbose
+    return {"replaced_with_upper": edited.strip() == start.strip().upper() or
+            (edited.strip().isupper() and recall(edited, start) >= 0.85),
+            "undo_brings_it_back": undone.strip() == start.strip(),
+            "start_ok": recall(start, EXPECTED["en_fox.wav"]) >= 0.85, "instruction_recorded": recording}
 
 
 def scenario_voice(r: Run) -> dict:
@@ -388,12 +497,18 @@ def main() -> int:
                 results["numpad"] = scenario_numpad(r)
             elif sc == "added":
                 results["added"] = scenario_added(r)
+            elif sc == "repaste":
+                results["repaste"] = scenario_repaste(r)
+            elif sc == "edit":
+                results["edit"] = scenario_edit(r)
             time.sleep(1.5)
     finally:
         r.stop()
     results["stop_to_paste_ms"] = r.stop_to_paste()
     results["real_input_during_run"] = guard.tripped.is_set()
     print(json.dumps(results, ensure_ascii=False, indent=1))
+    if getattr(r, "edit_texts", None):
+        print(json.dumps(r.edit_texts, ensure_ascii=False, indent=1))
     (tmp / "e2e_mac_last.json").write_text(json.dumps(results, ensure_ascii=False, indent=1))
     if guard.tripped.is_set():
         return 3
@@ -418,6 +533,9 @@ def main() -> int:
     if "recover" in results:
         v = results["recover"]
         ok = ok and v["recovered"] and not v["pasted"] and v["nothing_pasted_into_window"] and v["recall_of_first_half"] >= 0.7
+    for name in ("repaste", "edit"):
+        if name in results:
+            ok = ok and all(results[name].values())
     return 0 if ok else 1
 
 
