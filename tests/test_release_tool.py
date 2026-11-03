@@ -45,16 +45,15 @@ def _windows_args(tmp_path, *extra):
     return ["1.25.2", "--platform", "windows", "--notes", str(notes), "--asset", str(exe), *extra]
 
 
-def test_windows_dry_run_prints_guard_release_ticket_and_sync(capsys):
+def test_windows_dry_run_prints_guard_then_release_and_nothing_for_the_mac(capsys):
     assert release.main(["1.25.2", "--platform", "windows", "--asset", "Ecoscribe-Setup-1.25.2.exe", "--dry-run"]) == 0
     out = capsys.readouterr().out
     lines = [l for l in out.splitlines() if l.startswith("+ ")]
     assert "tools/privacy_guard.py text --file" in lines[0]
     assert lines[1].startswith("+ gh release create v1.25.2 Ecoscribe-Setup-1.25.2.exe -R ErikBros/ecoscribe "
                                "--target main --latest --title 'Ecoscribe 1.25.2' --notes-file")
-    assert any(l.startswith("+ bd create 'Mac download for v1.25.2' -p 1") for l in lines)
-    assert lines[-1] == "+ bd sync"
-    assert "(dry run)" in out
+    assert len(lines) == 2  # the Mac download is GitHub's mac-release run, no ticket (dictado-trtz.5)
+    assert "(dry run)" in out and "mac-release" in out
 
 
 def test_mac_dry_run_uploads_the_dmg_and_closes_the_ticket(capsys):
@@ -72,20 +71,11 @@ def test_the_download_must_have_the_name_the_apps_look_for(capsys):
     assert "Ecoscribe-1.25.2.dmg" in capsys.readouterr().out
 
 
-def test_windows_release_runs_in_order_and_creates_the_mac_ticket(tmp_path):
+def test_windows_release_makes_no_mac_ticket(tmp_path):
     sh = FakeShell()
     assert release.main(_windows_args(tmp_path), shell=sh) == 0
-    firsts = [c[:3] for c in sh.cmds]
-    assert firsts[1] == ["gh", "release", "create"]
-    assert ["bd", "create", "Mac download for v1.25.2"] in firsts
-    assert sh.cmds[-1] == ["bd", "sync"]
-
-
-def test_an_existing_mac_ticket_is_not_made_twice(tmp_path):
-    found = json.dumps([{"id": "dictado-x1", "title": "Mac download for v1.25.2"}])
-    sh = FakeShell({("bd", "list"): (0, found)})
-    assert release.main(_windows_args(tmp_path), shell=sh) == 0
-    assert not any(c[:2] == ["bd", "create"] for c in sh.cmds)
+    assert [c[:3] for c in sh.cmds][1] == ["gh", "release", "create"]
+    assert not any(c[0] == "bd" for c in sh.cmds)
 
 
 def test_privacy_guard_failure_stops_the_release(tmp_path):

@@ -58,7 +58,7 @@ wtest "$APP_W\\tests" -q -m win                     # real desktop, waits for 45
 npm install && npm run smoke                       # the window's JavaScript (jsdom)
 wpy "$APP_W\\tools\\build.py" --installer          # Windows installer
 wpy "$APP_W\\tools\\build.py" --installer --install  # installer, release gate, install only on all PASS
-python tools/build_mac.py                          # macOS .app + .dmg (on the Mac)
+python tools/build_mac.py                          # macOS .app + .dmg (on the Mac; releases: GitHub mac-release)
 tools/mac_check.sh                                 # macOS test suite (on the Mac)
 ```
 

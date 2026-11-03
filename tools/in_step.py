@@ -195,7 +195,10 @@ def downloads_line(releases: list[dict]) -> str | None:
             has = "has" if len(miss[p]) == 1 else "have"
             parts.append(f"{plural(len(miss[p]), 'release', 'releases')} {has} no {NAMES[p]} download: "
                          + ", ".join(miss[p]))
-    return "; ".join(parts) + "." if parts else None
+    if not parts:
+        return None
+    hint = " GitHub builds the Mac one: re-run Actions > mac-release if it failed." if miss["mac"] else ""
+    return "; ".join(parts) + "." + hint
 
 
 def installed_version(installed: dict, platform: str) -> str | None:

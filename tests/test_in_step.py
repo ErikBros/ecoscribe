@@ -47,7 +47,8 @@ def test_all_green_is_one_line():
 def test_missing_mac_download_names_the_releases_since_the_last_one_that_had_it():
     rs = [rel("1.25.2", dmg=False), rel("1.25.1", dmg=False), rel("1.25.0"), rel("1.24.4", dmg=False)]
     out = in_step.lines(facts(releases=rs))
-    assert "2 releases have no Mac download: v1.25.1, v1.25.2." in out
+    assert "2 releases have no Mac download: v1.25.1, v1.25.2. GitHub builds the Mac one: re-run Actions > mac-release" \
+        " if it failed." in out
     assert not any("1.24.4" in line for line in out)  # older gaps don't matter: updates go to the newest
 
 

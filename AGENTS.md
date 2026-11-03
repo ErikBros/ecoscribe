@@ -104,8 +104,9 @@ bd close <id>         # Complete work
   day-old PRs, releases missing the `.dmg` or `.exe`, installed versions on both computers, safety
   (git hooks, gitleaks, local names file, mass-delete guard, private tickets repo). A `STOP:` line comes first: fix it.
 - `python3 tools/release.py X.Y.Z --notes FILE` is the release step on both computers (`--dry-run` shows the commands).
-  Windows creates the release with the installer and a P1 ticket "Mac download for vX.Y.Z"; the Mac uploads its
-  `.dmg` to that release and closes the ticket.
+  Windows creates the release with the installer; GitHub's `mac-release` run (`.github/workflows/mac-release.yml`)
+  then builds, signs and attaches the `.dmg` (about 20 minutes). If that run fails, re-run it in Actions, or build on
+  the Mac and upload with `tools/release.py --platform mac`.
 - After an install: Windows records it itself (`tools/build.py --installer --install`); on the Mac run
   `python3 tools/record_install.py mac` (`build_mac.py` builds but doesn't install).
 
