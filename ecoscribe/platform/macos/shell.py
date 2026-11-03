@@ -134,6 +134,25 @@ def _mouse():
     return NSEvent.mouseLocation()
 
 
+def _work_at(x: float, y: float) -> tuple[float, float, float, float]:
+    """The visible area (menu bar and Dock left out) of the screen holding the point (x, y), in meetui's
+    coordinates: y grows downward, so AppKit's y is negated. The main screen when no screen holds it."""
+    screen = NSScreen.mainScreen()
+    for sc in NSScreen.screens():
+        f = sc.frame()
+        if f.origin.x <= x <= f.origin.x + f.size.width and f.origin.y <= -y <= f.origin.y + f.size.height:
+            screen = sc
+            break
+    v = screen.visibleFrame()
+    return v.origin.x, -(v.origin.y + v.size.height), v.origin.x + v.size.width, -v.origin.y
+
+
+def _primary_down() -> bool:
+    """Is the primary mouse button held right now? (polled; the pill never takes the event)"""
+    from AppKit import NSEvent
+    return bool(NSEvent.pressedMouseButtons() & 1)
+
+
 def _bottom_center(w: int, h: int, lift: int = 0) -> tuple[float, float]:
     vf = _active_screen().visibleFrame()
     return vf.origin.x + (vf.size.width - w) / 2, vf.origin.y + BOTTOM_GAP + lift
@@ -282,6 +301,18 @@ class Overlay:
         self.open = False  # the meeting chip is opened by the mouse over it (dictado-f6o)
         self._wave: deque = deque(maxlen=WAVE_N)  # the last WAVE_N levels, oldest first
         self._rw = RW
+        # Moving the pill (dictado-8dy, as dictado-06i/dr5s on Windows): spots are the pill's bottom centre in
+        # meetui's coordinates (y grows down: AppKit's y negated), kept in pill.json.
+        self._spot: tuple[float, float] | None = None  # where the user put it; None: bottom centre
+        self._spot_path = None
+        self._anchor: tuple[float, float] | None = None  # where it is while being dragged
+        self._drag = meetui.Drag()
+        self._clickable = False  # click-through, except while the mouse is on the pill
+
+    def remember_at(self, path) -> None:
+        """Keep the spot the pill is dragged to in `path` (pill.json), and start there."""
+        self._spot_path = path
+        self._spot = meetui.load_spot(path)
 
     # drawing primitives
     def _size(self, w: int, h: int) -> None:
@@ -295,7 +326,12 @@ class Overlay:
         self.view.setNeedsDisplay_(True)
 
     def _place_and_show(self) -> None:
-        x, y = _bottom_center(self.w, self.h)
+        spot = self._anchor if self._drag.moving else self._spot
+        if spot:  # the pill's bottom centre where the user put it, kept on screen at today's size
+            sx, sy = meetui.fit_spot(spot, (self.w, self.h), _work_at(*spot))
+            x, y = sx - self.w / 2, -sy
+        else:
+            x, y = _bottom_center(self.w, self.h)
         self.panel.setFrameOrigin_((x, y))
         self.panel.orderFrontRegardless()  # shown without activating Ecoscribe
         self.visible = True
@@ -312,6 +348,38 @@ class Overlay:
         # AppKit's screen y grows upward; meetui's rect is (left, top, right, bottom) with y growing down
         top, bottom = -(f.origin.y + f.size.height), -f.origin.y
         return meetui.hovering((loc.x, -loc.y), (f.origin.x, top, f.origin.x + f.size.width, bottom))
+
+    def _set_clickable(self, on: bool) -> None:
+        """Click-through unless the mouse is on the pill: a press there moves it instead of reaching the
+        app below. The panel never activates (non-activating), so typing goes on in that app."""
+        if on != self._clickable:
+            self._clickable = on
+            self.panel.setIgnoresMouseEvents_(not on)
+
+    def _here(self) -> tuple[float, float]:
+        f = self.panel.frame()
+        return f.origin.x + f.size.width / 2, -f.origin.y
+
+    def _pill_mouse(self, now: float) -> bool:
+        """Drag the pill under the mouse; a double-click puts it back at the bottom centre. Returns hover."""
+        hover = self._hover()
+        self._set_clickable(hover or self._drag.held)
+        loc = _mouse()
+        act = self._drag.step(now, (loc.x, -loc.y), _primary_down(), hover, self._here())
+        if act and act[0] == "move":
+            self._anchor = act[1]
+            self._place_and_show()
+        elif act and act[0] == "drop":
+            self._spot = meetui.fit_spot(self._anchor, (self.w, self.h), _work_at(*self._anchor))
+            self._anchor = None
+            if self._spot_path:
+                meetui.save_spot(self._spot_path, self._spot)
+        elif act and act[0] == "reset":
+            self._spot = self._anchor = None
+            if self._spot_path:
+                meetui.save_spot(self._spot_path, None)
+            self._place_and_show()
+        return hover or self._drag.held  # a chip being dragged stays open, though the mouse ran ahead of it
 
     def _meeting_chip(self, view: dict) -> None:
         """The meeting as it sits: a small dark chip, recording dot + timer."""
@@ -469,15 +537,21 @@ class Overlay:
 
     def tick(self) -> None:
         now = time.monotonic()
+        draggable = (self.mode == "hidden" and self.meeting or self.mode == "recording") and not self._flash_until
+        if not draggable:
+            self._set_clickable(False)
+            self._drag.press, self._drag.moving, self._anchor = None, False, None
         if self.mode == "recording":
             lvl = min(1.0, math.sqrt(self.level_fn()) * 4)
             self._wave.append(lvl)
             self._recording_pill(int(now - self._t0), lvl, now)
+            if draggable:
+                self._pill_mouse(now)
         elif self.mode == "hidden" and self._flash_until and now >= self._flash_until:
             self._flash_until = 0.0
             self._show_layer()
         elif self.mode == "hidden" and self.meeting and not self._flash_until:
-            hover = self._hover()  # the chip opens to the live line while the mouse is on it
+            hover = self._pill_mouse(now)  # it drags, and the chip opens to the live line while the mouse is on it
             if hover != self.open:
                 self.open = hover
                 self._show_layer()

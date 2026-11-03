@@ -30,7 +30,7 @@ can't use, for example).
 - **Live text on the pill** (Settings > Dictation > While you dictate > On-screen pill, on by default): the pill shows what it hears while you
   talk, a few seconds behind. It's a quick draft; the careful transcription is what gets pasted.
 - **On-screen pill** (same place) turns the pill off. **Sounds** plays a short sound at start and stop.
-- **Move it** (Windows): drag the pill while you dictate, or the meeting chip during a call. It stays there for both,
+- **Move it:** drag the pill while you dictate, or the meeting chip during a call. It stays there for both,
   next time too. Double-click it to put it back at the bottom. The app you're typing into keeps the keyboard.
 
 ## Languages
