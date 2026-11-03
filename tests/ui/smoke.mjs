@@ -332,6 +332,15 @@ async function load(query) {
   await sleep(2300);
   check(doc.querySelector("#history .h-text")?.textContent === "A brand new dictation.", "the new dictation is at the top by itself");
 }
+{ // dictado-rtpi: a long dictation shows its first lines, with Show all / Show less
+  const { doc } = await load("page=historial&longdict=1");
+  await sleep(50);
+  const long = doc.querySelector('#history .h-item[data-id="dl1"]'), more = long?.querySelector(".h-more");
+  check(long?.querySelector(".h-text").classList.contains("h-clamp") && more?.textContent === "Show all", "the long one is clamped, with Show all");
+  check(doc.querySelectorAll("#history .h-more").length === 1, "the short ones have no toggle");
+  more.click();
+  check(!long.querySelector(".h-text").classList.contains("h-clamp") && more.textContent === "Show less", "Show all opens it, Show less closes it");
+}
 { // historial + search
   const { window, doc } = await load("page=historial");
   check(doc.querySelectorAll(".h-item:not(.h-meeting)").length === 5, "history lists 5 dictations");

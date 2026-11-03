@@ -96,7 +96,8 @@ on. See [With Claude](claude.md#fix-it-when-you-correct-yourself).
 ## History and Retry
 
 The **History** tab has every dictation (and meeting), newest first, with the app it went into. Copy any of them. A new
-dictation shows up by itself while History is open.
+dictation shows up by itself while History is open. A long one shows its first lines: **Show all** opens it, **Show less**
+closes it again.
 
 - **Retry ▾** on a recent dictation transcribes it again: **Again, detect the language**, or **Again, in** one of
   your languages. The new text is copied, ready to paste. The last 20 dictations keep their audio on your computer

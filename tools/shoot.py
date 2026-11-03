@@ -10,7 +10,7 @@ from pathlib import Path
 APP = Path(__file__).resolve().parent.parent
 EDGE = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 SHOTS = {
-    "inicio": "page=inicio", "historial": "page=historial", "ajustes": "page=ajustes",
+    "inicio": "page=inicio", "historial": "page=historial", "historial-largo": "page=historial&longdict=1", "ajustes": "page=ajustes",
     "bienvenida": "page=bienvenida&welcome=1",
     **{f"setup-{k}": f"page=bienvenida&welcome=1&sstep={k}{q}" for k, q in
        (("permissions", "&mac=1"), ("models", ""), ("mic", ""), ("shortcut", ""), ("try", ""), ("done", ""))},
