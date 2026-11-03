@@ -66,5 +66,5 @@ Settings > General.
 
 Each has a ticket; [FEATURES.md](../FEATURES.md) has the full table.
 
-- Not tried on a Mac yet: Command mode on keys picked in Settings (a different letter, or a combo of its own).
+- Not tried on a Mac yet: Command mode on a combo of its own (a picked letter works).
 - The speakers pass during a call (it runs after the call).

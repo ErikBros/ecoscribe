@@ -214,6 +214,33 @@ def dictate(r: "Run", clip: Path, wait: bool = True) -> str:
 
 
 KC_A, KC_E, KC_R, KC_Z = 0, 14, 15, 6
+LETTERS = {"e": 14, "j": 38, "k": 40, "u": 32}
+MODS = {"ctrl": (59, "kCGEventFlagMaskControl"), "shift": (56, "kCGEventFlagMaskShift"),
+        "alt": (58, "kCGEventFlagMaskAlternate"), "cmd": (55, "kCGEventFlagMaskCommand")}
+
+
+def press_edit(key: str) -> None:
+    """Command mode's keys: Right Command + the letter, or the combo of its own (modifiers held, letter tapped)."""
+    if "+" not in key:
+        rcmd_plus(LETTERS[key])
+        return
+    from ecoscribe.platform.macos import keys
+    import Quartz as Q
+    *mods, letter = key.split("+")
+    flags = 0
+    for m in mods:
+        kc, mask = MODS[m]
+        flags |= getattr(Q, mask)
+        keys._post(kc, True, flags)
+        time.sleep(0.03)
+    keys._post(LETTERS[letter], True, flags)
+    time.sleep(0.06)
+    keys._post(LETTERS[letter], False, flags)
+    for m in reversed(mods):
+        kc, mask = MODS[m]
+        flags &= ~getattr(Q, mask)
+        time.sleep(0.03)
+        keys._post(kc, False, flags)
 
 
 def scenario_repaste(r: Run) -> dict:
@@ -243,9 +270,10 @@ def scenario_edit(r: Run) -> dict:
     import os
     claude = os.environ.get("ECOSCRIBE_E2E_CLAUDE")
     extra = f"[claude]\ncommand = {claude}\n" if claude else ""
+    key = os.environ.get("ECOSCRIBE_E2E_EDIT_KEY", "e")  # a letter, or a combo of its own like ctrl+shift+e
     cfg = r.data / "config.toml"
-    cfg.write_text(cfg.read_text(encoding="utf-8").replace("[text]\n", "[text]\ncommand_mode = true\n", 1) + extra,
-                   encoding="utf-8")
+    cfg.write_text(cfg.read_text(encoding="utf-8").replace(
+        "[text]\n", f'[text]\ncommand_mode = true\ncommand_key = "{key}"\n', 1) + extra, encoding="utf-8")
     r.app.terminate()
     r.app.wait(10)
     r.start_app()
@@ -255,13 +283,13 @@ def scenario_edit(r: Run) -> dict:
     time.sleep(0.5)
     r.use("say_edit.wav")
     began, done = r._log().count("command mode: recording"), r._log().count("command mode: ")
-    rcmd_plus(KC_E)
+    press_edit(key)
     end = time.monotonic() + 5  # the selection copied, then the instruction records
     while time.monotonic() < end and r._log().count("command mode: recording") <= began:
         time.sleep(0.05)
     recording = r._log().count("command mode: recording") > began
     time.sleep((r.clips / "say_edit.wav").stat().st_size / 32000 + 0.6)
-    tap_rcmd()
+    tap_rcmd() if "+" not in key else press_edit(key)  # a combo of its own is pressed again to stop
     end = time.monotonic() + 40  # the instruction transcribed, Claude's answer, the paste
     while time.monotonic() < end and r._log().count("command mode: ") <= done + 1:
         time.sleep(0.1)
