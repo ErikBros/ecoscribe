@@ -34,7 +34,6 @@ REPO = Path(__file__).resolve().parent.parent
 GH_REPO = "ErikBros/ecoscribe"
 GH_USER = "ErikBros"
 VERSION = re.compile(r"\d+\.\d+\.\d+")
-UNKNOWN_MODE = 2  # privacy_guard.py's exit code for a mode it doesn't have
 
 
 def tree_version() -> str:
@@ -106,11 +105,6 @@ class Shell:
         return self.execute(cmd)
 
 
-def loud(msg: str) -> None:
-    bar = "!" * 72
-    print(f"\n{bar}\n{msg}\n{bar}\n", flush=True)
-
-
 def open_tickets(sh: Shell, title: str) -> list[str]:
     code, out = sh(["bd", "list", "--status", "open,in_progress", "--title", title, "--json", "--brief"],
                    note="find the ticket")
@@ -126,10 +120,7 @@ def release_windows(sh: Shell, version: str, asset: Path, notes: Path | None) ->
     notes_arg = str(notes) if notes else "NOTES.md"
     code, _ = sh([sys.executable, "tools/privacy_guard.py", "text", "--file", notes_arg],
                  note="the notes are public")
-    if code == UNKNOWN_MODE:
-        loud("WARNING: tools/privacy_guard.py has no 'text' mode in this tree, so the release notes were NOT\n"
-             "checked. Read them yourself now: no names, no quotes of what the user said, no personal paths.")
-    elif code != 0:
+    if code != 0:
         print("release: the privacy guard stopped the release notes (above). Fix them and run again.")
         return 1
     code, _ = sh(["gh", "release", "create", tag, str(asset), "-R", GH_REPO, "--target", "main", "--latest",
