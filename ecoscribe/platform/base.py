@@ -61,7 +61,7 @@ CAPABILITIES: dict[str, dict] = {
         "windows": "ecoscribe.platform.windows.deliver:foreground_exe",  # + context.foreground_title for a browser tab
         "macos": "ecoscribe.platform.macos.context:foreground_app,app_key,foreground_title",  # bundle id, not the translated name
     },
-    "Move the pill: drag the meeting chip, it stays there; double-click puts it back": {  # dictado-06i
+    "Move the pill: drag it (dictating or the meeting chip), it stays there; double-click puts it back": {  # dictado-06i, dictado-dr5s
         "windows": "ecoscribe.platform.windows.shell:Overlay",  # Overlay.remember_at, _chip_mouse; meetui.Drag
         "macos": ("ticket", "dictado-8dy"),
     },
