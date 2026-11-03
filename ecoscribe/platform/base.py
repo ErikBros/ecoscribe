@@ -123,7 +123,7 @@ CAPABILITIES: dict[str, dict] = {
     },
     "Speakers pass during a call (when the GPU has room)": {
         "windows": "ecoscribe.platform.windows.speakers:gpu_room",  # nvidia-smi free memory >= 3 GB
-        "macos": ("ticket", "dictado-692"),  # gpu_room() is False: the pass waits for the call to end
+        "macos": "ecoscribe.platform.macos.speakers:gpu_room,free_mb",  # free memory >= 6 GB (shared with the GPU)
     },
     "Start at login": {
         "windows": "ecoscribe.platform.windows.startup:enable,disable,is_enabled",

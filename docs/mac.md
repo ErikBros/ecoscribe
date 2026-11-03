@@ -67,4 +67,3 @@ Settings > General.
 Each has a ticket; [FEATURES.md](../FEATURES.md) has the full table.
 
 - Not tried on a Mac yet: Command mode on a combo of its own (a picked letter works).
-- The speakers pass during a call (it runs after the call).
