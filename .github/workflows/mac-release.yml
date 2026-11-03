@@ -23,6 +23,7 @@ on:
       - tools/build_mac.py
       - packaging/macos/**
       - requirements-mac.txt
+      - requirements-mac.lock.txt
 permissions:
   contents: write
 concurrency:
@@ -60,15 +61,21 @@ jobs:
             echo "Release $TAG already has Ecoscribe-$v.dmg (uploaded from the Mac); nothing to do."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/setup-python@v5
+      # uv, like the Mac's own build: it has Python 3.12.13 for arm64 (setup-python doesn't)
+      - uses: astral-sh/setup-uv@v6
         if: steps.have.outputs.skip != 'true'
         with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: requirements-mac.txt
+          python-version: "3.12.13"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: requirements-mac.lock.txt
       - name: Install
         if: steps.have.outputs.skip != 'true'
-        run: python -m pip install -r requirements-mac.txt pyinstaller
+        # the same versions as the Mac's own build (requirements-mac.lock.txt), so an update never brings a
+        # differently built app; PyInstaller pinned to the Mac's too
+        run: |
+          uv pip install -r requirements-mac.lock.txt pyinstaller==6.22.3 pyinstaller-hooks-contrib==2026.8
+          python --version
       - name: Signing keychain (temporary)
         id: sign
         if: steps.have.outputs.skip != 'true'
