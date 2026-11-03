@@ -102,3 +102,15 @@ def test_prompt_card_has_its_tile_and_a_draining_countdown_line(monkeypatch):
         shell.snapshot(box, __import__("pathlib").Path("/dev/null"))  # draws every glyph path without error
     finally:
         pw._close()
+
+
+def test_the_pill_uses_the_app_font_and_falls_back(monkeypatch):
+    """dictado-vx1: Hanken Grotesk (the window's font, as on Windows); the system font if it can't load."""
+    from AppKit import NSApplication
+    NSApplication.sharedApplication()
+    from ecoscribe.platform.macos import shell
+    assert shell.APP_FONT.exists()
+    assert shell.font(13, True).fontName() == "HankenGrotesk-Regular_Bold"
+    assert shell.font(13).fontName() == "HankenGrotesk-Regular"
+    monkeypatch.setattr(shell, "_app_font", False)
+    assert "Hanken" not in shell.font(13, True).fontName()
