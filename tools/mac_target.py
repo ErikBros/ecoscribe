@@ -12,7 +12,7 @@ def main():
     root = tk.Tk()
     root.title("EcoscribeTarget")
     root.geometry("520x200+200+200")
-    text = tk.Text(root, font=("Helvetica", 13))
+    text = tk.Text(root, font=("Helvetica", 13), undo=True, autoseparators=True)  # ⌘Z: "scratch that", command mode
     text.pack(fill="both", expand=True)
     try:  # a Python process doesn't come to the front by itself on macOS
         from AppKit import NSApplication
