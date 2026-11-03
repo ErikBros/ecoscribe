@@ -4,6 +4,7 @@ Invented text only: never a real dictation or a real ticket here."""
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -271,3 +272,82 @@ def test_bootstrap_needs_the_private_sync_remote_first():
     assert "sync.remote" in mod.ticket_remote_risk(toks, lambda: "")
     assert "sync.remote" in mod.ticket_remote_risk(toks, lambda: PUBLIC_URL)
     assert mod.ticket_remote_risk(toks, lambda: PRIVATE_URL) is None
+
+
+# --- weekly audit (dictado-trtz.6) -----------------------------------------------------------------------
+
+def _audit():
+    spec_a = importlib.util.spec_from_file_location("public_audit_w", REPO / "tools" / "public_audit.py")
+    audit = importlib.util.module_from_spec(spec_a)
+    spec_a.loader.exec_module(audit)
+    return audit
+
+
+def test_reviewed_hits_file_is_read_without_comments(tmp_path):
+    audit = _audit()
+    f = tmp_path / "reviewed.txt"
+    f.write_text("# header\nPR #1 body: dictado-a1  # harmless\n\nrelease v1.0.0 notes: dictado-b2\n", encoding="utf-8")
+    assert audit.reviewed_keys(f) == {"PR #1 body: dictado-a1", "release v1.0.0 notes: dictado-b2"}
+    assert audit.reviewed_keys(tmp_path / "missing.txt") == set()
+
+
+def test_the_repo_reviewed_list_only_names_ticket_copies():
+    for key in _audit().reviewed_keys():
+        assert re.fullmatch(r"(PR #\d+ (body|title|branch name)|release v[\d.]+ (notes|name)|comment \S+): dictado-\S+",
+                            key), key
+
+
+def test_weekly_waits_seven_days():
+    audit = _audit()
+    import time as _t
+    now = _t.mktime(_t.strptime("2026-11-10", "%Y-%m-%d"))
+    assert audit.days_since_last('{"public-audit-last": "2026-11-05 clean"}', now) == pytest.approx(5, abs=0.1)
+    assert audit.days_since_last('{"other": "x"}', now) is None
+    assert audit.days_since_last("not json", now) is None
+
+
+def test_ticket_text_once_published_still_counts_as_public():
+    audit = _audit()
+    raw = json.dumps({"id": "dictado-x", "description": "The user wants a calmer pill colour at night"}) + "\n"
+    words = audit.exported_ticket_words(raw)
+    assert " the user wants a calmer pill colour " in words
+
+
+def _run_audit(monkeypatch, audit, copies, reviewed, exported=" ", weekly=False):
+    monkeypatch.setattr(audit, "token", lambda: "t")
+    monkeypatch.setattr(audit, "public_texts", lambda repo, env: [("PR #7 body", "invented text")])
+    monkeypatch.setattr(audit, "gitleaks_all", lambda texts: [])
+    monkeypatch.setattr(audit.guard, "speech_hits", lambda t: [])
+    monkeypatch.setattr(audit.guard, "ticket_copies", lambda t: copies)
+    monkeypatch.setattr(audit, "exported_ticket_words", lambda raw=None: exported)
+    monkeypatch.setattr(audit, "reviewed_keys", lambda path=None: reviewed)
+    monkeypatch.setattr(audit.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, "", ""))
+    calls = []
+    monkeypatch.setattr(audit, "bd", lambda *a, **k: calls.append(a) or (0, "{}"))
+    return audit.main(["public_audit.py"] + (["--weekly"] if weekly else [])), calls
+
+
+def test_a_reviewed_ticket_copy_is_not_a_hit(monkeypatch, capsys):
+    audit = _audit()
+    code, _ = _run_audit(monkeypatch, audit, {"dictado-q1 notes": ["a b c d e f"]}, {"PR #7 body: dictado-q1"})
+    assert code == 0 and "reviewed earlier" in capsys.readouterr().out
+
+
+def test_an_unreviewed_ticket_copy_is_a_hit_and_weekly_opens_a_private_ticket(monkeypatch, capsys):
+    audit = _audit()
+    code, calls = _run_audit(monkeypatch, audit, {"dictado-q1": ["a b c d e f"]}, set(), weekly=True)
+    assert code == 1 and "HIT PR #7 body" in capsys.readouterr().out
+    assert any(c[0] == "remember" and c[2] == "public-audit-last" and "1 hit" in c[3] for c in calls)
+    create = [c for c in calls if c[0] == "create"]
+    assert create and "PR #7 body" in create[0][-1] and "a b c" not in create[0][-1]
+
+
+def test_weekly_skips_when_run_recently(monkeypatch, capsys):
+    audit = _audit()
+    import time as _t
+    today = _t.strftime("%Y-%m-%d")
+    monkeypatch.setattr(audit, "bd", lambda *a, **k: (0, json.dumps({"public-audit-last": f"{today} clean"})))
+    monkeypatch.setattr(audit, "public_texts", lambda *a: pytest.fail("should not download"))
+    monkeypatch.setattr(audit, "token", lambda: "t")
+    assert audit.main(["public_audit.py", "--weekly"]) == 0
+    assert "next in" in capsys.readouterr().out

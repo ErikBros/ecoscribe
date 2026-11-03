@@ -1,0 +1,4 @@
+# Public audit hits a person looked at and found harmless (tools/public_audit.py).
+# One "<where>: <ticket>" per line, then " # " and why. Only ticket-copy hits belong here.
+PR #233 body: dictado-dy55  # neutral feature description written for the public ticket; nothing personal
+release v1.26.0 notes: dictado-dy55  # same neutral feature description
