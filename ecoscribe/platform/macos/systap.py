@@ -76,6 +76,10 @@ class Loopback(_Loopback):
         self._got_header = False
         self._warned = False
 
+    # The tap hears every app's output whatever device it plays to, so there is nothing to switch to
+    # (dictado-7bw): None makes session_rec.Recorder.switch say no, and the meeting keeps this track.
+    switch = None
+
     # ---------- the helper ----------
     def _argv(self) -> list[str] | None:
         if self.command:
