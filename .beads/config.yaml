@@ -58,3 +58,8 @@ agent:
     profile: team-maintainer
 prime:
     max-memory-chars: 2500
+sync:
+    remote: "git+ssh://git@github-personal/ErikBros/ecoscribe-tickets.git"
+    require_confirmation_on_mass_delete: true
+import:
+    auto: false
