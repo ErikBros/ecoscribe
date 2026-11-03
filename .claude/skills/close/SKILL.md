@@ -44,7 +44,18 @@ List: uncommitted files, local branches, stashes, open PRs and their checks, tic
 # Mac: tools/mac_check.sh runs them (and test_no_personal_data against the real history)
 ```
 
-Must be **6 passed, 0 skipped**: a skip means the gate didn't run. Then reread what this session wrote:
+Must be **6 passed, 0 skipped**: a skip means the gate didn't run. Then the weekly re-check of everything
+already public (does nothing if either computer ran it in the last 7 days; on a hit it opens a private P1
+ticket with the locations):
+
+```bash
+python3 tools/public_audit.py --weekly
+```
+
+A hit is fixed (rewrite or remove the public text) or, when harmless, listed in `tools/audit_reviewed.txt`
+with the reason. PR, release and issue text already passes the public gate (`.claude/hooks/public_gate.py`)
+before it goes out; a block there means rewrite the text, never get around the check.
+Then reread what this session wrote:
 commit messages, PR bodies, ticket text, messages to the other session. **No dictation or meeting text,
 no quotes of what Erik says, no numbers about his speech or usage, no names, no personal paths.**
 Tests and demo data use invented text. Describe requests neutrally ("the user wants X").

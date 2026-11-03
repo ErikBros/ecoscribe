@@ -124,7 +124,8 @@ comments; titles are fine):
   and blocks the command on a hit. A body from stdin (`-`) can't be checked: write a file first.
   By hand: `python3 tools/privacy_guard.py text --file body.md`.
 - **CI:** `pr-shape` runs gitleaks over the PR title, body and branch name.
-- **Audit:** `python3 tools/public_audit.py` checks everything already on GitHub (locations only).
+- **Audit:** `python3 tools/public_audit.py` checks everything already on GitHub (locations only); `/close`
+  runs it weekly (`--weekly`). Hits looked at and found harmless go in `tools/audit_reviewed.txt` with the reason.
 
 It fails closed: no gitleaks, no ticket store (`bd export`) or no app data folder blocks instead of
 passing. Hits name where (check, ticket id, line), never the text.
