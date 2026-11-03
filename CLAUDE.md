@@ -17,13 +17,18 @@ outcomes in plain words and only real choices (money, publishing, his desktop, w
    and GPU suites when a PR touches shared code. Merge commits, no squash.
 5. **Short-lived branches:** merge within the day; branches are deleted on merge. If main moves,
    rebase your one branch, never a pile.
-6. **Nothing goes straight to main**, ticket/beads updates included: they ride in the PR.
+6. **Nothing goes straight to main.** Tickets are not in this repo: they live in the private ticket store
+   (Beads below) and sync with `bd sync`, never through a PR.
 7. **Public repo:** before every push, `tests/test_no_secrets.py`, `tests/test_repo_hygiene.py` and
    `tests/test_no_personal_data.py` pass and the diff has no names, personal paths, keys or calendar links.
-   **Never any of Erik's personal data** anywhere in git, tickets (`.beads/issues.jsonl` is public),
-   commit messages, PR bodies or comments: no dictation or meeting text, no quotes of what he says,
-   no numbers about his speech or usage. Tests and demo data use invented text; describe requests
-   neutrally ("the user wants X").
+   **Never any of Erik's personal data** anywhere public: git, commit messages, branch names, PR titles,
+   bodies and comments, release notes: no dictation or meeting text, no quotes of what he says, no numbers
+   about his speech or usage. Tests and demo data use invented text; describe requests neutrally ("the user
+   wants X"). **Private tickets** may say what he wants and why, but still no dictation or meeting text
+   (they sit on GitHub's servers). **Private text reaches public only rewritten, never copied:** every
+   public text passes `tools/privacy_guard.py` (commits, pushes and branch names through the git hooks;
+   `gh` PR, release and issue text through the Claude Code check), which also refuses pieces copied from a
+   ticket. PR bodies follow the outline in AGENTS.md (Public text).
 8. **Parity:** OS-specific work updates `ecoscribe/platform/base.py` + `FEATURES.md` in the same PR
    (`tests/test_platform_contract.py` checks it); the other platform gets done, a ticket, or
    "not needed" with a reason.
@@ -78,7 +83,18 @@ bd close <id>         # Complete work
 - Run `bd prime` for detailed command reference and session close protocol
 - Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
 
-**Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md for details and anti-patterns.
+**Architecture in one line:** issues live in a local Dolt DB, synced by `bd sync` through the **private** remote
+ErikBros/ecoscribe-tickets (`refs/dolt/data`). The old `.beads/issues.jsonl` here is frozen (no export writes it) until it
+is removed from git. A fresh clone joins with
+`bd init --prefix dictado --remote git+ssh://git@github-personal/ErikBros/ecoscribe-tickets.git`, never an empty
+`bd init` (it would push an empty database; the mass-delete guard asks first). See
+https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md for details and anti-patterns.
+
+## Session start (Windows and Mac)
+
+The first lines of a session are the in-step check (`tools/in_step.py`). Act on them before anything else:
+`bd sync` when tickets aren't synced; merge green PRs (any platform's); on the Mac, build and attach the missing Mac
+downloads (`tools/release.py`); a `STOP:` line is fixed first.
 
 ## Session Completion
 
@@ -88,7 +104,7 @@ bd close <id>         # Complete work
 
 1. **File issues for remaining work** - Create issues for anything that needs follow-up
 2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
+3. **Update issue status** - Close finished work, update in-progress items, then `bd sync`
 4. **PUSH YOUR BRANCH AND OPEN/UPDATE ITS PR** (see STANDARD PROCESS above; main is protected):
    ```bash
    git fetch && git rebase origin/main   # your one branch only
