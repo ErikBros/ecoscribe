@@ -29,8 +29,8 @@ computer's sound). Everything stays on your computer.
 ### While it records
 
 - **The meeting pill:** a small chip with a recording dot and the timer. Put the mouse on it to see the latest line.
-- **Move it:** drag the chip where you want it; it stays there next time. Double-click puts it back. (Windows; Mac
-  ticket dictado-8dy.)
+- **Move it:** drag the chip where you want it; it stays there next time, for the dictating pill too. Double-click puts
+  it back. (Windows; Mac ticket dictado-8dy.)
 - **The Meetings tab** shows the live transcript (**Watch live**), the language, and **Stop**.
 - **What it's recording:** two small meters next to Stop, one for your mic ("hearing you") and one for the call
   ("hearing them"). Hover one to see the device. If one stays silent while the call app uses another device, a warning

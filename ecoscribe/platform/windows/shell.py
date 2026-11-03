@@ -234,8 +234,9 @@ class Overlay:
         ex = self.ex_style()
         u32.SetWindowLongW(self.hwnd, GWL_EXSTYLE, ex & ~WS_EX_TRANSPARENT if on else ex | WS_EX_TRANSPARENT)
 
-    def _chip_mouse(self, now: float) -> None:
-        """The meeting chip under the mouse: it opens to the live line, and it can be dragged."""
+    def _chip_mouse(self, now: float, chip: bool = True) -> None:
+        """The pill under the mouse can be dragged; the meeting chip also opens to the live line. The
+        dictating pill drags too (dictado-dr5s): it never takes focus (WS_EX_NOACTIVATE), so typing goes on."""
         cursor = self._cursor()
         hover = self._hover(cursor)
         self._set_clickable(hover or self._drag.held)
@@ -254,7 +255,7 @@ class Overlay:
             if self._spot_path:
                 meetui.save_spot(self._spot_path, None)
             self._place_and_show()
-        if hover != self.open:
+        if chip and hover != self.open:
             self.open = hover
             self._show_layer()
 
@@ -317,12 +318,15 @@ class Overlay:
     def tick(self) -> None:
         """Called every 50 ms by the UI loop."""
         now = time.monotonic()
-        if not (self.mode == "hidden" and self.meeting and not self._flash_until):
+        draggable = (self.mode == "hidden" and self.meeting or self.mode == "recording") and not self._flash_until
+        if not draggable:
             self._set_clickable(False)
             self._drag.press = None
             self._drag.moving = False
         if self.mode == "recording":
             self._dictating_pill(int(now - self._t0), min(1.0, math.sqrt(self.level_fn()) * 4))
+            if draggable:
+                self._chip_mouse(now, chip=False)
         elif self.mode == "hidden" and self._flash_until and now >= self._flash_until:
             self._flash_until = 0.0
             self._show_layer()

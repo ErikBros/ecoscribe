@@ -1,4 +1,9 @@
-"""Moving the pill (dictado-06i): drag the meeting chip, it stays there; a double-click puts it back."""
+"""Moving the pill (dictado-06i): drag the meeting chip or the dictating pill, it stays there; a double-click puts it back."""
+import sys
+
+import pytest
+
+
 from ecoscribe import meetui
 from ecoscribe.meetui import Drag, fit_spot, load_spot, save_spot
 
@@ -63,3 +68,20 @@ def test_the_spot_is_kept_and_put_back(tmp_path):
 
 def test_the_drag_threshold_and_double_click_are_sensible():
     assert 2 <= meetui.DRAG_START <= 8 and 0.25 <= meetui.DOUBLE_S <= 0.6
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="the Windows pill")
+def test_the_dictating_pill_can_be_dragged_too():  # dictado-dr5s
+    from ecoscribe.platform.windows import shell
+    o = object.__new__(shell.Overlay)
+    o.mode, o.meeting, o._flash_until, o._t0, o.level_fn = "recording", None, 0.0, 0.0, lambda: 0.0
+    o._drag, o.open, calls = meetui.Drag(), False, []
+    o._dictating_pill = lambda secs, level: None
+    o._set_clickable = lambda on: calls.append(("clickable", on))
+    o._chip_mouse = lambda now, chip=True: calls.append(("mouse", chip))
+    o.tick()
+    assert ("mouse", False) in calls and ("clickable", False) not in calls  # drags, and doesn't open like the chip
+    calls.clear()
+    o._flash_until = 1.0  # a notice on the pill: hands off
+    o.tick()
+    assert ("clickable", False) in calls and not any(c[0] == "mouse" for c in calls)
