@@ -32,13 +32,9 @@ List: uncommitted files, local branches, stashes, open PRs and their checks, tic
 - **Open PRs:** all three checks green (`unit (windows-latest)`, `unit (macos-14)`, `pr-shape`) -> merge
   (`--merge --delete-branch`). Red -> fix it if it's small, else leave it open and say why. No checks at
   all -> check githubstatus.com; GitHub dropping events is not ours to fix, say so.
-- **Two PRs touching `.beads/`** conflict on merge: merge one, then rebase the next and rebuild
-  `.beads/issues.jsonl` from main's file plus that ticket's line from `bd export` (never hand-edit
-  other tickets' lines). `interactions.jsonl` is append-only: main's lines plus the branch's new ones.
-- **Ticket changes made after the last PR** (closes, notes, new tickets) ride in a PR too: branch
-  `beads-session-close` from `origin/main`, commit `.beads/`, PR, merge when green (as #38 did).
-  bd's auto-export lags a few seconds: run `bd export -o .beads/issues.jsonl` right before `git add .beads`,
-  and check `git status` is clean after the merge (#53 missed three new tickets; #54 carried them).
+- **Tickets sync privately**, never in a PR: `bd sync` after the last close (it pulls, merges and pushes
+  to ErikBros/ecoscribe-tickets). A conflict on the same field of one ticket stops it: keep the other
+  computer's change for its own platform's tickets (`bd vc merge origin/main --strategy theirs`), else ours.
 - Afterwards: merged branches deleted locally, no stashes, local `main` == `origin/main`.
 
 ## 3. Privacy gates (before every push in this close)

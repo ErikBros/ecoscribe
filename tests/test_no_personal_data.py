@@ -1,5 +1,5 @@
 """No personal data in the repo: nothing the user dictated or said in a recorded meeting may appear
-in a file here or in an unpushed commit message (the repo is public; tickets in .beads/issues.jsonl too).
+in a file here or in an unpushed commit message (the repo is public; tickets live in a private store, never here).
 
 Runs where a real dictation history or meeting transcripts exist (the developer's computer) and checks
 every 6-word piece of them against the working tree. Short meeting lines are checked joined, the way
