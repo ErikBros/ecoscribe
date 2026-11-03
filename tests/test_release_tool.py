@@ -94,11 +94,10 @@ def test_privacy_guard_failure_stops_the_release(tmp_path):
     assert not any(c[:2] == ["gh", "release"] for c in sh.cmds)
 
 
-def test_privacy_guard_without_text_mode_warns_loudly_and_goes_on(tmp_path, capsys):
+def test_privacy_guard_usage_error_also_stops_the_release(tmp_path):
     sh = FakeShell({("privacy",): (2, "")})
-    assert release.main(_windows_args(tmp_path), shell=sh) == 0
-    assert "NOT\nchecked" in capsys.readouterr().out
-    assert any(c[:3] == ["gh", "release", "create"] for c in sh.cmds)
+    assert release.main(_windows_args(tmp_path), shell=sh) == 1
+    assert not any(c[:2] == ["gh", "release"] for c in sh.cmds)
 
 
 def test_mac_without_a_release_stops_before_uploading(tmp_path):

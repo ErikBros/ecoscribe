@@ -1,4 +1,7 @@
 #!/usr/bin/env sh
+# --- privacy guard (dictado-trtz.1): keep the refs git sends on stdin, for beads and the branch-name check ---
+_pg_refs=$(mktemp "${TMPDIR:-/tmp}/ecoscribe-refs.XXXXXX" 2>/dev/null) && cat > "$_pg_refs" && exec < "$_pg_refs"
+trap 'rm -f "$_pg_refs"' EXIT
 # --- BEGIN BEADS INTEGRATION v1.0.4 ---
 # This section is managed by beads. Do not remove these markers.
 if command -v bd >/dev/null 2>&1; then
@@ -24,4 +27,4 @@ fi
 # --- END BEADS INTEGRATION v1.0.4 ---
 
 # --- privacy guard (dictado-05h): the repo is public; see tools/privacy_guard.py ---
-python3 "$(git rev-parse --show-toplevel)/tools/privacy_guard.py" pre-push || exit 1
+python3 "$(git rev-parse --show-toplevel)/tools/privacy_guard.py" pre-push --refs "$_pg_refs" || exit 1

@@ -11,6 +11,18 @@
         "matcher": ""
       }
     ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/public_gate.py\"",
+            "timeout": 120,
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash"
+      }
+    ],
     "SessionStart": [
       {
         "hooks": [
