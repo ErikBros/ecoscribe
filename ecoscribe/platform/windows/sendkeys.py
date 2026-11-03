@@ -8,6 +8,7 @@ from .win32types import (INPUT, INPUT_KEYBOARD, INPUT_MOUSE, KEYEVENTF_EXTENDEDK
 
 # Keys whose scan code needs the E0 prefix flag (right-hand modifiers, nav cluster).
 EXTENDED = {0xA3, 0xA5, 0x5B, 0x5C, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2D, 0x2E}
+VK_TAB = 0x09
 
 
 def send_keys(events: list[tuple[int, bool]], extended: set[int] | None = None) -> int:
@@ -31,3 +32,8 @@ def send_wheel(delta: int = -120) -> int:
     arr[0].u.mi.mouseData = ctypes.c_uint32(delta).value
     arr[0].u.mi.dwFlags = MOUSEEVENTF_WHEEL
     return user32.SendInput(1, arr, ctypes.sizeof(INPUT))
+
+
+def press_tab() -> int:
+    """Tab, for the voice command "next field" (dictado-dy55)."""
+    return send_keys([(VK_TAB, True), (VK_TAB, False)])

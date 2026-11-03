@@ -133,6 +133,10 @@ VOICE_COMMANDS = [
     ("line", "Line break", {"en": ["new line"], "es": ["nueva línea"], "sv": ["ny rad"]}),
     ("enter", "Press Enter after the text (at the very end only)",
      {"en": ["send it", "press enter"], "es": ["envíalo", "enviar"], "sv": ["skicka"]}),
+    ("tab", "Press Tab after the text (at the very end only)",  # dictado-dy55: the next field of a form
+     {"en": ["next field", "press tab"], "es": ["siguiente campo", "pulsa tabulador"], "sv": ["nästa fält", "tryck tabb"]}),
+    ("undo", "Take back the last dictation (said on its own)",  # dictado-dy55: like "scratch that" alone
+     {"en": ["undo that"], "es": ["deshaz eso"], "sv": ["ångra det"]}),
 ]
 _ACCENTS = {"á": "[aá]", "é": "[eé]", "í": "[ií]", "ó": "[oó]", "ú": "[uú]"}
 PHRASE_MAX, PHRASES_MAX = 40, 8  # dictado-67v: per phrase (characters), per command and language
@@ -196,15 +200,22 @@ _E = r"\s*([.,;:!?]|$)\s*"
 
 @functools.lru_cache(maxsize=8)
 def _matchers(custom_json: str = "{}"):
-    """(paragraph, line, enter) regexes for a phrase table; None for a command with no phrase left."""
+    """(paragraph, line, enter, tab, undo) regexes for a phrase table; None for a command with no phrase left.
+    Enter and Tab close the text (at the very end only); undo is the whole dictation or nothing."""
     table = phrase_table(json.loads(custom_json))
-    def rx(key, tail):
+    def rx(key, tail, head=_B):
         alt = _phrases(key, table)
-        return re.compile(_B + f"(?:{alt})" + tail, re.IGNORECASE) if alt else None
-    return rx("paragraph", _E), rx("line", _E), rx("enter", r"\s*[.!]?\s*$")
+        return re.compile(head + f"(?:{alt})" + tail, re.IGNORECASE) if alt else None
+    closing = r"\s*[.!]?\s*$"
+    return (rx("paragraph", _E), rx("line", _E), rx("enter", closing), rx("tab", closing),
+            rx("undo", r"\s*[.,;:!?]*\s*", head=r"\s*"))
 
 
-_PARAGRAPH, _LINE, _ENTER = _matchers()
+def _custom_key(custom) -> str:
+    return json.dumps(custom or {}, sort_keys=True, ensure_ascii=False)
+
+
+_matchers()  # the built-in table compiles at import
 
 
 # Spoken quotes (dictado-y52): "called, quote, weekly review, end quote." -> called "weekly review".
@@ -237,20 +248,28 @@ def _end(punct: str) -> str:
     return punct if punct in ".!?" else ("." if punct else "")
 
 
-def voice_commands(s: str, custom=None) -> tuple[str, bool]:
-    """"new line" -> line break, "new paragraph" -> blank line, a closing "send it" -> (text, press Enter).
+def voice_commands(s: str, custom=None) -> tuple[str, str | None]:
+    """"new line" -> line break, "new paragraph" -> blank line; a closing "send it" or "next field" ->
+    (text, "enter" or "tab"): the key to press after the paste, None when the text doesn't end in one.
     custom: the user's own phrases ([text] voice_phrases, dictado-67v) over the built-in ones."""
-    enter = False
-    para, line, enter_rx = _matchers(json.dumps(custom or {}, sort_keys=True, ensure_ascii=False))
-    m = enter_rx.search(s) if enter_rx else None
-    if m:
-        s, enter = s[:m.start()] + _end(m.group(1)), True
+    key = None
+    para, line, enter_rx, tab_rx, _ = _matchers(_custom_key(custom))
+    ends = [(m, k) for k, rx in (("enter", enter_rx), ("tab", tab_rx)) if rx is not None and (m := rx.search(s))]
+    if ends:  # the one that takes the most of the end, if two ever match
+        m, key = min(ends, key=lambda e: e[0].start())
+        s = s[:m.start()] + _end(m.group(1))
     for rx, brk in ((para, "\n\n"), (line, "\n")):
         if rx is not None:
             s = rx.sub(lambda m: _end(m.group(1)) + brk, s)
     s = re.sub(r"\n([a-zà-ÿ])", lambda m: "\n" + m.group(1).upper(), s)
     s = s.lstrip("\n")
-    return (s.rstrip() if enter else s), enter
+    return (s.rstrip() if key else s), key
+
+
+def undo_only(s: str, custom=None) -> bool:
+    """The whole dictation is "undo that" (dictado-dy55): take back the last one. Inside a sentence it is text."""
+    rx = _matchers(_custom_key(custom))[4]
+    return bool(rx is not None and s and rx.fullmatch(s))
 
 
 def _replace_rx(table):

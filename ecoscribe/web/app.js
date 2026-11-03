@@ -99,7 +99,9 @@ function demoApi() {
     voice_command_list: [  // like window._voice_command_list: `builtin` per language; get_settings adds `phrases` (dictado-67v)
       { key: "paragraph", what: "Paragraph break", builtin: { en: ["new paragraph"], es: ["nuevo párrafo", "punto y aparte"], sv: ["nytt stycke"] } },
       { key: "line", what: "Line break", builtin: { en: ["new line"], es: ["nueva línea"], sv: ["ny rad"] } },
-      { key: "enter", what: "Press Enter after the text (at the very end only)", builtin: { en: ["send it", "press enter"], es: ["envíalo", "enviar"], sv: ["skicka"] } }],
+      { key: "enter", what: "Press Enter after the text (at the very end only)", builtin: { en: ["send it", "press enter"], es: ["envíalo", "enviar"], sv: ["skicka"] } },
+      { key: "tab", what: "Press Tab after the text (at the very end only)", builtin: { en: ["next field", "press tab"], es: ["siguiente campo", "pulsa tabulador"], sv: ["nästa fält", "tryck tabb"] } },
+      { key: "undo", what: "Take back the last dictation (said on its own)", builtin: { en: ["undo that"], es: ["deshaz eso"], sv: ["ångra det"] } }],
     correction_list: [{ what: "Drops the sentence before it", en: '"scratch that", "delete that", "strike that"', es: '"borra eso", "tacha eso"', sv: '"stryk det", "sudda det"', el: '"σβήσε το", "σβήσ\' το"' },
       { what: "Claude applies the correction", en: '"no wait", "sorry I mean", "sorry I meant", "correction"', es: '"no perdón", "no espera", "perdón quise decir", "corrijo"', sv: '"nej förlåt", "nej vänta", "förlåt jag menar", "rättelse"', el: '"όχι συγγνώμη", "όχι περίμενε", "συγγνώμη εννοώ"' }],
   };
@@ -1846,7 +1848,7 @@ function phraseTables() {
   const first = (key, c) => { const p = vcPhrases(vcList.find((r) => r.key === key) || {}, c)[0]; return p && `"${p}"`; };
   const more = cols.filter((c) => c !== "en" && vcList.some((r) => vcPhrases(r, c).length));
   const eg = more.flatMap((c) => [first("line", c), first("enter", c)]).filter(Boolean);
-  $("#vc-help").textContent = '"New line" makes a break; ending with "send it" presses Enter.'
+  $("#vc-help").textContent = '"New line" makes a break; ending with "send it" presses Enter, "next field" presses Tab. "Undo that" on its own takes back the last dictation.'
     + (more.length ? ` ${andList(more.map(label))} work${more.length === 1 ? "s" : ""} too: ${eg.join(", ")}.` : "");
 }
 // Voice commands > See all commands (dictado-67v): the phrases are the user's to change, per action and

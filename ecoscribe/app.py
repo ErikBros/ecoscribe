@@ -36,7 +36,7 @@ class App:
     LIVE_EVERY_S = 2.0  # dictado-live: one quick pass this often while recording
     def __init__(self, cfg, recorder, engine, deliver_fn, ui, gate=None, history_path: Path | None = None,
                  press_enter=None, screen=None, spool=None, window_title=None, app_id=None, undo=None,
-                 window_now=None, copy_selection=None, target_app=None):
+                 window_now=None, copy_selection=None, target_app=None, press_tab=None):
         self.cfg = cfg
         self.recorder = recorder
         self.engine = engine
@@ -45,6 +45,7 @@ class App:
         self.gate = gate
         self.history_path = history_path
         self.press_enter = press_enter or _press_enter
+        self.press_tab = press_tab or _press_tab  # dictado-dy55: "next field"
         self.undo, self.window_now = undo, window_now  # dictado-ost: Ctrl+Z, the focused window (None: no undo)
         self._last_paste: tuple | None = None  # (window, when, text) of the last paste
         self.copy_selection = copy_selection  # dictado-ua2: Ctrl+C of the selection (None: no command mode)
@@ -378,7 +379,10 @@ class App:
         undo_on = getattr(self.cfg.text, "self_corrections", False) or getattr(self.cfg.text, "voice_commands", False)
         if res.text and undo_on:
             from .corrections import scratch_only
-            if scratch_only(res.text):  # dictado-ost: "scratch that" alone takes back the last paste
+            from .text import undo_only
+            if scratch_only(res.text) or (  # dictado-ost: "scratch that" alone takes back the last paste
+                    getattr(self.cfg.text, "voice_commands", False)  # dictado-dy55: so does "undo that"
+                    and undo_only(res.text, getattr(self.cfg.text, "voice_phrases", None))):
                 self.undo_last()
                 return
         if res.text and getattr(self.cfg.text, "self_corrections", False):  # dictado-ehc: first, on what was said
@@ -388,15 +392,15 @@ class App:
                 self.ui.flash("Scratched", 1.2)
                 log.info("dictation scratched")
                 return
-        enter = False
+        key = None  # "enter" or "tab": pressed after the paste (voice commands)
         style = self._style()  # dictado-h0m: None unless per-app styles are on
         if res.text and getattr(self.cfg.text, "voice_commands", False) and (style is None or style["commands"]):
             from .text import voice_commands
-            text, enter = voice_commands(res.text, getattr(self.cfg.text, "voice_phrases", None))  # dictado-67v
+            text, key = voice_commands(res.text, getattr(self.cfg.text, "voice_phrases", None))  # dictado-67v
             res = replace(res, text=text)
-            if enter and not text:  # only "send it": submit what is already in the box
-                self.press_enter()
-                log.info("voice command: enter only")
+            if key and not text:  # only "send it" (submit what is in the box) or "next field"
+                self._press(key)
+                log.info("voice command: %s only", key)
                 return
         if res.text and style is not None:  # before Replace and Snippets: what those write stays as written
             from .app_styles import apply
@@ -421,9 +425,9 @@ class App:
         self._unheard = 0
         dr = self.deliver(res.text)
         to = self._audience(dr.target_exe)
-        if enter and dr.pasted:
-            time.sleep(0.12)  # let the paste land before Enter submits it
-            self.press_enter()
+        if key and dr.pasted:
+            time.sleep(0.12)  # let the paste land before Enter submits it (or Tab leaves the field)
+            self._press(key)
         stop_to_paste = int((time.monotonic() - t_stop) * 1000)
         self.last_text = res.text
         self._last_paste = (getattr(dr, "window", 0), time.monotonic(), res.text) if dr.pasted else None
@@ -443,6 +447,9 @@ class App:
         if not dr.pasted:
             self.ui.flash(NOT_PASTED.get(dr.reason, f"Copied: paste with {PASTE_KEYS}"), 4.0 if dr.reason == "no_text_box" else 2.0)
         return res, audio, dr, words, to
+
+    def _press(self, key: str) -> None:
+        (self.press_tab if key == "tab" else self.press_enter)()
 
     def undo_last(self) -> bool:
         """Takes back the last paste with the window's own undo, only in the window it went into and
@@ -752,3 +759,12 @@ def _press_enter() -> None:
         return press_enter()
     from .platform.windows.sendkeys import send_keys
     send_keys([(0x0D, True), (0x0D, False)])  # VK_RETURN
+
+
+def _press_tab() -> None:
+    import sys
+    if sys.platform == "darwin":
+        from .platform.macos.keys import press_tab
+        return press_tab()
+    from .platform.windows.sendkeys import press_tab
+    press_tab()

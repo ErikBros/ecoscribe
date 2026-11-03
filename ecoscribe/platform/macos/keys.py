@@ -5,6 +5,7 @@ import Quartz as Q
 
 MAGIC = 0x44494354  # "DICT" in kCGEventSourceUserData: ours, like LLKHF_INJECTED on Windows
 KC_C, KC_V, KC_Z, KC_RETURN, KC_ESCAPE = 8, 9, 6, 36, 53
+KC_TAB = 0x30  # kVK_Tab, for the voice command "next field" (dictado-dy55)
 KC_CMD, KC_RCMD, KC_SHIFT, KC_OPTION, KC_CTRL = 55, 54, 56, 58, 59
 MOD_FLAGS = {"cmd": Q.kCGEventFlagMaskCommand, "shift": Q.kCGEventFlagMaskShift,
              "alt": Q.kCGEventFlagMaskAlternate, "ctrl": Q.kCGEventFlagMaskControl}
@@ -40,6 +41,11 @@ def undo() -> int:
 
 def press_enter() -> None:
     send_keys([(KC_RETURN, True), (KC_RETURN, False)])
+
+
+def press_tab() -> None:
+    """Tab, for the voice command "next field" (dictado-dy55)."""
+    send_keys([(KC_TAB, True), (KC_TAB, False)])
 
 
 def modifiers_down() -> bool:

@@ -29,6 +29,14 @@ CAPABILITIES: dict[str, dict] = {
         "windows": "ecoscribe.platform.windows.deliver:undo_paste,foreground_window",  # + hook.VK_REPASTE
         "macos": "ecoscribe.platform.macos.deliver:undo_paste,foreground_window",  # + keyhook.KC_REPASTE
     },
+    "Voice command Tab: press Tab after the text (\"next field\")": {  # dictado-dy55
+        "windows": "ecoscribe.platform.windows.sendkeys:press_tab,VK_TAB",
+        "macos": "ecoscribe.platform.macos.keys:press_tab,KC_TAB",
+    },
+    "Voice command Undo: \"undo that\" alone takes back the last dictation": {  # dictado-dy55, App.undo_last
+        "windows": "ecoscribe.platform.windows.deliver:undo_paste,foreground_window",
+        "macos": "ecoscribe.platform.macos.deliver:undo_paste,foreground_window",
+    },
     "Command mode (dictation key + E: say how to change the selection)": {
         "windows": "ecoscribe.platform.windows.deliver:copy_selection",  # + hook.VK_EDIT
         "macos": "ecoscribe.platform.macos.deliver:copy_selection",  # Cmd+C; keyhook.HookThread.action_keys
