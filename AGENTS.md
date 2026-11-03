@@ -96,3 +96,14 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 > **Standard process:** see CLAUDE.md, "How we work". One ticket = one branch from main = one PR, never stacked; main only changes through green PRs.
+
+## Windows and Mac in step
+
+- `python3 tools/in_step.py` runs at every session start (SessionStart hook): tickets pulled, green or
+  day-old PRs, releases missing the `.dmg` or `.exe`, installed versions on both computers, safety
+  (git hooks, gitleaks, local names file, mass-delete guard, private tickets repo). A `STOP:` line comes first: fix it.
+- `python3 tools/release.py X.Y.Z --notes FILE` is the release step on both computers (`--dry-run` shows the commands).
+  Windows creates the release with the installer and a P1 ticket "Mac download for vX.Y.Z"; the Mac uploads its
+  `.dmg` to that release and closes the ticket.
+- After an install: Windows records it itself (`tools/build.py --installer --install`); on the Mac run
+  `python3 tools/record_install.py mac` (`build_mac.py` builds but doesn't install).

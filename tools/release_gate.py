@@ -314,6 +314,12 @@ def run(setup: Path, do_install: bool) -> int:
     for name, good, detail in post:
         print(f"{'PASS' if good else 'FAIL'}  {name}: {detail}", flush=True)
     gpu_ok = all(good for _, good, _ in post)
+    if ok:  # the other computer's start check (tools/in_step.py) reads it; a failure only warns
+        try:
+            import record_install
+            record_install.record("windows", version)
+        except Exception as e:
+            print(f"warning: install not recorded for the other computer ({type(e).__name__}: {e})")
     print(f"Installed: {'yes' if ok else 'no'}, {version}, {when}")
     print(f"Running now: {'yes' if s.get('state') == 'ready' else 'no'}")
     print(f"Checked by: status.json says {s.get('state')} on {s.get('device')}, version {s.get('version')}"
