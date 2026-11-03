@@ -107,3 +107,34 @@ bd close <id>         # Complete work
   `.dmg` to that release and closes the ticket.
 - After an install: Windows records it itself (`tools/build.py --installer --install`); on the Mac run
   `python3 tools/record_install.py mac` (`build_mac.py` builds but doesn't install).
+
+## Public text
+
+The repo is public, and so is everything around it: commits, branch names, PR titles, bodies,
+comments and reviews, issues, release notes. Tickets are private. One check covers all of it,
+`tools/privacy_guard.py` (gitleaks with `.gitleaks.toml`, 6-word pieces of the user's own dictations
+and meetings, 6-word pieces of private ticket text: descriptions, design, acceptance criteria, notes,
+comments; titles are fine):
+
+- **Commits and pushes:** the git hooks in `.beads/hooks` (pre-commit; pre-push also checks the branch
+  and tag names). Never `--no-verify`: fix what the hook found.
+- **PRs, comments, reviews, issues, releases:** the Claude Code hook `.claude/hooks/public_gate.py` runs
+  `privacy_guard.py text` on the whole `gh` command and on every `--body-file`/`--notes-file` it names,
+  and blocks the command on a hit. A body from stdin (`-`) can't be checked: write a file first.
+  By hand: `python3 tools/privacy_guard.py text --file body.md`.
+- **CI:** `pr-shape` runs gitleaks over the PR title, body and branch name.
+- **Audit:** `python3 tools/public_audit.py` checks everything already on GitHub (locations only).
+
+It fails closed: no gitleaks, no ticket store (`bd export`) or no app data folder blocks instead of
+passing. Hits name where (check, ticket id, line), never the text.
+
+**Rewrite, don't copy.** Read the ticket, then say it in new words: what changed for the user and why.
+No dictation or meeting text, no quotes of the user, no pasted ticket paragraphs. PR body outline:
+
+```
+Ticket: dictado-xxx
+What changed: <one or two lines, in your own words>
+Why: the user wants <...>
+Tests: <what ran, counts>
+docs: <guide updated> | docs: not needed, because <reason>
+```

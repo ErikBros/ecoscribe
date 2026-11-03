@@ -55,3 +55,14 @@ jobs:
           v=8.30.1
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v$v/gitleaks_${v}_linux_x64.tar.gz" | tar -xz gitleaks
           ./gitleaks git --no-banner --redact -c .gitleaks.toml --log-opts="origin/main..$HEAD_SHA" .
+      # The PR's own text goes public too (dictado-trtz.1). Read from env, never pasted into the script.
+      - name: PR title, body and branch name, nothing personal or secret (privacy_guard.py text)
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          ECOSCRIBE_GATE_CI: "1"
+        run: |
+          set -euo pipefail
+          printf '%s\n%s\n\n%s\n' "$PR_BRANCH" "$PR_TITLE" "$PR_BODY" > "$RUNNER_TEMP/pr-text.txt"
+          PATH="$PWD:$PATH" python3 tools/privacy_guard.py text --file "$RUNNER_TEMP/pr-text.txt"
