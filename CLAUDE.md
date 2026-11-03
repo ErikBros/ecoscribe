@@ -84,7 +84,8 @@ bd close <id>         # Complete work
 - Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
 
 **Architecture in one line:** issues live in a local Dolt DB, synced by `bd sync` through the **private** remote
-ErikBros/ecoscribe-tickets (`refs/dolt/data`); nothing about tickets is in this public repo. A fresh clone joins with
+ErikBros/ecoscribe-tickets (`refs/dolt/data`). The old `.beads/issues.jsonl` here is frozen (no export writes it) until it
+is removed from git. A fresh clone joins with
 `bd init --prefix dictado --remote git+ssh://git@github-personal/ErikBros/ecoscribe-tickets.git`, never an empty
 `bd init` (it would push an empty database; the mass-delete guard asks first). See
 https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md for details and anti-patterns.
