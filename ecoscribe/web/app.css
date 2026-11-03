@@ -815,6 +815,9 @@ kbd { font: inherit; font-size: var(--fs-xs); padding: 1px 6px; border: 1px soli
 .h-time { grid-column: 1; grid-row: 1 / span 2; padding-top: 2px; font-size: var(--fs-ui); color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 .h-group-list .h-text { grid-column: 2; font-size: var(--fs-read); }
 .h-group-list .h-meta { grid-column: 2; flex-wrap: wrap; gap: 6px; }
+.h-text.h-clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: var(--h-lines, 3); overflow: hidden; }  /* dictado-rtpi */
+.h-more { border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: var(--aegean); cursor: pointer; }
+.h-more:hover { text-decoration: underline; }
 .h-group-list .h-btns { grid-column: 3; }
 .h-edit { grid-column: 2 / -1; width: 100%; box-sizing: border-box; padding: 8px 12px; border: 1px solid var(--aegean); border-radius: var(--radius-sm); background: var(--card); color: var(--ink); font: var(--fs-read)/1.6 var(--font); resize: vertical; }  /* dictado-1ph */
 .h-edit:focus { outline: none; box-shadow: 0 0 0 3px var(--aegean-soft); }

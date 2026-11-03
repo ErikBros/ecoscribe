@@ -104,6 +104,7 @@ function demoApi() {
       { what: "Claude applies the correction", en: '"no wait", "sorry I mean", "sorry I meant", "correction"', es: '"no perdón", "no espera", "perdón quise decir", "corrijo"', sv: '"nej förlåt", "nej vänta", "förlåt jag menar", "rättelse"', el: '"όχι συγγνώμη", "όχι περίμενε", "συγγνώμη εννοώ"' }],
   };
   const history = [
+    ...(params.get("longdict") === "1" ? [{ ts: iso(1), text: "Okay, notes for the planning on Monday. First, the release: we said we'd ship the new export before the end of the month, but the review found two problems with how dates are written in other languages, so that moves a week. Second, the onboarding page: the copy is done, the pictures aren't, and nobody owns them yet, so let's pick someone on Monday. Third, the bug list is down to eleven, and four of those are the same crash on old laptops. Let's look at that one together before we split up the rest. And last, the offsite: the venue is booked, the train tickets aren't, so please do that this week. ", target: "notepad.exe", pasted: true, id: "dl1" }] : []),
     { ts: iso(2), text: "Can you check why the deploy failed last night and send me the logs before the standup? ", target: "WindowsTerminal.exe", pasted: true, id: "d1", audio: true },
     { ts: iso(14), text: "Sounds good, let's do Thursday at six. I'll bring the new shoes. ", target: "slack.exe", pasted: true, id: "d2", audio: true },
     { ts: iso(41), text: "Remind me to book the climbing gym for the weekend. ", target: "chrome.exe", pasted: false },
@@ -1494,6 +1495,7 @@ function rWire() {
 /* ---------------------------------------------------------------- historial */
 let searchTimer = null;
 let hKind = "all";  // History's filter: all | dict | meet (dictado-6oe.5)
+const H_CLAMP_CHARS = 240;  // longer than about three lines: clamped, with Show all (dictado-rtpi)
 let hStamp = null;  // the history file as last drawn (dictado-sgkj)
 async function renderHistory() {
   const q = $("#search").value;
@@ -1525,6 +1527,12 @@ async function renderHistory() {
     const meta = document.createElement("div");
     meta.className = "h-meta";
     const tag = (txt, cls = "") => { const b = document.createElement("span"); b.className = "h-tag " + cls; b.textContent = txt; meta.append(b); };
+    if (r.text.trim().length > H_CLAMP_CHARS) {  // a long one shows its first lines (dictado-rtpi)
+      p.classList.add("h-clamp");
+      const more = document.createElement("button"); more.type = "button"; more.className = "h-more"; more.textContent = "Show all";
+      more.onclick = () => { const open = p.classList.toggle("h-clamp"); more.textContent = open ? "Show all" : "Show less"; };
+      meta.append(more);
+    }
     if (r.lang && !String(r.lang).includes("+")) tag(String(r.lang).toUpperCase(), "h-tag-line");
     if (appName(r.target)) tag(appName(r.target));
     if (r.pasted === false) tag("Not pasted: copy it here", "h-tag-dark");
@@ -1546,6 +1554,9 @@ async function renderHistory() {
     btns.append(del);
     li.append(t, p, btns, meta);
     group.append(li);
+  }
+  for (const c of $$("#history .h-clamp")) {
+    if (c.clientHeight && c.scrollHeight <= c.clientHeight + 1) { c.classList.remove("h-clamp"); $(".h-more", c.closest(".h-item"))?.remove(); }
   }
   const empty = rows.length === 0;
   $("#history-empty").hidden = !empty;
