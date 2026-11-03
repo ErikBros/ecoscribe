@@ -67,7 +67,6 @@ Settings > General.
 Each has a ticket; [FEATURES.md](../FEATURES.md) has the full table.
 
 - Not tried on a Mac yet: command mode (Right Command + E), taking back the last paste ("scratch that"), pasting it
-  again (Right Command + R), fix it when you correct yourself, call summaries and the to-dos built from them (they
-  run Claude Code from the app).
+  again (Right Command + R).
 - Moving the meeting pill by dragging it, and the meeting following the call's mic and output.
 - The speakers pass during a call (it runs after the call).

@@ -30,6 +30,20 @@ On any meeting page, **Copy ▾ > Copy for Claude** copies the transcript with i
 notes), ready to paste into any Claude chat. **Copy a summary prompt** adds a request for decisions and action items.
 Settings > General > Help > **Copy debug info for Claude** does the same for a problem with Ecoscribe itself.
 
+## Which Claude Code login
+
+Ecoscribe starts `claude` the way a new terminal would: on Windows inside WSL, on a Mac from a zsh login shell. It
+doesn't read your shell's interactive setup (`.zshrc`, `.bashrc`), so functions or aliases there that pick a Claude
+config folder don't apply. If you keep more than one Claude login (say one for work and one for home), tell Ecoscribe
+which one in config.toml, for example:
+
+```toml
+[claude]
+command = ["/usr/bin/env", "CLAUDE_CONFIG_DIR=/Users/you/.claude-home", "/bin/zsh", "-lc", "exec claude \"$@\"", "claude"]
+```
+
+Ecoscribe adds the `claude` arguments after that list. Quit Ecoscribe from the menu bar or tray before editing the file.
+
 ## Fix it when you correct yourself
 
 Settings > Dictation > With Claude > **Fix it when you correct yourself** (off by default). Needs Claude Code logged in
