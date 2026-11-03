@@ -107,6 +107,15 @@ def test_history_newest_first_search_and_stats(api):
     assert [r["text"] for r in api.get_history(query="report")["items"]] == ["Send the report today "]
 
 
+def test_history_stamp_changes_when_a_dictation_lands(api):  # dictado-sgkj
+    assert api.history_stamp() == ""  # no history yet
+    write_history(api, [{"ts": "2026-09-30T10:00:00", "text": "first ", "pasted": True}])
+    a = api.history_stamp()
+    write_history(api, [{"ts": "2026-09-30T10:00:00", "text": "first ", "pasted": True},
+                        {"ts": "2026-09-30T10:01:00", "text": "second one ", "pasted": True}])
+    assert a and api.history_stamp() != a
+
+
 def test_history_survives_garbage_lines(api):
     (api._data_dir / "history.jsonl").write_text('{"text": "ok "}\nnot json\n\n', encoding="utf-8")
     assert [r["text"] for r in api.get_history()["items"]] == ["ok "]

@@ -295,6 +295,7 @@ function demoApi() {
     mic_test_start: async () => ({ device: "Microphone (Anker PowerConf C20", fell_back: false }),
     mic_test_level: async () => { t += 1; return Math.abs(Math.sin(t / 3)) * 0.08; },
     mic_test_stop: async () => ({ ok: true }),
+    history_stamp: async () => String(history.length) + ":" + (history[0]?.ts || ""),
     get_history: async (limit, q) => {
       const items = history.filter((r) => !q || r.text.toLowerCase().includes(q.toLowerCase()));
       return { items, stats: { total: 312, total_words: 4210, today_words: 152 } };
@@ -1493,8 +1494,10 @@ function rWire() {
 /* ---------------------------------------------------------------- historial */
 let searchTimer = null;
 let hKind = "all";  // History's filter: all | dict | meet (dictado-6oe.5)
+let hStamp = null;  // the history file as last drawn (dictado-sgkj)
 async function renderHistory() {
   const q = $("#search").value;
+  hStamp = api.history_stamp ? await api.history_stamp().catch(() => null) : null;
   const h = await api.get_history(200, q);
   let meets = [];
   try { meets = (await api.list_sessions(q)).items; } catch (e) { meets = []; }
@@ -2660,6 +2663,15 @@ async function boot() {
   const w = await api.get_welcome();
   if (page === "bienvenida" || !w.done) openSetup();
   setInterval(refreshStatus, 1500);
+  setInterval(async () => {  // History shows a new dictation while it's open (dictado-sgkj)
+    if (current !== "historial" || !api.history_stamp) return;
+    const s = await api.history_stamp().catch(() => null);
+    const busy = $("#history .h-edit") || $$("#history .h-menu").some((m) => !m.hidden);
+    if (s === null || s === hStamp || busy) return;
+    const box = $("#history"), top = box.scrollTop;
+    await renderHistory();
+    box.scrollTop = top;
+  }, 2000);
   setInterval(async () => {  // a notice's button asked this open window for a page (Windows; macOS calls show)
     const p = api.take_page ? await api.take_page().catch(() => null) : null;
     if (p) show(p);

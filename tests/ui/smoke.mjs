@@ -323,6 +323,15 @@ async function load(query) {
   check(doc.querySelector(".side-facts").hidden && !doc.querySelector("#side-off").hidden,
     "stopped shows no stale facts, and says why");
 }
+{ // dictado-sgkj: History shows a new dictation while it's open, no page switch
+  const { window, doc } = await load("page=historial");
+  await sleep(50);
+  const api = window.__ecoscribe.api, get = api.get_history;
+  api.history_stamp = async () => "new";
+  api.get_history = async (l, q) => { const h = await get(l, q); return { ...h, items: [{ id: "x1", ts: "2099-01-01T09:00:00", text: "A brand new dictation." }, ...h.items] }; };
+  await sleep(2300);
+  check(doc.querySelector("#history .h-text")?.textContent === "A brand new dictation.", "the new dictation is at the top by itself");
+}
 { // historial + search
   const { window, doc } = await load("page=historial");
   check(doc.querySelectorAll(".h-item:not(.h-meeting)").length === 5, "history lists 5 dictations");

@@ -493,6 +493,14 @@ class Api:
             pass
         return rows
 
+    def history_stamp(self) -> str:
+        """Changes when a dictation is added, edited or removed: History redraws by itself (dictado-sgkj)."""
+        try:
+            st = (self._data_dir / "history.jsonl").stat()
+        except OSError:
+            return ""
+        return f"{st.st_mtime_ns}:{st.st_size}"
+
     def get_history(self, limit: int = 200, query: str = "") -> dict:
         rows = self._history_rows()
         today = time.strftime("%Y-%m-%d")
