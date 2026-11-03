@@ -75,7 +75,7 @@ CAPABILITIES: dict[str, dict] = {
     },
     "Which mic and output a call app uses (the meeting follows the call, the page shows it)": {  # dictado-s1a, 297, c7v
         "windows": "ecoscribe.platform.windows.audio_route:call_devices,sessions",  # each app's audio session per device
-        "macos": ("ticket", "dictado-7bw"),
+        "macos": "ecoscribe.platform.macos.audio_route:call_devices,sessions",  # each process object's devices (dictado-7bw)
     },
     "Paste text where the cursor is": {
         "windows": "ecoscribe.platform.windows.deliver:deliver,set_clipboard_text",

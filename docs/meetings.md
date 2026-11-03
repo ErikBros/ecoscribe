@@ -34,8 +34,9 @@ computer's sound). Everything stays on your computer.
 - **The Meetings tab** shows the live transcript (**Watch live**), the language, and **Stop**.
 - **What it's recording:** two small meters next to Stop, one for your mic ("hearing you") and one for the call
   ("hearing them"). Hover one to see the device. If one stays silent while the call app uses another device, a warning
-  says so with a button to record that device instead (**Record** + the device's name). On Windows Ecoscribe also
-  follows the call by itself: a silent source switches to the device the call app uses.
+  says so with a button to record that device instead (**Record** + the device's name). Ecoscribe also follows the
+  call by itself: a silent source switches to the device the call app uses. On a Mac only the mic does: the call's
+  side is recorded from every app's sound, whatever speakers or headphones it plays to.
   The warning's × hides it for the rest of that meeting (useful in a room meeting, where nothing plays on the
   computer); the meter still shows the source as silent.
 - **Your notes:** type in the notes box above the transcript, during or after the call. It saves itself, and Copy for

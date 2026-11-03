@@ -192,8 +192,9 @@ def main(session_dir: str) -> int:
     full = config.load(paths.config_path())
     from .calendar_ics import session_words
     from .text import vocab_prompt
-    call_devices = None
-    if sys.platform != "darwin":  # the Mac: dictado-7bw (which mic and output a call app uses)
+    if sys.platform == "darwin":  # dictado-7bw: Core Audio's process objects
+        from .platform.macos.audio_route import call_devices
+    else:
         from .platform.windows.audio_route import call_devices
     return run(d, full.transcribe, prompt=vocab_prompt(session_words(d, full.text.vocabulary)),
                replacements=dict(full.text.replacements), call_devices=call_devices)
