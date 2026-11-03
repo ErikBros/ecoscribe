@@ -32,7 +32,9 @@ def test_meeting_sits_as_a_chip_with_the_timer(overlay):
 def test_mouse_on_the_chip_opens_the_full_pill_and_leaving_closes_it(overlay, monkeypatch):
     from ecoscribe.platform.macos import shell
     frame = SimpleNamespace(origin=SimpleNamespace(x=500, y=80), size=SimpleNamespace(width=92, height=30))
-    overlay.panel = SimpleNamespace(frame=lambda: frame, setContentSize_=lambda s: None, orderOut_=lambda x: None)
+    overlay.panel = SimpleNamespace(frame=lambda: frame, setContentSize_=lambda s: None, orderOut_=lambda x: None,
+                                    setIgnoresMouseEvents_=lambda on: None)
+    monkeypatch.setattr(shell, "_primary_down", lambda: False)
     overlay.set_meeting(VIEW)
     monkeypatch.setattr(shell, "_mouse", lambda: SimpleNamespace(x=520, y=95))  # inside, AppKit's y-up coords
     overlay.tick()

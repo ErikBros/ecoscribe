@@ -71,7 +71,7 @@ CAPABILITIES: dict[str, dict] = {
     },
     "Move the pill: drag it (dictating or the meeting chip), it stays there; double-click puts it back": {  # dictado-06i, dictado-dr5s
         "windows": "ecoscribe.platform.windows.shell:Overlay",  # Overlay.remember_at, _chip_mouse; meetui.Drag
-        "macos": ("ticket", "dictado-8dy"),
+        "macos": "ecoscribe.platform.macos.shell:Overlay",  # Overlay.remember_at, _pill_mouse; meetui.Drag (dictado-8dy)
     },
     "Which mic and output a call app uses (the meeting follows the call, the page shows it)": {  # dictado-s1a, 297, c7v
         "windows": "ecoscribe.platform.windows.audio_route:call_devices,sessions",  # each app's audio session per device
