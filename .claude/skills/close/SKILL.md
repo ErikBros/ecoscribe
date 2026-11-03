@@ -69,8 +69,9 @@ meeting or file job: check for `--meeting` / `--transcribe` / `--speakers` proce
 On Windows, install only through `tools/build.py --installer --install`: the release gate
 (`tools/release_gate.py`) checks disk room, no live or queued meeting, version, unit tests and the built
 app's GPU selftest, installs only when all PASS, and prints the `Installed:` / `Running now:` lines.
-Release with `python3 tools/release.py X.Y.Z --notes FILE` on both computers (Windows creates the release and
-the "Mac download" ticket; the Mac uploads the .dmg and closes it). After a Mac install:
+Release with `python3 tools/release.py X.Y.Z --notes FILE` on Windows; GitHub's `mac-release` run then builds and
+attaches the .dmg (check it finished: `gh run list --workflow mac-release`; if it failed, re-run it, or build on the
+Mac and run `tools/release.py --platform mac`). After a Mac install:
 `python3 tools/record_install.py mac`.
 
 ## 5. Tickets

@@ -10,11 +10,12 @@ Windows (makes the release, after tools/build.py --installer --install):
   1. python3 tools/privacy_guard.py text --file NOTES     the notes are public: no names, quotes, paths
   2. gh release create vX.Y.Z Ecoscribe-Setup-X.Y.Z.exe --target main --latest
         --title "Ecoscribe X.Y.Z" --notes-file NOTES
-  3. bd create "Mac download for vX.Y.Z" (P1) and bd sync: the Mac session's start check sees it
-Mac (adds its download, after tools/build_mac.py):
+  The release starts .github/workflows/mac-release.yml (dictado-trtz.5): a GitHub Mac builds, signs and
+  attaches Ecoscribe-X.Y.Z.dmg. tools/in_step.py reports a release still without it.
+Mac (by hand, only when that run failed; after tools/build_mac.py):
   1. gh release view vX.Y.Z                                 the Windows session makes the release
   2. gh release upload vX.Y.Z Ecoscribe-X.Y.Z.dmg --clobber
-  3. bd close the open "Mac download for vX.Y.Z" ticket and bd sync
+  3. bd close an open "Mac download for vX.Y.Z" ticket, if there is one, and bd sync
 
 --dry-run prints every command and runs none. The installer is looked for in the Windows build folder
 (%USERPROFILE%\\ecoscribe-build), the .dmg in build/mac; --asset names another file.
@@ -128,19 +129,8 @@ def release_windows(sh: Shell, version: str, asset: Path, notes: Path | None) ->
     if code != 0:
         print(f"release: gh release create {tag} failed (above).")
         return 1
-    title = mac_ticket_title(version)
-    if open_tickets(sh, title):
-        print(f"release: the ticket '{title}' is already open.")
-    else:
-        code, _ = sh(["bd", "create", title, "-p", "1", "-t", "task", "-l", "mac,release", "-d",
-                      f"Release {tag} has the Windows installer and no Mac download. On the Mac: tools/build_mac.py, "
-                      f"install it, python3 tools/record_install.py mac, then python3 tools/release.py {version} "
-                      "(uploads the .dmg and closes this ticket)."])
-        if code != 0:
-            print(f"release: warning: the ticket '{title}' was not created; create it by hand.")
-    if sh(["bd", "sync"])[0] != 0:
-        print("release: warning: bd sync failed; run it before ending the session.")
-    print(f"{'(dry run) ' if sh.dry_run else ''}Released {tag} with the Windows installer; the Mac download is ticket '{title}'.")
+    print(f"{'(dry run) ' if sh.dry_run else ''}Released {tag} with the Windows installer. GitHub builds and attaches "
+          "the Mac download (Actions: mac-release, about 20 minutes); the start check says so if it's missing.")
     return 0
 
 
