@@ -697,6 +697,9 @@ async function load(query) {
     [...i.parentElement.querySelectorAll(".vc-chip")].map((c) => c.firstChild.textContent));
   check(heads() === "What it does,English", "columns: English and the user's languages: " + heads());
   check(chips("line").join(",") === "new line" && doc.querySelector("#vc-reset-all").hidden, "built-in phrases, nothing to reset");
+  check(chips("tab").join(",") === "next field,press tab" && chips("undo").join(",") === "undo that"
+    && doc.querySelector("#vc-help").textContent.includes('"next field" presses Tab. "Undo that" on its own'),
+    "dictado-dy55: Tab and Undo listed, and in the help line");
   const add = (key, text) => { const i = doc.querySelector(`.vc-add[data-key="${key}"][data-lang="en"]`); i.value = text;
     i.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })); };
   add("line", "  Next Line! ");

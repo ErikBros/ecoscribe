@@ -521,7 +521,7 @@ def test_lists_show_only_the_users_languages(tmp_path):
     api = Api(data_dir=tmp_path, config_path=tmp_path / "config.toml", signal_reload=lambda: True)
     s = api.get_settings()
     assert s["values"]["meet_lang"] == "en"
-    assert [r["key"] for r in s["voice_command_list"]] == ["paragraph", "line", "enter"]
+    assert [r["key"] for r in s["voice_command_list"]] == ["paragraph", "line", "enter", "tab", "undo"]
     assert api.save_settings({"meet_lang": "sv"})["ok"]  # chosen by hand (or an older config): kept selectable
     assert [o["value"] for o in api.get_settings()["options"]["meet_langs"]] == ["en", "sv", "en,sv", "auto"]
     assert api.save_settings({"meet_lang": "en", "extra_languages": ["es"], "languages": "en,es"})["ok"]

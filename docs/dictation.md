@@ -69,6 +69,13 @@ start, or after a pause or punctuation, and before one or the end. "We need a ne
 | Paragraph break | "new paragraph" | "nuevo párrafo", "punto y aparte" | "nytt stycke" |
 | Line break | "new line" | "nueva línea" | "ny rad" |
 | Press Enter after the text (at the very end only) | "send it", "press enter" | "envíalo", "enviar" | "skicka" |
+| Press Tab after the text (at the very end only) | "next field", "press tab" | "siguiente campo", "pulsa tabulador" | "nästa fält", "tryck tabb" |
+| Take back the last dictation (said on its own) | "undo that" | "deshaz eso" | "ångra det" |
+
+- **Tab** moves on to the next box of a form: "Anna, next field." types "Anna." and presses Tab. Said alone, it
+  just presses Tab. "Book the next field trip" stays text.
+- **Undo** works only when it is the whole dictation: it takes back what Ecoscribe last typed, in the same window
+  and within a minute, like "scratch that" said alone. Inside a sentence ("can you undo that change?") it stays text.
 
 Every phrase works whichever of your languages you speak. **See all commands** lists them; type a phrase and press
 Enter to add your own, × removes one, **Back to the built-in phrases** resets the list.

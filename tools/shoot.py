@@ -60,7 +60,8 @@ TALL = {"inicio-largo": "page=inicio", "ajustes-largo": "page=ajustes&dirty=1", 
         # each Settings tab, whole (dictado-o955); the old Speech models and Help tabs open General
         "ajustes-dictado-largo": "page=ajustes&sec=dictation", "ajustes-palabras-largo": "page=ajustes&sec=words",
         "ajustes-reuniones-largo": "page=ajustes&sec=meetings", "ajustes-modelos-largo": "page=ajustes&sec=models",
-        "ajustes-ayuda-largo": "page=ajustes&sec=help"}
+        "ajustes-ayuda-largo": "page=ajustes&sec=help",
+        "ajustes-comandos-largo": "page=ajustes&sec=words&styles=1&vc=1"}  # Words > Voice commands, the list open
 
 
 def shot(web: Path, query: str, out: Path, size=(980, 690), scale=1.0) -> Path:
