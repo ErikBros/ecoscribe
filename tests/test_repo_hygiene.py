@@ -36,3 +36,18 @@ def test_the_pattern_catches_what_build_mac_makes():
     for p in (".signing/identity.p12", ".signing/dictado-signing.keychain-db", ".signing/cert.pem", "x/.signing/a"):
         assert SECRET.search(p), p
     assert not SECRET.search("ecoscribe/platform/macos/systap.swift")
+
+
+TICKET_FILES = (".beads/issues.jsonl", ".beads/interactions.jsonl")
+
+
+def test_no_tickets_in_the_public_repo():
+    """Tickets live in the private store (bd sync), never in this public repo (dictado-trtz.2)."""
+    bad = [p for p in tracked() if p in TICKET_FILES]
+    assert not bad, f"ticket files tracked by git: {bad}"
+
+
+def test_ticket_files_are_ignored():
+    ignored = (APP / ".beads" / ".gitignore").read_text(encoding="utf-8").splitlines()
+    for name in ("issues.jsonl", "interactions.jsonl"):
+        assert name in ignored, name
