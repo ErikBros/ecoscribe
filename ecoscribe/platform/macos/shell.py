@@ -55,7 +55,32 @@ def color(hex_color: str, alpha: float = 1.0):
     return NSColor.colorWithSRGBRed_green_blue_alpha_(r / 255, g / 255, b / 255, alpha)
 
 
+APP_FONT = Path(__file__).resolve().parents[2] / "web" / "fonts" / "hanken-grotesk-latin-wght-normal.woff2"
+_FACES = ("HankenGrotesk-Regular", "HankenGrotesk-Regular_Bold")  # named instances of the variable font
+_app_font: bool | None = None
+
+
+def _has_app_font() -> bool:
+    """The window's font (Hanken Grotesk) registered for this process, once (dictado-vx1, as Windows'
+    pillart). Letters it lacks (Greek) fall back to the system font by themselves."""
+    global _app_font
+    if _app_font is None:
+        try:
+            import CoreText
+            from Foundation import NSURL
+            CoreText.CTFontManagerRegisterFontsForURL(NSURL.fileURLWithPath_(str(APP_FONT)),
+                                                      CoreText.kCTFontManagerScopeProcess, None)
+            _app_font = NSFont.fontWithName_size_(_FACES[1], 12) is not None
+        except Exception:
+            _app_font = False
+    return _app_font
+
+
 def font(size: float, bold: bool = False):
+    if _has_app_font():
+        f = NSFont.fontWithName_size_(_FACES[bool(bold)], size)
+        if f is not None:
+            return f
     return NSFont.boldSystemFontOfSize_(size) if bold else NSFont.systemFontOfSize_(size)
 
 
