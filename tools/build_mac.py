@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 APP = Path(__file__).resolve().parent.parent
@@ -36,6 +37,20 @@ KC_PASS = "ecoscribe-local"  # protects nothing secret: the key only signs this 
 def run(cmd, **kw) -> subprocess.CompletedProcess:
     print("+", " ".join(map(str, cmd)), flush=True)
     return subprocess.run(list(map(str, cmd)), check=True, **kw)
+
+
+def hdiutil_create(args, tries: int = 3, wait: float = 3.0, runner=subprocess.run, sleep=time.sleep, **kw):
+    """hdiutil create, tried up to `tries` times: on GitHub's macOS runners it sometimes exits 1 ("resource
+    busy") and passes on the next try with nothing changed (dictado-ndxs)."""
+    cmd = ["hdiutil", "create", *map(str, args)]
+    for n in range(1, tries + 1):
+        try:
+            return runner(cmd, check=True, **kw)
+        except subprocess.CalledProcessError:
+            if n == tries:
+                raise
+            print(f"hdiutil create failed (try {n} of {tries}), trying again in {wait:g} s", flush=True)
+            sleep(wait)
 
 
 def version() -> str:
@@ -145,8 +160,9 @@ def dmg(app: Path) -> Path:
         run(["ditto", app, stage / "Ecoscribe.app"])
         (stage / "Applications").symlink_to("/Applications")
         out.unlink(missing_ok=True)
-        run(["hdiutil", "create", "-volname", "Ecoscribe", "-srcfolder", stage, "-ov", "-format", "UDZO", out],
-            stdout=subprocess.DEVNULL)
+        print("+ hdiutil create", out, flush=True)
+        hdiutil_create(["-volname", "Ecoscribe", "-srcfolder", stage, "-ov", "-format", "UDZO", out],
+                       stdout=subprocess.DEVNULL)
     return out
 
 

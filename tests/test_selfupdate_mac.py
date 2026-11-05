@@ -1,6 +1,7 @@
 """dictado-6gr: self-update on the Mac. The release's .dmg, only announced when there is one; the install
 script swaps Ecoscribe.app only for an app signed like this one. The real-script test runs on a throwaway
 app and .dmg in tmp_path (darwin only); the installed app is never touched."""
+import importlib.util
 import shutil
 import subprocess
 import sys
@@ -10,6 +11,10 @@ import pytest
 
 from ecoscribe import selfupdate, updates
 from ecoscribe.platform.macos import selfinstall
+
+_spec = importlib.util.spec_from_file_location("build_mac", Path(__file__).resolve().parent.parent / "tools" / "build_mac.py")
+build_mac = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(build_mac)
 
 TAG = "v1.19.0"
 DMG = "Ecoscribe-1.19.0.dmg"
@@ -108,9 +113,36 @@ def _app(where: Path, text: str) -> Path:
 
 
 def _dmg(app: Path, out: Path) -> Path:
-    subprocess.run(["hdiutil", "create", "-volname", "Ecoscribe", "-srcfolder", str(app), "-ov", "-format", "UDZO",
-                    str(out)], check=True, capture_output=True)
+    build_mac.hdiutil_create(["-volname", "Ecoscribe", "-srcfolder", app, "-ov", "-format", "UDZO", out],
+                             capture_output=True)
     return out
+
+
+def test_hdiutil_create_tries_again_after_a_failure():
+    calls, waits = [], []
+
+    def runner(cmd, check, **kw):
+        calls.append(cmd)
+        if len(calls) == 1:
+            raise subprocess.CalledProcessError(1, cmd)
+        return subprocess.CompletedProcess(cmd, 0)
+
+    r = build_mac.hdiutil_create(["-ov", Path("x.dmg")], runner=runner, sleep=waits.append)
+    assert r.returncode == 0
+    assert calls == [["hdiutil", "create", "-ov", "x.dmg"]] * 2
+    assert waits == [3.0]
+
+
+def test_hdiutil_create_gives_up_after_its_tries():
+    calls = []
+
+    def runner(cmd, check, **kw):
+        calls.append(cmd)
+        raise subprocess.CalledProcessError(1, cmd)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        build_mac.hdiutil_create(["x.dmg"], tries=3, runner=runner, sleep=lambda s: None)
+    assert len(calls) == 3
 
 
 @pytest.mark.skipif(sys.platform != "darwin" or not shutil.which("hdiutil"), reason="the Mac's hdiutil and codesign")
