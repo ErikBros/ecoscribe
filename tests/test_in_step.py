@@ -158,7 +158,7 @@ def test_hooks_path_may_be_absolute(monkeypatch, tmp_path):
 
 def test_mass_delete_guard_off_is_a_stop(monkeypatch):
     answers = {"pull": in_step.Result(True, "", ""), "memories": in_step.Result(True, "{}", ""),
-               "config": in_step.Result(True, "false\n", "")}
+               "list": in_step.Result(True, "[]", ""), "config": in_step.Result(True, "false\n", "")}
 
     def fake_run(cmd, timeout, env=None):
         return answers[cmd[2] if cmd[1] == "dolt" else cmd[1]]
@@ -167,7 +167,7 @@ def test_mass_delete_guard_off_is_a_stop(monkeypatch):
     f = in_step.Facts()
     in_step.check_bd(f)
     assert any("mass-delete" in s and "bd config set" in s for s in f.stop)
-    assert f.pull_error is None and f.installed == {}
+    assert f.pull_error is None and f.installed == {} and f.tickets == []
 
 
 def test_a_public_tickets_repo_is_a_stop(monkeypatch):
@@ -189,3 +189,46 @@ def test_a_crash_inside_is_one_line_and_exit_zero(monkeypatch, capsys):
     assert in_step.main() == 0
     out = capsys.readouterr().out.strip().splitlines()
     assert len(out) == 1 and "RuntimeError" in out[0]
+
+
+# ---- open tickets whose PR already merged (dictado-0agh) ----
+
+def ticket(tid, updated, status="open"):
+    return {"id": tid, "status": status, "updated_at": updated}
+
+
+def merged_pr(number, title, at):
+    return {"number": number, "title": title, "mergedAt": at}
+
+
+def test_an_open_ticket_untouched_since_its_pr_merged_is_named():
+    tickets = [ticket("dictado-abc", "2026-11-02T10:00:00Z"), ticket("dictado-xyz", "2026-11-02T10:00:00Z")]
+    merged = [merged_pr(240, "Pill moves by drag (dictado-abc)", "2026-11-03T08:45:00Z"),
+              merged_pr(241, "Something else (dictado-other)", "2026-11-03T08:46:00Z")]
+    out = in_step.lines(facts(tickets=tickets, merged=merged))
+    assert "1 open ticket is named in a merged PR: dictado-abc (#240). Close if finished (bd close)." in out
+    assert not any("dictado-xyz" in line for line in out)
+
+
+def test_a_ticket_worked_on_after_the_merge_is_left_alone():
+    tickets = [ticket("dictado-abc", "2026-11-03T08:52:00Z", status="in_progress")]
+    merged = [merged_pr(244, "Desktop check: paste again, command mode (dictado-cp1, dictado-abc)", "2026-11-03T08:45:00Z")]
+    assert in_step.done_tickets(tickets, merged) == []
+    assert in_step.lines(facts(tickets=tickets, merged=merged)) == [
+        "Windows and Mac in step: 1.25.2 on both, tickets synced, nothing waiting."]
+
+
+def test_several_tickets_and_the_newest_pr_naming_one():
+    tickets = [ticket("dictado-abc", "2026-11-01T00:00:00Z"), ticket("dictado-trtz.2", "2026-11-01T00:00:00Z")]
+    merged = [merged_pr(250, "Second part (dictado-abc)", "2026-11-04T00:00:00Z"),
+              merged_pr(248, "Tickets out of the repo (dictado-trtz.2)", "2026-11-03T00:00:00Z"),
+              merged_pr(246, "First part (dictado-abc)", "2026-11-02T00:00:00Z")]
+    assert in_step.done_tickets(tickets, merged) == [("dictado-abc", 250), ("dictado-trtz.2", 248)]
+    assert any(line.startswith("2 open tickets are named in a merged PR: dictado-abc (#250), dictado-trtz.2 (#248).")
+               for line in in_step.lines(facts(tickets=tickets, merged=merged)))
+
+
+def test_no_ticket_or_pr_list_means_no_ticket_line():
+    merged = [merged_pr(240, "x (dictado-abc)", "2026-11-03T08:45:00Z")]
+    assert in_step.lines(facts(tickets=None, merged=merged)) == in_step.lines(facts())
+    assert in_step.lines(facts(tickets=[ticket("dictado-abc", "2026-11-01T00:00:00Z")], merged=None)) == in_step.lines(facts())

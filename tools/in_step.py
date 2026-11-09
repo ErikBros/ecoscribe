@@ -13,7 +13,9 @@ What it checks:
 3. Downloads: recent releases without the Mac .dmg or the Windows .exe.
 4. Versions: the bd memories installed-windows and installed-mac ("1.25.2 2026-11-03T08:02", written by
    tools/record_install.py after an install) against the newest release.
-5. Safety: git hooks on (.beads/hooks), gitleaks installed, the local names file for the privacy guard,
+5. Tickets left open: an open ticket named in a merged PR's title, with nothing done on it since the merge
+   (dictado-0agh): close it if the work is finished.
+6. Safety: git hooks on (.beads/hooks), gitleaks installed, the local names file for the privacy guard,
    the mass-delete guard of ticket sync, the tickets repo still private. A failure is a "STOP:" line.
 
 Every command has a short timeout and the checks run side by side (the whole run stays under 15 s).
@@ -46,6 +48,8 @@ MAX_LINES = 5
 RELEASES_LOOKED_AT = 10
 VTAG = re.compile(r"v(\d+)\.(\d+)\.(\d+)")
 GREEN = {"SUCCESS", "NEUTRAL", "SKIPPED"}
+TICKET_ID = re.compile(r"\bdictado-[a-z0-9]+(?:\.\d+)*\b")
+MERGED_LOOKED_AT = 30
 
 
 @dataclass
@@ -93,6 +97,8 @@ class Facts:
     prs: list[dict] | None = None  # gh pr list --json rows; None: couldn't check
     releases: list[dict] | None = None  # [{"tag", "assets": [names], "draft", "prerelease"}]; None: couldn't check
     installed: dict | None = None  # {"windows": "1.25.2 2026-...", "mac": ...}; None: couldn't check
+    tickets: list[dict] | None = None  # open + in-progress tickets (bd list --json rows); None: couldn't check
+    merged: list[dict] | None = None  # recently merged PRs: {"number", "title", "mergedAt"}; None: couldn't check
     stop: list[str] = field(default_factory=list)  # safety problems, each naming its fix
     unchecked: list[str] = field(default_factory=list)  # "open PRs (timed out)"
 
@@ -229,6 +235,39 @@ def versions_line(installed: dict, releases: list[dict], computer: str) -> str |
             + (" After an install: tools/record_install.py." if unrecorded else ""))
 
 
+def _when(stamp) -> datetime | None:
+    try:
+        return datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def done_tickets(tickets: list[dict], merged: list[dict]) -> list[tuple[str, int]]:
+    """(ticket id, PR number): open tickets a merged PR names in its title, untouched since that merge.
+    A ticket updated after the merge (a note, more work on a second PR) is still being worked on."""
+    by_id = {t.get("id"): t for t in tickets if t.get("id")}
+    out = {}
+    for pr in sorted(merged, key=lambda p: str(p.get("mergedAt") or "")):
+        at = _when(pr.get("mergedAt"))
+        if at is None:
+            continue
+        for tid in TICKET_ID.findall(pr.get("title") or ""):
+            t = by_id.get(tid)
+            upd = _when(t.get("updated_at")) if t else None
+            if t is not None and (upd is None or upd <= at):
+                out[tid] = pr.get("number")  # merges come oldest first: the newest PR naming it wins
+    return sorted(out.items())
+
+
+def done_line(tickets: list[dict], merged: list[dict]) -> str | None:
+    done = done_tickets(tickets, merged)
+    if not done:
+        return None
+    names = ", ".join(f"{tid} (#{n})" for tid, n in done)
+    word = "ticket is" if len(done) == 1 else "tickets are"
+    return f"{len(done)} open {word} named in a merged PR: {names}. Close if finished (bd close)."
+
+
 def lines(f: Facts) -> list[str]:
     """The report: at most MAX_LINES lines; all fine is one line."""
     out = []
@@ -247,6 +286,10 @@ def lines(f: Facts) -> list[str]:
             out.append(line)
     if f.prs is not None:
         line = pr_line(f.prs, f.now)
+        if line:
+            out.append(line)
+    if f.tickets is not None and f.merged is not None:
+        line = done_line(f.tickets, f.merged)
         if line:
             out.append(line)
     if f.unchecked:
@@ -285,6 +328,14 @@ def check_bd(f: Facts) -> None:
     if not isinstance(f.installed, dict):
         f.installed = None
         f.unchecked.append(f"installed versions (bd memories: {first_line(r.err, 40) or 'no answer'})")
+    r = run(["bd", "list", "--status", "open,in_progress", "--limit", "0", "--json"], 5)
+    try:
+        f.tickets = json.loads(r.out) if r.ok else None
+    except ValueError:
+        f.tickets = None
+    if not isinstance(f.tickets, list):
+        f.tickets = None
+        f.unchecked.append(f"open tickets (bd list: {first_line(r.err, 40) or 'no answer'})")
     r = run(["bd", "config", "get", MASS_DELETE_KEY], 3)
     if not r.ok:
         f.unchecked.append(f"the mass-delete guard ({first_line(r.err, 40)})")
@@ -295,6 +346,15 @@ def check_bd(f: Facts) -> None:
 def check_prs(env: dict) -> tuple[list[dict] | None, str]:
     r = run(["gh", "pr", "list", "-R", GH_REPO, "--state", "open",
              "--json", "number,createdAt,isDraft,statusCheckRollup"], 10, env)
+    try:
+        return (json.loads(r.out), "") if r.ok else (None, r.err)
+    except ValueError:
+        return None, "unreadable answer"
+
+
+def check_merged(env: dict) -> tuple[list[dict] | None, str]:
+    r = run(["gh", "pr", "list", "-R", GH_REPO, "--state", "merged", "--limit", str(MERGED_LOOKED_AT),
+             "--json", "number,title,mergedAt"], 10, env)
     try:
         return (json.loads(r.out), "") if r.ok else (None, r.err)
     except ValueError:
@@ -342,12 +402,13 @@ def short(err: str) -> str:
 
 def gather() -> Facts:
     f = Facts(computer=this_computer())
-    with ThreadPoolExecutor(max_workers=5) as pool:
+    with ThreadPoolExecutor(max_workers=6) as pool:
         bd = pool.submit(check_bd, f)
         env = gh_env()
         prs = pool.submit(check_prs, env)
         rel = pool.submit(check_releases, env)
         priv = pool.submit(check_private, env)
+        merged = pool.submit(check_merged, env)
         check_local(f)
         f.prs, err = prs.result()
         if f.prs is None:
@@ -360,6 +421,9 @@ def gather() -> Facts:
             f.unchecked.append(f"that the tickets repo is private ({short(err)})")
         elif not private:
             f.stop.append(f"the tickets repo {TICKETS_REPO} is PUBLIC: make it private on GitHub now")
+        f.merged, err = merged.result()
+        if f.merged is None:
+            f.unchecked.append(f"merged PRs ({short(err)})")
         bd.result()
     return f
 
