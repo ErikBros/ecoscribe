@@ -72,7 +72,7 @@ function demoApi() {
       size: 3.09e9, required: false, checked: false, ready: false }];
   let settings = {
     values: { hotkey: "rctrl", mic: "Anker PowerConf", languages: demoLangs.join(","), extra_languages: demoLangs.filter((c) => !["en", "sv"].includes(c)), sounds: true, overlay: true, live_text: true, insights: params.get("insights") === "1", speech_feedback: false, unmute: true, startup: true,
-      meet_mode: "prompt", meet_end: "10", meet_lang: demoLangs[0], on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: params.get("styles") === "1" && params.get("vc") !== "0", self_corrections: false, command_mode: params.get("cm") === "1", command_key: params.get("cmkey") || "e", command_style_file: params.get("cmstyle") === "1" ? "C:/Users/you/Documents/writing-style.md" : "", voice_phrases: params.get("vp") === "1" ? { line: { en: ["new line", "next line"] }, enter: { en: ["send it", "press enter", "ship it"] } } : {}, screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, update_check: true, auto_update: params.get("auto") === "1", theme: params.get("theme") || "system",
+      meet_mode: "prompt", meet_end: "10", meet_lang: demoLangs[0], on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: params.get("styles") === "1" && params.get("vc") !== "0", self_corrections: false, command_mode: params.get("cm") === "1", command_key: params.get("cmkey") || "e", command_style_file: params.get("cmstyle") === "1" ? "C:/Users/you/Documents/writing-style.md" : "", voice_phrases: params.get("vp") === "1" ? { line: { en: ["new line", "next line"] }, enter: { en: ["send it", "press enter", "ship it"] } } : {}, voice_langs: params.get("vl") ? params.get("vl").split(",") : [], screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, update_check: true, auto_update: params.get("auto") === "1", theme: params.get("theme") || "system",
       export_dir: "C:/x/Downloads", export_default: true,
       snippets: [{ trigger: "my email", text: "alex@example.com" }], replacements: [{ heard: "poll request", write: "pull request" }],
       per_app_styles: params.get("styles") === "1",
@@ -1720,6 +1720,7 @@ function formValues() {
     meet_mode: $("#f-meet-mode").value, meet_end: $("#f-meet-end").value, meet_lang: $("#f-meet-lang").value, on_demand: $("#f-on-demand").checked,
     speakers: $("#f-speakers").checked, voice_commands: $("#f-voice-commands").checked,
     voice_phrases: vcSaved(),  // dictado-67v
+    voice_langs: vcLangs,  // dictado-gee5: [] = every language
     self_corrections: $("#f-self-corrections").checked, command_mode: $("#f-command-mode").checked, command_key: $("#f-command-key").value,
     command_style_file: $("#f-command-style-file").value,  // dictado-jq7p
     screen_names: $("#f-screen-names").checked, hold_to_talk: $("#f-hold").checked, numpad_enter: $("#f-numpad-enter").checked,
@@ -1843,20 +1844,45 @@ function phraseTables() {
       body.append(tr);
     }
   };
+  vcLangChecks();  // dictado-gee5
   vcEditor();  // the voice commands: the user's own phrases, per language (dictado-67v)
   table($("#sc-head"), $("#sc-rows"), scList);
   const first = (key, c) => { const p = vcPhrases(vcList.find((r) => r.key === key) || {}, c)[0]; return p && `"${p}"`; };
-  const more = cols.filter((c) => c !== "en" && vcList.some((r) => vcPhrases(r, c).length));
+  const vc = vcCols(), more = vc.filter((c) => c !== "en" && vcList.some((r) => vcPhrases(r, c).length));
   const eg = more.flatMap((c) => [first("line", c), first("enter", c)]).filter(Boolean);
-  $("#vc-help").textContent = '"New line" makes a break; ending with "send it" presses Enter, "next field" presses Tab. "Undo that" on its own takes back the last dictation.'
-    + (more.length ? ` ${andList(more.map(label))} work${more.length === 1 ? "s" : ""} too: ${eg.join(", ")}.` : "");
+  $("#vc-help").textContent = vc.includes("en")
+    ? '"New line" makes a break; ending with "send it" presses Enter, "next field" presses Tab. "Undo that" on its own takes back the last dictation.'
+      + (more.length ? ` ${andList(more.map(label))} work${more.length === 1 ? "s" : ""} too: ${eg.join(", ")}.` : "")
+    : `Say a phrase in ${andList(vc.map(label))} to make a break or press Enter${eg.length ? `: ${eg.join(", ")}` : ""}.`;
 }
 // Voice commands > See all commands (dictado-67v): the phrases are the user's to change, per action and
 // language: English (built in for everyone) and the user's other languages. × removes one, typing and
 // Enter adds one, Reset puts a cell back to the built-in phrases. Saved as [text] voice_phrases (only
 // what differs), and the real matcher uses it.
 let vcCustom = {};
-function vcCols() { return ["en", ...myLangs().filter((c) => c !== "en")]; }
+// dictado-gee5: the languages voice commands work in. [] = all of them, so a language added later is on too.
+let vcLangs = [];
+function vcAll() { return ["en", ...myLangs().filter((c) => c !== "en")]; }
+function vcCols() {
+  const all = vcAll(), on = all.filter((c) => !vcLangs.length || vcLangs.includes(c));
+  return on.length ? on : all;
+}
+function vcLangChecks() {
+  const all = vcAll(), on = new Set(vcCols()), box = $("#vc-langs");
+  box.replaceChildren(...all.map((code) => {
+    const l = document.createElement("label"); l.className = "lang-check";
+    const i = document.createElement("input"); i.type = "checkbox"; i.value = code; i.checked = on.has(code);
+    i.onchange = () => {
+      const ticked = $$("#vc-langs input:checked").map((x) => x.value);
+      if (!ticked.length) { i.checked = true; return; }  // at least one
+      vcLangs = ticked.length === all.length ? [] : ticked;
+      phraseTables(); dirty();
+    };
+    l.append(i, document.createTextNode(vcLabel(code)));
+    return l;
+  }));
+  $("#row-vc-langs").hidden = all.length < 2;  // one language: nothing to choose
+}
 const vcLabel = (c) => langNames[c] || DICT_LANGS[c] || c;
 const vcSame = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
 function vcPhrases(row, lang) { return (vcCustom[row.key] || {})[lang] ?? (row.builtin || {})[lang] ?? []; }
@@ -2040,6 +2066,7 @@ async function renderSettings() {
   $("#f-theme").onchange = () => { applyTheme($("#f-theme").value, false); dirty(); };  // a preview until Save
   if (params.get("vc") === "1") $("#vc-list").open = true;  // screenshot
   vcCustom = JSON.parse(JSON.stringify(s.values.voice_phrases || {}));  // dictado-67v
+  vcLangs = [...(s.values.voice_langs || [])];  // dictado-gee5
   $("#vc-reset-all").onclick = () => { vcCustom = {}; phraseTables(); dirty(); };
   if (params.get("sc") === "1") $("#sc-list").open = true;  // screenshot
   vcList = s.voice_command_list || []; scList = s.correction_list || [];  // drawn after the language card (phraseTables)

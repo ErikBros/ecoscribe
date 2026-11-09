@@ -198,11 +198,19 @@ _B = r"(^|[.,;:!?])\s*"
 _E = r"\s*([.,;:!?]|$)\s*"
 
 
+def only_langs(table: dict, langs=None) -> dict:
+    """The phrase table cut to the languages voice commands work in (dictado-gee5); no list = every language."""
+    keep = {str(lang) for lang in (langs or []) if lang}
+    if not keep:
+        return table
+    return {k: {lang: ps for lang, ps in v.items() if lang in keep} for k, v in table.items()}
+
+
 @functools.lru_cache(maxsize=8)
-def _matchers(custom_json: str = "{}"):
+def _matchers(custom_json: str = "{}", langs_key: str = ""):
     """(paragraph, line, enter, tab, undo) regexes for a phrase table; None for a command with no phrase left.
     Enter and Tab close the text (at the very end only); undo is the whole dictation or nothing."""
-    table = phrase_table(json.loads(custom_json))
+    table = only_langs(phrase_table(json.loads(custom_json)), langs_key.split(",") if langs_key else None)
     def rx(key, tail, head=_B):
         alt = _phrases(key, table)
         return re.compile(head + f"(?:{alt})" + tail, re.IGNORECASE) if alt else None
@@ -213,6 +221,10 @@ def _matchers(custom_json: str = "{}"):
 
 def _custom_key(custom) -> str:
     return json.dumps(custom or {}, sort_keys=True, ensure_ascii=False)
+
+
+def _langs_key(langs) -> str:
+    return ",".join(sorted({str(lang) for lang in (langs or []) if lang}))
 
 
 _matchers()  # the built-in table compiles at import
@@ -248,12 +260,13 @@ def _end(punct: str) -> str:
     return punct if punct in ".!?" else ("." if punct else "")
 
 
-def voice_commands(s: str, custom=None) -> tuple[str, str | None]:
+def voice_commands(s: str, custom=None, langs=None) -> tuple[str, str | None]:
     """"new line" -> line break, "new paragraph" -> blank line; a closing "send it" or "next field" ->
     (text, "enter" or "tab"): the key to press after the paste, None when the text doesn't end in one.
-    custom: the user's own phrases ([text] voice_phrases, dictado-67v) over the built-in ones."""
+    custom: the user's own phrases ([text] voice_phrases, dictado-67v) over the built-in ones.
+    langs: only these languages' phrases count ([text] voice_langs, dictado-gee5); None or empty = all."""
     key = None
-    para, line, enter_rx, tab_rx, _ = _matchers(_custom_key(custom))
+    para, line, enter_rx, tab_rx, _ = _matchers(_custom_key(custom), _langs_key(langs))
     ends = [(m, k) for k, rx in (("enter", enter_rx), ("tab", tab_rx)) if rx is not None and (m := rx.search(s))]
     if ends:  # the one that takes the most of the end, if two ever match
         m, key = min(ends, key=lambda e: e[0].start())
@@ -266,9 +279,9 @@ def voice_commands(s: str, custom=None) -> tuple[str, str | None]:
     return (s.rstrip() if key else s), key
 
 
-def undo_only(s: str, custom=None) -> bool:
+def undo_only(s: str, custom=None, langs=None) -> bool:
     """The whole dictation is "undo that" (dictado-dy55): take back the last one. Inside a sentence it is text."""
-    rx = _matchers(_custom_key(custom))[4]
+    rx = _matchers(_custom_key(custom), _langs_key(langs))[4]
     return bool(rx is not None and s and rx.fullmatch(s))
 
 

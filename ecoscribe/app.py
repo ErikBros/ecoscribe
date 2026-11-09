@@ -382,7 +382,8 @@ class App:
             from .text import undo_only
             if scratch_only(res.text) or (  # dictado-ost: "scratch that" alone takes back the last paste
                     getattr(self.cfg.text, "voice_commands", False)  # dictado-dy55: so does "undo that"
-                    and undo_only(res.text, getattr(self.cfg.text, "voice_phrases", None))):
+                    and undo_only(res.text, getattr(self.cfg.text, "voice_phrases", None),
+                                  getattr(self.cfg.text, "voice_langs", None))):
                 self.undo_last()
                 return
         if res.text and getattr(self.cfg.text, "self_corrections", False):  # dictado-ehc: first, on what was said
@@ -396,7 +397,8 @@ class App:
         style = self._style()  # dictado-h0m: None unless per-app styles are on
         if res.text and getattr(self.cfg.text, "voice_commands", False) and (style is None or style["commands"]):
             from .text import voice_commands
-            text, key = voice_commands(res.text, getattr(self.cfg.text, "voice_phrases", None))  # dictado-67v
+            text, key = voice_commands(res.text, getattr(self.cfg.text, "voice_phrases", None),  # dictado-67v
+                                       getattr(self.cfg.text, "voice_langs", None))  # dictado-gee5
             res = replace(res, text=text)
             if key and not text:  # only "send it" (submit what is in the box) or "next field"
                 self._press(key)

@@ -246,6 +246,7 @@ class Api:
                 "meet_mode": c.meetings.mode, "meet_end": str(int(c.meetings.grace_s)), "meet_lang": c.meetings.default_lang, "on_demand": c.whisper.on_demand,
                 "speakers": c.meetings.speakers, "vocabulary": "\n".join(c.text.vocabulary),
                 "voice_commands": c.text.voice_commands, "voice_phrases": c.text.voice_phrases,  # dictado-67v
+                "voice_langs": list(c.text.voice_langs),  # dictado-gee5
                 "self_corrections": c.text.self_corrections, "command_mode": c.text.command_mode,  # dictado-bd6
                 "command_key": c.text.command_key, "command_key_label": self._command_label(c),  # dictado-a1d
                 "command_style_file": c.text.command_style_file,  # dictado-jq7p
@@ -366,6 +367,10 @@ class Api:
                     c.text.voice_phrases = clean_custom(values["voice_phrases"])
                 except ValueError as e:
                     return {"ok": False, "error": str(e)}
+            if "voice_langs" in values:  # dictado-gee5: known codes only, in order, no repeats; [] = every language
+                from .languages import ALL
+                got = values["voice_langs"] if isinstance(values["voice_langs"], list) else []
+                c.text.voice_langs = list(dict.fromkeys(str(x) for x in got if str(x) in ALL))
             if "app_styles" in values:  # dictado-h0m: [{kind, capital, full_stop, commands}]
                 from .app_styles import clean_table
                 c.text.app_styles = clean_table(values["app_styles"])

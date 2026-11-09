@@ -106,7 +106,7 @@ def test_app_undo_that_needs_voice_commands_on(tmp_path):
     assert pasted == ["Buy milk tomorrow. ", "Undo that. "] and undos == []
 
 
-def _app(tmp_path, said, on, phrases=None, keys=None):
+def _app(tmp_path, said, on, phrases=None, keys=None, langs=None):
     from ecoscribe.app import App
     from ecoscribe.config import Config
     from ecoscribe.deliver import DeliveryResult
@@ -115,6 +115,7 @@ def _app(tmp_path, said, on, phrases=None, keys=None):
     cfg = Config()
     cfg.text.voice_commands = on
     cfg.text.voice_phrases = phrases or {}
+    cfg.text.voice_langs = langs or []
     delivered, enters = [], []
 
     class Eng:
@@ -195,6 +196,48 @@ def test_settings_edit_the_phrases_and_reset_them(tmp_path):
     assert api.save_settings({"voice_phrases": {}})["ok"]  # Back to the built-in phrases
     assert config.load(tmp_path / "c.toml").text.voice_phrases == {}
 
+
+
+# -- the languages voice commands work in (dictado-gee5) -------------------------------------
+def test_only_the_ticked_languages_phrases_count():
+    assert voice_commands("Hej. Ny rad. Vi ses. ", langs=["en", "es"]) == ("Hej. Ny rad. Vi ses. ", None)
+    assert voice_commands("Hola. Nueva línea. Qué tal. ", langs=["en", "es"]) == ("Hola.\nQué tal. ", None)
+    assert voice_commands("Run it, send it. ", langs=["sv"]) == ("Run it, send it. ", None)
+    assert voice_commands("Kör det, skicka. ", langs=["sv"]) == ("Kör det.", "enter")
+
+
+def test_no_language_list_means_every_language():
+    for langs in (None, [], [""]):
+        assert voice_commands("Hej. Ny rad. Vi ses. ", langs=langs) == ("Hej.\nVi ses. ", None)
+        assert voice_commands("Run it, send it. ", langs=langs) == ("Run it.", "enter")
+
+
+def test_undo_follows_the_same_languages():
+    assert undo_only("Ångra det.", langs=["sv"]) and not undo_only("Ångra det.", langs=["en"])
+    assert undo_only("Undo that.", langs=None) and not undo_only("Undo that.", langs=["es"])
+
+
+def test_own_phrases_follow_the_languages_too():
+    mine = {"line": {"el": ["νέα γραμμή"]}}
+    assert voice_commands("Γεια. Νέα γραμμή. Τι κάνεις; ", mine, ["el"]) == ("Γεια.\nΤι κάνεις; ", None)
+    assert voice_commands("Γεια. Νέα γραμμή. Τι κάνεις; ", mine, ["en"]) == ("Γεια. Νέα γραμμή. Τι κάνεις; ", None)
+
+
+def test_app_uses_the_ticked_languages(tmp_path):
+    from ecoscribe.config import Config
+    assert Config().text.voice_langs == []  # every language, as before
+    assert _app(tmp_path, "Run the tests again, send it. ", True, langs=["es"]) == (["Run the tests again, send it. "], [])
+
+
+def test_settings_save_the_languages(tmp_path):
+    from ecoscribe import config
+    from ecoscribe.window import Api
+    api = Api(data_dir=tmp_path, config_path=tmp_path / "c.toml", signal_reload=lambda: True)
+    assert api.save_settings({"voice_langs": ["es", "en", "es", "xx", 3]})["ok"]
+    assert config.load(tmp_path / "c.toml").text.voice_langs == ["es", "en"]
+    assert api.get_settings()["values"]["voice_langs"] == ["es", "en"]
+    assert api.save_settings({"voice_langs": []})["ok"]
+    assert config.load(tmp_path / "c.toml").text.voice_langs == []
 
 # -- spoken quotes (dictado-y52): always on, needs the opening and the closing words -------------
 from ecoscribe.text import spoken_quotes  # noqa: E402
