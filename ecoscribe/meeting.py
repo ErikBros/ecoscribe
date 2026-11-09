@@ -27,6 +27,61 @@ log = logging.getLogger(__name__)
 SR = 16000
 STOP_EVENT = "Local\\EcoscribeMeetingStop"
 MAX_S = 4 * 3600  # a forgotten recording stops itself after 4 h
+# dictado-9z99: the call is in another of the user's languages than the one it records in. Two live chunks in a row
+# (each >= HINT_MIN_S of audio with words in it) must say the same other language with >= HINT_P, within the first
+# HINT_UNTIL_S of the call; then meta "heard_lang" is written once and the pill offers the switch.
+HINT_P = 0.8
+HINT_MIN_S = 5.0
+HINT_UNTIL_S = 240.0
+HINT_SAME_DONE = 3
+
+
+class LangHint:
+    """Watches the first live chunks of a one-language meeting for another of the user's languages."""
+
+    def __init__(self, mine, p_min: float = HINT_P, in_a_row: int = 2):
+        self.mine = {str(c) for c in mine or []}
+        self.p_min, self.in_a_row = p_min, in_a_row
+        self.run: tuple[str | None, int] = (None, 0)
+        self.done = False
+        self.same = 0  # clear chunks of the set language: after HINT_SAME_DONE the call is what it says, stop checking
+
+    def other(self, probs, current: str) -> str | None:
+        """The language a chunk is clearly in, when it is another of the user's; else None."""
+        p = dict(probs or [])
+        if not p:
+            return None
+        top = max(p, key=p.get)
+        return top if top != current and top in self.mine and p[top] >= self.p_min else None
+
+    def feed(self, probs, current: str, t0: float, seconds: float, has_words: bool) -> str | None:
+        """One live chunk. Returns the language to suggest, once; None otherwise."""
+        if self.done or not current or current == "auto" or mixed_langs(current) or t0 > HINT_UNTIL_S:
+            return None
+        if seconds < HINT_MIN_S or not has_words:
+            return None  # too little to go on: neither counts nor breaks a run
+        lang = self.other(probs, current)
+        p = dict(probs or [])
+        if lang is None and p and max(p, key=p.get) == current and p[current] >= self.p_min:
+            self.same += 1
+            if self.same >= HINT_SAME_DONE:
+                self.done = True  # each check costs a detector pass: no more once the language is confirmed
+        n = self.run[1] + 1 if lang is not None and lang == self.run[0] else (1 if lang else 0)
+        self.run = (lang, n)
+        if lang is not None and n >= self.in_a_row:
+            self.done = True
+            return lang
+        return None
+
+
+def _probs(model, audio):
+    """The detector's [(lang, p)] for a piece of audio; [] when it can't say."""
+    try:
+        _, _, probs = model.detect_language(audio)
+        return list(probs or [])
+    except Exception:
+        log.debug("language check of a live chunk failed", exc_info=True)
+        return []
 
 
 def stop_checker(d: Path, event_name: str | None = STOP_EVENT):
@@ -95,7 +150,7 @@ def _label(d: Path) -> None:
 def run(session_dir: Path, cfg: TranscribeCfg, recorder_factory=_default_recorder, stop_check=None,
         poll_s: float = 0.25, factory=transcribe._default_factory, resolve=None,
         clock=time.monotonic, prompt: str | None = None, speech=transcribe._speech,
-        replacements: dict | None = None, call_devices=None) -> int:
+        replacements: dict | None = None, call_devices=None, my_langs=None) -> int:
     d = Path(session_dir)
     stop_check = stop_check or stop_checker(d)
     cache: dict = {}
@@ -110,6 +165,7 @@ def run(session_dir: Path, cfg: TranscribeCfg, recorder_factory=_default_recorde
         chunks: queue.Queue = queue.Queue()
         dropping = threading.Event()
         last_lang = [None]  # a mixed meeting's last live language: short unsure chunks keep it
+        hint = LangHint(my_langs)  # dictado-9z99
         t_start = clock()
 
         def on_chunk(t0, audio):
@@ -132,6 +188,11 @@ def run(session_dir: Path, cfg: TranscribeCfg, recorder_factory=_default_recorde
                                               condition_on_previous_text=False, initial_prompt=prompt)
                     text = " ".join(s["text"] for s in segclean.clean_segments(
                         [{"text": s.text} for s in gen]))
+                    if not hint.done and not mixed_langs(lang_now) and t0 <= HINT_UNTIL_S and len(audio) / SR >= HINT_MIN_S:
+                        heard = hint.feed(_probs(model, audio), lang_now, t0, len(audio) / SR, bool(text.strip()))
+                        if heard:
+                            sessions.write_meta(d, heard_lang=heard)
+                            log.info("meeting sounds like %s, not %s: offering the switch", heard, lang_now)
                 except Exception:
                     log.exception("live chunk at %.1f s failed", t0)
                     continue
@@ -196,5 +257,7 @@ def main(session_dir: str) -> int:
         from .platform.macos.audio_route import call_devices
     else:
         from .platform.windows.audio_route import call_devices
+    from .languages import user_langs
     return run(d, full.transcribe, prompt=vocab_prompt(session_words(d, full.text.vocabulary)),
-               replacements=dict(full.text.replacements), call_devices=call_devices)
+               replacements=dict(full.text.replacements), call_devices=call_devices,
+               my_langs=user_langs(full.whisper.languages, full.whisper.extra_languages, full.meetings.default_lang))

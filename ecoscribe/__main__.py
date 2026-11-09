@@ -278,6 +278,10 @@ def _start_meetings(cfg, data, ui, root, log, app=None):
             ipc.open_ui("ajustes/claude")
         elif choice == "todos":  # dictado-xuu: the week's to-dos, on Home
             ipc.open_ui("inicio/todos")
+        elif choice == "cambiar_idioma":  # dictado-9z99: the call is in another language: switch, and remember it
+            m = ctl.state().get("meeting")
+            if m and m["dir"] == prompt.app and prompt.lang and ctl.set_lang(prompt.lang):
+                watch.remember(m.get("app"), prompt.lang)
         else:
             watch.answer(choice, lang)
     ui.prompts = PromptWindow(root, on_answer)
@@ -286,6 +290,7 @@ def _start_meetings(cfg, data, ui, root, log, app=None):
     from . import commands
     commands.Watcher(data, commands.handler_for(ctl, watch, MANUAL, app=app)).start()  # the window's buttons
     tracker = meetui.Tracker()
+    lang_offer = meetui.LangOffer()  # dictado-9z99
     from .summary import Sweeper
     sweeper = Sweeper(cfg, ctl.root, ipc.spawn)
     from . import meaning
@@ -309,6 +314,9 @@ def _start_meetings(cfg, data, ui, root, log, app=None):
             ui.set_meeting(st, meetui.meeting_view(st, time.time(), line))
             for kind, d in tracker.update(st):
                 ui.prompt(kind, d, None)
+            offer = lang_offer.update(st)
+            if offer:
+                ui.prompt("lang?", offer[0], offer[1])
         except Exception:
             log.exception("meetings poll failed")
         root.after(1000, poll)
