@@ -23,7 +23,7 @@ def releases():
     return [rel("1.25.2"), rel("1.25.1"), {"tag": "gpu-runtime-3", "assets": ["x.zip"]}, rel("1.25.0")]
 
 
-def green_check(name="unit (macos-14)"):
+def green_check(name="unit (macos-15)"):
     return {"__typename": "CheckRun", "name": name, "status": "COMPLETED", "conclusion": "SUCCESS"}
 
 
