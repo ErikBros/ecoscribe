@@ -29,7 +29,7 @@ List: uncommitted files, local branches, stashes, open PRs and their checks, tic
 
 - **Every change is on a pushed branch with a PR.** Uncommitted code belongs to its ticket's branch;
   a commit on local `main` is a mistake: move it to a branch.
-- **Open PRs:** all three checks green (`unit (windows-latest)`, `unit (macos-14)`, `pr-shape`) -> merge
+- **Open PRs:** all three checks green (`unit (windows-latest)`, `unit (macos-15)`, `pr-shape`) -> merge
   (`--merge --delete-branch`). Red -> fix it if it's small, else leave it open and say why. No checks at
   all -> check githubstatus.com; GitHub dropping events is not ours to fix, say so.
 - **Tickets sync privately**, never in a PR: `bd sync` after the last close (it pulls, merges and pushes

@@ -12,7 +12,7 @@ outcomes in plain words and only real choices (money, publishing, his desktop, w
 2. **Never stack.** Never branch from another open branch. A follow-up waits until the first PR
    is merged, then starts from the updated main. The `pr-shape` check fails stacked PRs.
 3. **Open the PR as soon as the branch is pushed** (`gh pr create --base main`), even if small.
-4. **Merge only when green:** `unit (windows-latest)`, `unit (macos-14)` and `pr-shape` must pass
+4. **Merge only when green:** `unit (windows-latest)`, `unit (macos-15)` and `pr-shape` must pass
    (GitHub enforces it on `main`, for everyone). The Windows session also runs the local desktop
    and GPU suites when a PR touches shared code. Merge commits, no squash.
 5. **Short-lived branches:** merge within the day; branches are deleted on merge. If main moves,
