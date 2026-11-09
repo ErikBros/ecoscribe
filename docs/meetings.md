@@ -12,6 +12,10 @@ computer's sound). Everything stays on your computer.
   System Audio Recording** when macOS asks, or only your side is recorded.
 - **Pick the language** in the box that asks: one language, a pair like English + Spanish for a call that mixes
   them, or Detect. A wrong language gives a poor transcript; you can change it while the call runs.
+- **Wrong language?** In the first minutes of a call, if Ecoscribe clearly hears another of your languages (set to
+  English, but everyone speaks Swedish), a box over the pill asks **"Sounds like Swedish. Switch?"**. **Switch**
+  changes the notes from then on and the final transcript, and that app starts in Swedish next time. **Keep**, or
+  ignoring it for a minute, changes nothing. It asks once per call, and not when you picked Detect or a pair.
 
 ## Taking notes in a call
 

@@ -232,6 +232,34 @@ class Tracker:
         return out
 
 
+class LangOffer:
+    """dictado-9z99: the recording meeting's worker heard another of the user's languages (meta heard_lang):
+    offer the switch once per meeting, and not when the meeting is already in that language."""
+
+    def __init__(self):
+        self._offered: set[str] = set()
+
+    def update(self, state: dict) -> tuple[str, str] | None:
+        """(meeting dir, language to offer) once; else None."""
+        m = (state or {}).get("meeting")
+        if not m or m.get("status", "recording") != "recording" or m["dir"] in self._offered:
+            return None
+        try:
+            meta = sessions.read_meta(Path(m["dir"]))
+        except Exception:
+            return None
+        heard = meta.get("heard_lang")
+        if not heard or heard == meta.get("lang"):
+            return None
+        self._offered.add(m["dir"])
+        return m["dir"], heard
+
+
+def lang_label(code: str | None) -> str:
+    from .languages import name
+    return name(code) if code else ""
+
+
 def placement(current, new) -> str:
     """How `new` meets the open prompt: show (nothing open, or a note), queue (a note behind a
     question: it must not hide a call prompt), displace (a question over a question)."""
@@ -250,10 +278,19 @@ def _which(d: str | None) -> str:
     return " · ".join(x for x in (m.get("title") or "", f"{mins} min" if mins else "") if x)
 
 
+def _meeting_lang(d: str | None) -> str | None:
+    try:
+        lang = sessions.read_meta(Path(d)).get("lang")
+    except (OSError, TypeError, ValueError):
+        return None
+    return lang if lang and lang != "auto" and "," not in lang else None
+
+
 class Prompt:
     """kind: start (a call began) | end? (long silence) | done | failed (a transcript ended) |
     summary (its summary is written) | todos (the week's to-dos are collected; app = how many) | nomic (dictation heard nothing twice) |
-    cmdoff (the command-mode keys were pressed while it is off)."""
+    cmdoff (the command-mode keys were pressed while it is off) |
+    lang? (the call sounds like another of the user's languages; app = the meeting's folder, lang = that language)."""
 
     def __init__(self, kind: str, app: str | None, lang: str | None, opened_at: float):
         self.kind, self.app, self.lang, self.opened_at = kind, app, lang, opened_at
@@ -270,6 +307,11 @@ class Prompt:
             self.title = "Command mode is off"
             self.question = "Turn on Command mode in Settings to use it."
             self.buttons = [("Open Settings", "claude"), ("Close", "hide")]
+        elif kind == "lang?":  # dictado-9z99
+            now = _meeting_lang(app)
+            self.title = f"Sounds like {lang_label(lang)}"
+            self.question = (f"This call is set to {lang_label(now)}. " if now else "") + f"Switch the notes to {lang_label(lang)}?"
+            self.buttons = [("Switch", "cambiar_idioma"), ("Keep", "hide")]
         elif kind == "done":
             self.title, self.question = "Transcript ready", _which(app)
             self.buttons = [("Open", "abrir"), ("Close", "hide")]
@@ -285,7 +327,7 @@ class Prompt:
 
     @property
     def timeout_s(self) -> float:
-        return START_PROMPT_S if self.kind == "start" else PROMPT_S if self.kind == "end?" else DONE_S
+        return START_PROMPT_S if self.kind == "start" else PROMPT_S if self.kind in ("end?", "lang?") else DONE_S
 
     @property
     def timeout_choice(self) -> str:

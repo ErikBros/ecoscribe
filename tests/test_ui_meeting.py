@@ -115,6 +115,29 @@ def test_prompt_texts_and_timeout():
     assert meetui.app_name("slack") == "Slack" and meetui.app_name("chrome") == "Chrome"
 
 
+
+def test_language_offer_once_per_meeting_and_its_box(tmp_path):  # dictado-9z99
+    d = sessions.create("Call", "en", "meeting", tmp_path)
+    st = {"meeting": {"dir": str(d), "app": "zoom", "status": "recording"}}
+    offer = meetui.LangOffer()
+    assert offer.update(st) is None  # nothing heard yet
+    sessions.write_meta(d, heard_lang="sv")
+    assert offer.update(st) == (str(d), "sv")
+    assert offer.update(st) is None  # asked once
+    p = meetui.Prompt("lang?", str(d), "sv", opened_at=0.0)
+    assert p.title == "Sounds like Swedish" and p.question == "This call is set to English. Switch the notes to Swedish?"
+    assert p.buttons == [("Switch", "cambiar_idioma"), ("Keep", "hide")]
+    assert p.expired(59.0) is None and p.expired(61.0) == "hide"  # ignored: nothing changes
+    assert p.button_text("hide", 10.0) == "Keep (50)"
+    assert meetui.placement(meetui.Prompt("start", "zoom", "en", 0.0), p) == "queue"  # never hides a call prompt
+    d2 = sessions.create("Call", "sv", "meeting", tmp_path / "b")
+    sessions.write_meta(d2, heard_lang="sv")  # already Swedish (the user switched): no offer
+    assert meetui.LangOffer().update({"meeting": {"dir": str(d2), "app": "zoom", "status": "recording"}}) is None
+    assert meetui.LangOffer().update({"meeting": None}) is None
+    d3 = sessions.create("Call", "en", "meeting", tmp_path / "c")
+    sessions.write_meta(d3, heard_lang="sv")  # the call is being saved: too late to switch
+    assert meetui.LangOffer().update({"meeting": {"dir": str(d3), "app": "zoom", "status": "finalizing"}}) is None
+
 def test_no_em_dashes_in_strings():
     import inspect
     assert "\u2014" not in inspect.getsource(meetui)

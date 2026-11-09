@@ -188,3 +188,89 @@ def test_the_after_transcribe_command_gets_the_finished_session(tmp_path, monkey
                                 factory=lambda path, device, ct: FakeModel(),
                                 resolve=lambda name, cfg: Path("M:/") / name.replace("/", "--"))
     assert rc == 0 and got == [(["py", "a.py"], d, "done")]
+
+
+# -- the call sounds like another of the user's languages (dictado-9z99) ----------------------
+from ecoscribe.meeting import LangHint  # noqa: E402
+
+
+def test_two_clear_chunks_of_another_own_language_suggest_it_once():
+    h = LangHint(["en", "sv"])
+    sv = [("sv", 0.93), ("en", 0.04)]
+    assert h.feed(sv, "en", 0.0, 15.0, True) is None  # one chunk isn't enough
+    assert h.feed(sv, "en", 15.0, 15.0, True) == "sv"
+    assert h.feed(sv, "en", 30.0, 15.0, True) is None  # once per meeting
+
+
+def test_no_suggestion_when_unsure_the_same_or_not_one_of_mine():
+    for probs, current in (([("sv", 0.6), ("en", 0.3)], "en"),  # unsure
+                           ([("en", 0.95)], "en"),  # the language it already records in
+                           ([("de", 0.95)], "en"),  # not one of the user's languages
+                           ([], "en")):  # the detector said nothing
+        h = LangHint(["en", "sv"])
+        assert h.feed(probs, current, 0.0, 15.0, True) is None and h.feed(probs, current, 15.0, 15.0, True) is None
+
+
+def test_detect_and_a_pair_are_left_alone_and_late_chunks_dont_count():
+    sv = [("sv", 0.95)]
+    for current in ("auto", "en,sv"):
+        h = LangHint(["en", "sv"])
+        assert h.feed(sv, current, 0.0, 15.0, True) is None and h.feed(sv, current, 15.0, 15.0, True) is None
+    h = LangHint(["en", "sv"])
+    assert h.feed(sv, "en", 600.0, 15.0, True) is None and h.feed(sv, "en", 615.0, 15.0, True) is None
+
+
+def test_short_or_silent_chunks_neither_count_nor_break_a_run():
+    h = LangHint(["en", "sv"])
+    sv = [("sv", 0.95)]
+    assert h.feed(sv, "en", 0.0, 15.0, True) is None
+    assert h.feed(sv, "en", 15.0, 2.0, True) is None  # too short
+    assert h.feed([("en", 0.9)], "en", 17.0, 15.0, False) is None  # no words in it
+    assert h.feed(sv, "en", 32.0, 15.0, True) == "sv"
+    h = LangHint(["en", "sv"])
+    h.feed(sv, "en", 0.0, 15.0, True)
+    h.feed([("en", 0.9)], "en", 15.0, 15.0, True)  # a clear chunk of the set language breaks the run
+    assert h.feed(sv, "en", 30.0, 15.0, True) is None
+
+
+class SwedishModel(FakeModel):
+    def detect_language(self, audio, **kw):
+        return "sv", 0.95, [("sv", 0.95), ("en", 0.03)]
+
+
+def _run_with_langs(tmp_path, lang, mine, chunks=3):
+    d = sessions.create("Call", lang, "meeting", tmp_path / "t")
+    holder, stop = {}, threading.Event()
+
+    def rec_factory(sd, on_chunk):
+        holder["rec"] = FakeRecorder(sd, on_chunk)
+        return holder["rec"]
+
+    def drive():
+        while "rec" not in holder or not holder["rec"].started:
+            time.sleep(0.01)
+        for i in range(chunks):
+            holder["rec"].on_chunk(i * 10.0, np.full(10 * SR, 0.2, np.float32))
+        time.sleep(0.3)
+        stop.set()
+    threading.Thread(target=drive, daemon=True).start()
+    rc = meeting.run(d, TranscribeCfg(), recorder_factory=rec_factory, stop_check=stop.is_set, poll_s=0.02,
+                     factory=lambda path, device, ct: SwedishModel(), my_langs=mine,
+                     resolve=lambda name, cfg: Path("M:/") / name.replace("/", "--"))
+    return d, rc
+
+
+def test_the_worker_writes_the_heard_language_for_the_pill(tmp_path):
+    d, rc = _run_with_langs(tmp_path, "en", ["en", "sv"])
+    assert rc == 0 and sessions.read_meta(d).get("heard_lang") == "sv"
+    d, rc = _run_with_langs(tmp_path / "b", "en", ["en", "es"])  # Swedish isn't one of this user's languages
+    assert rc == 0 and "heard_lang" not in sessions.read_meta(d)
+
+
+def test_checking_stops_once_the_set_language_is_confirmed():
+    h = LangHint(["en", "sv"])
+    en, sv = [("en", 0.97)], [("sv", 0.97)]
+    for i in range(3):
+        h.feed(en, "en", i * 15.0, 15.0, True)
+    assert h.done  # no more detector passes for this meeting
+    assert h.feed(sv, "en", 45.0, 15.0, True) is None and h.feed(sv, "en", 60.0, 15.0, True) is None
