@@ -226,11 +226,12 @@ def press_edit(key: str) -> None:
         return
     from ecoscribe.platform.macos import keys
     import Quartz as Q
+    from ecoscribe.platform.macos.keymap import MOD_BITS
     *mods, letter = key.split("+")
     flags = 0
-    for m in mods:
+    for m in mods:  # a real key sets its left/right bit too, and the hook reads that bit (keymap.modifier_down)
         kc, mask = MODS[m]
-        flags |= getattr(Q, mask)
+        flags |= getattr(Q, mask) | MOD_BITS[kc]
         keys._post(kc, True, flags)
         time.sleep(0.03)
     keys._post(LETTERS[letter], True, flags)
@@ -238,7 +239,7 @@ def press_edit(key: str) -> None:
     keys._post(LETTERS[letter], False, flags)
     for m in reversed(mods):
         kc, mask = MODS[m]
-        flags &= ~getattr(Q, mask)
+        flags &= ~(getattr(Q, mask) | MOD_BITS[kc])
         time.sleep(0.03)
         keys._post(kc, False, flags)
 
