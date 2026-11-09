@@ -724,6 +724,35 @@ async function load(query) {
   await sleep(200);
   check([...sv.doc.querySelectorAll('.vc-add[data-key="enter"][data-lang="en"]')][0].parentElement.textContent.includes("ship it"), "saved phrases show on load");
 }
+{ // dictado-gee5: pick the languages voice commands work in
+  const { window, doc } = await load("page=ajustes&langs=en,es&styles=1");
+  await sleep(200);
+  const heads = () => [...doc.querySelectorAll("#vc-head th")].map((t) => t.textContent).join(",");
+  const boxes = () => [...doc.querySelectorAll("#vc-langs input")];
+  check(!doc.querySelector("#row-vc-langs").hidden && boxes().map((i) => i.value + (i.checked ? "+" : "-")).join(",") === "en+,es+",
+    "a box per language, all ticked by default: " + boxes().map((i) => i.value).join(","));
+  check(heads() === "What it does,English,Spanish", "both columns at first: " + heads());
+  const en = boxes().find((i) => i.value === "en");
+  en.checked = false; en.dispatchEvent(new window.Event("change", { bubbles: true })); await sleep(20);
+  check(heads() === "What it does,Spanish" && doc.querySelector("#vc-help").textContent.startsWith("Say a phrase in Spanish"),
+    "English unticked: its column goes, the help line names Spanish: " + heads());
+  check(!doc.querySelector("#savebar").hidden, "a language change offers Save");
+  const es = boxes().find((i) => i.value === "es");
+  es.checked = false; es.dispatchEvent(new window.Event("change", { bubbles: true })); await sleep(20);
+  check(boxes().find((i) => i.value === "es").checked, "the last ticked language stays ticked");
+  let sent = null;
+  const api = window.__ecoscribe.api, orig = api.save_settings;
+  api.save_settings = async (v) => { sent = v; return orig(v); };
+  doc.querySelector("#save").click(); await sleep(100);
+  check(sent && JSON.stringify(sent.voice_langs) === '["es"]', "saves the ticked languages: " + JSON.stringify(sent));
+  const one = await load("page=ajustes");
+  await sleep(200);
+  check(one.doc.querySelector("#row-vc-langs").hidden, "one language: nothing to choose, the row is hidden");
+  const back = await load("page=ajustes&langs=en,es&vl=es");
+  await sleep(200);
+  check([...back.doc.querySelectorAll("#vc-langs input")].map((i) => i.value + (i.checked ? "+" : "-")).join(",") === "en-,es+",
+    "saved languages show on load");
+}
 { // dictado-a1d: Command mode by that name, with keys the user picks (the dictation key's picker)
   const { window, doc } = await load("page=ajustes");
   await sleep(200);

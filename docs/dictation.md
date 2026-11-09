@@ -77,6 +77,9 @@ start, or after a pause or punctuation, and before one or the end. "We need a ne
 - **Undo** works only when it is the whole dictation: it takes back what Ecoscribe last typed, in the same window
   and within a minute, like "scratch that" said alone. Inside a sentence ("can you undo that change?") it stays text.
 
+**Languages** picks which languages' phrases count: English and the languages you dictate in, all ticked at first
+(a language you add later is ticked too). Untick one and its phrases stay ordinary text; at least one stays on.
+
 Every phrase works whichever of your languages you speak. **See all commands** lists them; type a phrase and press
 Enter to add your own, × removes one, **Back to the built-in phrases** resets the list.
 
