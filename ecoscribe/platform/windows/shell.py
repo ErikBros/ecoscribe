@@ -408,11 +408,12 @@ class PromptWindow:
         now = time.monotonic()
         labels = [(prompt.button_text(c, now), c) for _l, c in prompt.buttons]  # "Not now (10)": the widest
         bws = [f_btn.measure(t) + 32 for t, _c in labels]
-        width = max(PW, sum(bws) + gap * (len(bws) - 1) + 2 * pad, f_title.measure(prompt.title) + 2 * pad)
+        tx = pad + 38 + 14  # the text column, right of the icon
+        # the title starts at tx, so the card is that much wider than the title (dictado-ejsh)
+        width = max(PW, sum(bws) + gap * (len(bws) - 1) + 2 * pad, tx + f_title.measure(prompt.title) + pad)
         c = tk.Canvas(top, width=width, height=10, bg=KEY, highlightthickness=0, bd=0)
         c.pack()
         _prompt_icon(c, pad, pad, prompt.kind)  # what it's about, at a glance (dictado-6oe.9)
-        tx = pad + 38 + 14
         y = pad + 1
         c.create_text(tx, y, text=prompt.title, fill=P.PAPER, font=f_title, anchor="nw")
         y += f_title.metrics("linespace") + 4

@@ -179,6 +179,19 @@ def test_tk_meeting_pill_and_prompt_box():
         assert pw.top.winfo_exists() and pw._lang_code() == "el"
         pw._answer("transcribir")
         assert answers == [("start", "transcribir", "el")] and pw.top is None
+        wide = meetui.Prompt("done", "zoom", None, opened_at=0.0)
+        wide.title = "A title longer than the least width of the card"  # wider than the card's least width
+        pw.show(wide)
+        root.update()
+        c = pw.top.winfo_children()[0]  # the title keeps the card's padding at its right end (dictado-ejsh)
+        title = next(i for i in c.find_all() if c.type(i) == "text" and c.itemcget(i, "text") == wide.title)
+        assert c.bbox(title)[2] <= int(c.cget("width")) - 16
+        pw._answer("hide")
+        answers.clear()
+        pw.show(meetui.Prompt("start", "msteams", "el", opened_at=0.0))
+        root.update()
+        pw._answer("transcribir")
+        assert answers == [("start", "transcribir", "el")] and pw.top is None
         pw.show(meetui.Prompt("start", "slack", "sv", opened_at=-1e9))
         pw.tick()  # long expired: Ahora no
         assert answers[-1] == ("start", "ahora_no", "sv")
