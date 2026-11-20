@@ -64,6 +64,15 @@ def set_clipboard_text(s: str | None, private: bool = True) -> None:
     pb.setString_forType_(s, NSPasteboardTypeString)
 
 
+def set_clipboard_files(paths) -> None:
+    """Files on the pasteboard, as Finder's Copy puts them (file URLs): Cmd+V in Slack, a chat or a
+    folder attaches them (Share in Slack, dictado-pnuy)."""
+    from Foundation import NSURL
+    pb = _pb()
+    pb.clearContents()
+    pb.writeObjects_([NSURL.fileURLWithPath_(str(p)) for p in paths])
+
+
 def change_count() -> int:
     return int(_pb().changeCount())
 

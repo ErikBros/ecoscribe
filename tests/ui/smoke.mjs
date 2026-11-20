@@ -476,7 +476,7 @@ async function load(query) {
   check(!doc.querySelector("#r-d-done-actions").hidden && doc.querySelectorAll(".r-seg").length === 4, "done session: transcript + actions");
   check(doc.querySelector('.r-who[data-who="Others"]') !== null, "speaker labels shown");
   check(doc.querySelector("#r-copy-summary")?.textContent.startsWith("Copy a summary prompt"), "done session offers a summary prompt (in the Copy menu)");
-  check(doc.querySelectorAll("#r-d-done-actions > .btn, #r-d-done-actions > details").length === 3, "three actions: Copy ▾, Email, ··· (dictado-6oe.4)");
+  check(doc.querySelectorAll("#r-d-done-actions > .btn, #r-d-done-actions > details").length === 3, "three actions: Copy ▾, Share ▾, ··· (dictado-6oe.4, dictado-pnuy)");
   check(doc.querySelectorAll("#r-list .r-day").length >= 1, "the list is grouped by day");
   { // t0u.22: several remote speakers, named and renamed
     doc.querySelector("#r-back").click(); await sleep(150);
@@ -652,6 +652,16 @@ async function load(query) {
   const t = ng.doc.querySelector("#toast").textContent;
   check(ng.window.__emailHow === "" && t.startsWith("Transcript copied. Google Calendar is open on") && t.includes("Email guests"),
     "no invite: Google Calendar on that day, the steps in the toast");
+}
+{ // Meetings > Share in Slack (dictado-pnuy): the .md copied as a file, Slack opens
+  const { window, doc } = await load("page=reuniones/2026-10-05_0915_planering");
+  await sleep(300);
+  const b = doc.querySelector("#r-slack");
+  check(b && b.closest("#r-d-done-actions details") && b.closest("details").querySelector("#r-email"), "a finished meeting offers Share in Slack, in the Share menu with Email");
+  b.click(); await sleep(150);
+  const t = doc.querySelector("#toast").textContent;
+  check(window.__slacked === "2026-10-05_0915_planering" && t.includes("copied as a file") && t.includes("Ctrl+V"),
+    "copies the file, says to paste it in the chat");
 }
 { // dictado-607: a user with Swedish and Spanish sees both, Swedish removable like an added one
   const { window, doc } = await load("page=ajustes&langs=en,sv,es");
