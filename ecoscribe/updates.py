@@ -71,7 +71,30 @@ def fetch_release(timeout: float = TIMEOUT_S, opener=urllib.request.urlopen) -> 
     if not parse(tag):
         return None
     from .selfupdate import pick_asset
-    return {"tag": tag, "asset": pick_asset(data)}
+    return {"tag": tag, "asset": pick_asset(data), "highlights": highlights(data.get("body"))}
+
+
+_HIGHLIGHT = re.compile(r"^\s*[-*]\s+\*\*([^*\n]{2,60}?):?\*\*")
+_PLATFORM_HEAD = {"windows": "mac", "mac": "windows"}
+
+
+def highlights(body, platform: str | None = None, most: int = 4) -> list[str]:
+    """The bold titles of the release notes' lines (tools/release.py writes them from whatsnew.py), leaving out
+    the other platform's section: what Home's notice names before you install (dictado-owyk). Plain text only."""
+    if not isinstance(body, str):
+        return []
+    other = _PLATFORM_HEAD["mac" if (platform or sys.platform) in ("mac", "darwin") else "windows"]
+    out, skip = [], False
+    for line in body.splitlines()[:200]:
+        if line.startswith("#"):
+            skip = line.lstrip("#").strip().lower() == other
+            continue
+        m = None if skip else _HIGHLIGHT.match(line)
+        if m:
+            t = "".join(c for c in m.group(1).strip() if c.isprintable())
+            if t and t not in out:
+                out.append(t)
+    return out[:most]
 
 
 def fetch_latest(timeout: float = TIMEOUT_S, opener=urllib.request.urlopen) -> str | None:
@@ -113,6 +136,7 @@ def check(data_dir: Path, now: float | None = None, fetch=fetch_release, every: 
     keys = {"checked_at": now}
     if isinstance(got, dict) and got.get("tag"):
         keys["latest"], keys["asset"] = got["tag"], got.get("asset")
+        keys["highlights"] = got.get("highlights") or []
     elif got:
         keys["latest"] = got
     return _update(data_dir, **keys)
@@ -132,7 +156,8 @@ def notice(state: dict, current: str, need_installer: bool | None = None) -> dic
     dismissed = state.get("dismissed")
     if dismissed and not is_newer(latest, dismissed):
         return None
-    return {"version": str(latest).lstrip("v"), "url": release_url(latest)}
+    hl = [str(h)[:60] for h in (state.get("highlights") or []) if isinstance(h, str)][:4]
+    return {"version": str(latest).lstrip("v"), "url": release_url(latest), "highlights": hl}
 
 
 def dismiss(data_dir: Path, version: str) -> None:

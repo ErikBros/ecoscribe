@@ -198,7 +198,8 @@ function demoApi() {
     update_notice: async () => {  // update=1 offer, dl downloading, ready, failed (dictado-nmo)
       const u = params.get("update");
       if (!u || window.__updDismissed) return {};
-      const n = { version: "1.18.0", url: "https://github.com/ErikBros/ecoscribe/releases/tag/v1.18.0" };
+      const n = { version: "1.18.0", url: "https://github.com/ErikBros/ecoscribe/releases/tag/v1.18.0",
+        highlights: params.get("hl") === "0" ? [] : ["Share in Slack", "Meetings in another language", "Voice commands"] };
       if (MAC) return n;
       const install = window.__updInstall ? "downloading" : { 1: "offer", dl: "downloading", ready: "ready", failed: "failed" }[u] || "offer";
       return { ...n, install, ...(install === "downloading" ? { pct: 42 } : {}) };
@@ -207,6 +208,13 @@ function demoApi() {
     open_update: async () => { window.__updOpened = true; return { ok: true }; },
     open_guide: async (p, s) => { window.__guide = p + (s ? "#" + s : ""); return { ok: true }; },
     dismiss_update: async (v) => { window.__updDismissed = v; return { ok: true }; },
+    whats_new: async () => (params.get("new") && !window.__newDismissed ? { version: "1.28.0", url: "https://github.com/ErikBros/ecoscribe/releases/tag/v1.28.0", items: [
+      { title: "What's new on Home", text: "after an update, this card says what the new version brings." },
+      { title: "Share in Slack", text: "a meeting's Share menu copies the transcript as a Markdown file and opens Slack. Paste it in a chat to attach it." },
+      { title: "Meetings in another language", text: "when a call sounds like a different language than the one picked, Ecoscribe offers to switch." },
+      { title: "Voice commands", text: "pick the languages they work in." }] } : {}),
+    dismiss_whats_new: async () => { window.__newDismissed = true; return { ok: true }; },
+    open_release_notes: async () => { window.__notesOpened = true; return { ok: true }; },
     copy_debug_info: async () => ({ ok: true }), open_logs_folder: async () => ({ ok: true }),
     save_export: async (name, fmt) => { window.__exported = fmt; return { ok: true, path: "C:/x/Downloads/t." + fmt, name: "t." + fmt, folder: "Downloads" }; },
     show_export: async (p) => { window.__revealed = p; return { ok: true }; },
@@ -869,13 +877,15 @@ async function updateNote() {  // dictado-cjk: a newer version is out (the app c
   // dictado-nmo: offer -> downloading -> ready (installs when idle or at Quit, never in a call); failed -> Download
   const step = n.install || "";
   const have = `You have ${lastStatus?.version || "an older version"}.`;
+  const hl = (n.highlights || []).filter(Boolean);  // dictado-owyk: what the new version brings, before you install it
+  const brings = hl.length ? `New: ${hl.length > 1 ? hl.slice(0, -1).join(", ") + " and " + hl.at(-1) : hl[0]}. ` : "";
   const [title, sub] = {
-    "": [`Ecoscribe ${n.version} is out`, `${have} Your settings and history stay as they are.`],
-    offer: [`Ecoscribe ${n.version} is out`, `${have} Your settings and history stay as they are.`],
+    "": [`Ecoscribe ${n.version} is out`, brings ? `${brings}${have}` : `${have} Your settings and history stay as they are.`],
+    offer: [`Ecoscribe ${n.version} is out`, brings ? `${brings}${have}` : `${have} Your settings and history stay as they are.`],
     downloading: [`Getting Ecoscribe ${n.version} ready`, n.error || `Downloading in the background, ${n.pct || 0}%. It installs when you step away or quit, never during a call.`],
     ready: [`Ecoscribe ${n.version} is ready`, "It installs when you step away from the computer or quit Ecoscribe. Never during a call."],
     failed: [`Ecoscribe ${n.version} is out`, "It couldn't install by itself. Download it and run the installer."],
-  }[step] || [`Ecoscribe ${n.version} is out`, have];
+  }[step] || [`Ecoscribe ${n.version} is out`, `${brings}${have}`];
   box.dataset.step = step;
   $("#update-title").textContent = title;
   $("#update-sub").textContent = sub;
@@ -890,6 +900,27 @@ async function updateNote() {  // dictado-cjk: a newer version is out (the app c
   if (step === "downloading") updateNote.timer = setTimeout(() => { if (!box.hidden && current === "inicio") updateNote(); }, 5000);
 }
 
+async function whatsNew() {  // dictado-owyk: what this version brings, once after an update, until closed
+  const n = await api.whats_new().catch(() => ({}));
+  const box = $("#new-card");
+  box.hidden = !n.items?.length;
+  if (box.hidden) return;
+  const short = n.version.replace(/\.0$/, "");
+  $("#new-title").textContent = box.dataset.look === "line" ? `New in ${short}:` : `What's new in Ecoscribe ${short}`;
+  $("#new-line").textContent = n.items.map((i) => i.title).join(" · ");
+  $("#new-list").replaceChildren(...n.items.map((i) => {
+    const li = document.createElement("li"), b = document.createElement("strong");
+    b.textContent = i.title;
+    li.append(b, i.text ? `: ${i.text}` : "");
+    return li;
+  }));
+  const more = $("#new-more");
+  more.hidden = box.dataset.look !== "line";
+  more.onclick = () => { box.classList.toggle("open"); more.textContent = box.classList.contains("open") ? "Show less" : "See what's new"; };
+  $("#new-all").onclick = (e) => { e.preventDefault(); api.open_release_notes(); };
+  $("#new-x").onclick = async () => { await api.dismiss_whats_new(); box.hidden = true; };
+}
+
 async function renderInicio() {  // the dictate banner, today's numbers, recent dictations (dictado-6oe.3)
   crashCard();
   const hour = new Date().getHours();
@@ -897,6 +928,7 @@ async function renderInicio() {  // the dictate banner, today's numbers, recent 
   $("#home-date").textContent = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
   await refreshStatus();
   updateNote();  // after the status: it says which version you have
+  whatsNew();
   const h = await api.get_history(200, "");
   const today = new Date().toISOString().slice(0, 10);
   const todays = h.items.filter((x) => String(x.ts || "").startsWith(today));

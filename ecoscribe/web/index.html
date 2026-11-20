@@ -72,6 +72,17 @@
         <button type="button" class="btn btn-primary btn-sm" id="update-get">Download</button>
         <button type="button" class="home-tip-x" id="update-x" aria-label="Not now" title="Hide until a newer version is out">×</button>
       </div>
+      <div class="new-card card" id="new-card" data-look="list" hidden>  <!-- dictado-owyk: what this version brings, once after an update -->
+        <div class="new-head">
+          <span class="badge new-badge">New</span>
+          <strong id="new-title">What's new in Ecoscribe</strong>
+          <span class="new-line" id="new-line"></span>
+          <button type="button" class="btn btn-ghost btn-sm" id="new-more" hidden>See what's new</button>
+          <button type="button" class="home-tip-x" id="new-x" aria-label="Got it, hide this" title="Got it">×</button>
+        </div>
+        <ul class="new-list" id="new-list"></ul>
+        <a href="#" class="new-all small" id="new-all">All release notes</a>
+      </div>
       <div class="hero" data-state="ready">  <!-- the dictate banner (dictado-6oe.3) -->
         <div class="hero-state">
           <h2 id="hero-title">Checking Ecoscribe…</h2>

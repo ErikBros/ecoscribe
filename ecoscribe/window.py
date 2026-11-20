@@ -1323,6 +1323,27 @@ class Api:
         updates.dismiss(self._data_dir, version)
         return {"ok": True}
 
+    def whats_new(self) -> dict:
+        """Home: this version's new features, once after an update (dictado-owyk): {"version", "items", "url"} or {}."""
+        from . import whatsnew
+        from .updates import release_url
+        try:
+            n = whatsnew.pending(self._data_dir, __version__, updated=(self._data_dir / "welcome_done").exists())
+        except Exception:  # noqa: BLE001  a card, never worth an error on Home
+            log.exception("what's new failed")
+            return {}
+        return {**n, "url": release_url(f"v{__version__}")} if n else {}
+
+    def dismiss_whats_new(self) -> dict:
+        from . import whatsnew
+        whatsnew.mark_seen(self._data_dir, __version__)
+        return {"ok": True}
+
+    def open_release_notes(self) -> dict:
+        from .updates import release_url
+        self._open_url(release_url(f"v{__version__}"))
+        return {"ok": True}
+
     def get_welcome(self) -> dict:
         return {"done": (self._data_dir / "welcome_done").exists()}
 

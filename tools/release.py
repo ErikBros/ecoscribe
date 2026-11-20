@@ -2,12 +2,13 @@
 """The release step both computers use (dictado-trtz.3): no release goes out without its two downloads
 being tracked, and the Mac download never gets forgotten again.
 
-    python3 tools/release.py [X.Y.Z] --notes FILE [--asset PATH] [--platform windows|mac] [--dry-run]
+    python3 tools/release.py [X.Y.Z] [--notes FILE] [--asset PATH] [--platform windows|mac] [--dry-run]
 
 X.Y.Z defaults to ecoscribe/__init__.py, the platform to this computer (WSL counts as Windows).
 
 Windows (makes the release, after tools/build.py --installer --install):
   1. python3 tools/privacy_guard.py text --file NOTES     the notes are public: no names, quotes, paths
+     (NOTES: --notes FILE, else written from ecoscribe/whatsnew.py, the lines Home shows after the update)
   2. gh release create vX.Y.Z Ecoscribe-Setup-X.Y.Z.exe --target main --latest
         --title "Ecoscribe X.Y.Z" --notes-file NOTES
   The release starts .github/workflows/mac-release.yml (dictado-trtz.5): a GitHub Mac builds, signs and
@@ -29,6 +30,7 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -157,6 +159,21 @@ def release_mac(sh: Shell, version: str, asset: Path) -> int:
     return 0
 
 
+def notes_from_whatsnew(version: str) -> Path | None:
+    """The release notes from ecoscribe/whatsnew.py (dictado-owyk), the same lines Home shows after the update."""
+    sys.path.insert(0, str(REPO))
+    try:
+        from ecoscribe import whatsnew
+        text = whatsnew.release_notes(version)
+    finally:
+        sys.path.pop(0)
+    if not text:
+        return None
+    out = Path(tempfile.gettempdir()) / f"ecoscribe-notes-{version}.md"
+    out.write_text(text, encoding="utf-8")
+    return out
+
+
 def main(argv: list[str] | None = None, shell: Shell | None = None) -> int:
     ap = argparse.ArgumentParser(description="Release step for Windows (creates) and Mac (adds the .dmg).")
     ap.add_argument("version", nargs="?", help="X.Y.Z (default: ecoscribe/__init__.py)")
@@ -178,8 +195,11 @@ def main(argv: list[str] | None = None, shell: Shell | None = None) -> int:
         if not asset.is_file():
             print(f"release: {asset} doesn't exist; build it first or pass --asset.")
             return 1
+        if platform == "windows" and not a.notes:
+            a.notes = notes_from_whatsnew(version)
         if platform == "windows" and not (a.notes and a.notes.is_file()):
-            print("release: --notes FILE is needed: what's new in this version, in plain words.")
+            print(f"release: no notes for {version}: add its entry to ecoscribe/whatsnew.py (what Home shows after "
+                  "the update) or pass --notes FILE.")
             return 1
     sh = shell or Shell(a.dry_run)
     if platform == "windows":

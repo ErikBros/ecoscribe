@@ -45,12 +45,15 @@ commands**. See [Dictation](dictation.md#languages) and
 **New versions** has three choices:
 
 - *Tell me on Home* (the default): once a day Ecoscribe asks GitHub for the newest version number. When there is one,
-  Home says so with **Download** (the Releases page) and ×. **Install when idle** next to it gets the new version in
+  Home says so, names what the new version brings, and offers **Download** (the Releases page) and ×. **Install when idle** next to it gets the new version in
   the background and installs it when you step away or quit Ecoscribe. Nothing from your dictations or meetings is
   sent. On a Mac, only a version that has a Mac download is shown.
 - *Install by itself*: the same for every new version, without asking. Never during a call, while a meeting
   is being saved or while you dictate.
 - *Don't check*.
+
+After an update, Home shows **What's new** in that version once: a few lines on what changed and **All release notes**.
+× hides it until the next update. A fresh install doesn't show it.
 
 ### Speech models
 

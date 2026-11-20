@@ -76,7 +76,7 @@ def test_network_failure_keeps_last_known_and_waits_a_day(tmp_path):
 
 def test_notice_shows_newer_hides_same_or_older():
     assert updates.notice({"latest": "v1.18.0"}, "1.17.0") == {
-        "version": "1.18.0", "url": "https://github.com/ErikBros/ecoscribe/releases/tag/v1.18.0"}
+        "version": "1.18.0", "url": "https://github.com/ErikBros/ecoscribe/releases/tag/v1.18.0", "highlights": []}
     assert updates.notice({"latest": "v1.17.0"}, "1.17.0") is None
     assert updates.notice({}, "1.17.0") is None
 
