@@ -145,6 +145,7 @@
           <button class="btn btn-ghost btn-sm" id="r-now-open">Watch live</button>
           <button class="btn btn-sm r-stop" id="r-now-stop">Stop</button>
         </div>
+        <div class="r-tags" id="r-tags" role="group" aria-label="Show the meetings with a tag" hidden></div>  <!-- dictado-4vms -->
         <ol class="history r-list" id="r-list"></ol>
         <div class="empty" id="r-empty" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 10.5v3M8.25 8v8M12 4.5v15M15.75 8.5v7M19.5 10.5v3"/></svg>
@@ -160,6 +161,12 @@
         </header>
         <input class="r-title" id="r-d-title" aria-label="Title" maxlength="120">
         <div class="muted small r-d-meta" id="r-d-meta"></div>
+        <div class="r-d-tags" id="r-d-tags" role="group" aria-label="Tags">  <!-- dictado-4vms: the meeting's own labels -->
+          <span class="r-d-taglist" id="r-d-taglist"></span>
+          <input class="vc-add r-tag-add" id="r-tag-add" list="r-tag-known" placeholder="Add tag" maxlength="40" autocomplete="off" spellcheck="false"
+            aria-label="Add a tag" title="A label to find this meeting by, like a customer or a recurring meeting. Enter adds it.">
+          <datalist id="r-tag-known"></datalist>
+        </div>
         <div class="r-d-actions" id="r-d-live-actions" hidden>
           <span class="r-rec-dot"></span><span class="r-live-note">Transcribing live: the final version comes when you stop.</span>
           <label class="r-lang"><span class="muted small">Language</span>

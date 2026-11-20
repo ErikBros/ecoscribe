@@ -48,6 +48,10 @@ SHOTS = {
     "reunion-reemplazar": "page=reuniones/2026-10-04_1600_kund&replace=1",  # the Replace list offered (dictado-9lo)
     "reunion-reemplazado": "page=reuniones/2026-10-04_1600_kund&replace=1&replaced=1",  # ... and applied, with Undo
     "reunion-sin-invitados": "page=reuniones/2026-10-05_0915_planering&noguests=1&email=1",  # Email participants, no invite (dictado-qxr)
+    # tags (dictado-4vms): the chips with one picked, the list before anything is tagged, a meeting's own tags
+    "reuniones-etiqueta": "page=reuniones&rtag=Customer%20A", "reuniones-etiqueta-oscuro": "page=reuniones&rtag=Customer%20A&theme=dark",
+    "reuniones-sin-etiquetas": "page=reuniones&tags=0",
+    "reunion-etiquetas": "page=reuniones/2026-10-05_0915_planering", "reunion-etiquetas-oscuro": "page=reuniones/2026-10-05_0915_planering&theme=dark",
     "historial-editar": "page=historial&hedit=1", "historial-aprender": "page=historial&learn=1",
     "insights": "page=insights&insights=1",
     # dark mode (dictado-u9h)

@@ -526,6 +526,44 @@ async function load(query) {
   await sleep(150);
   check(!deep.doc.querySelector("#r-detail-view").hidden && deep.doc.querySelector("#r-d-title").value === "Client call", "deep link opens a session");
 }
+{ // dictado-4vms: tags. Chips above the list filter in one click, with the search box; the meeting's page edits them
+  const { window, doc, errors } = await load("page=reuniones");
+  const chips = () => [...doc.querySelectorAll("#r-tags .r-tag")];
+  const label = (c) => c.childNodes[0].textContent;
+  const rows = () => [...doc.querySelectorAll(".r-row")].map((li) => li.dataset.name);
+  check(!doc.querySelector("#r-tags").hidden && JSON.stringify(chips().map(label)) === JSON.stringify(["All", "Customer A", "Weekly ops", "Hiring"]),
+    "tag chips: All, then by count and name: " + chips().map(label));
+  check(chips()[1].querySelector("b").textContent === "2" && chips()[0].getAttribute("aria-pressed") === "true", "each chip counts its meetings; All starts active");
+  check([...doc.querySelectorAll('.r-row[data-name="2026-10-05_0915_planering"] .badge-tag')].map((b) => b.textContent).join() === "Weekly ops,Hiring",
+    "a row shows its tags as badges");
+  chips()[2].click(); await sleep(150);
+  check(JSON.stringify(rows()) === JSON.stringify(["2026-10-05_1400_retro", "2026-10-05_0915_planering"]) && chips()[2].getAttribute("aria-pressed") === "true"
+    && chips()[0].getAttribute("aria-pressed") === "false", "one click on Weekly ops: only its meetings, the chip lit");
+  const s = doc.querySelector("#r-search");
+  s.value = "retro"; s.dispatchEvent(new window.Event("input")); await sleep(250);
+  check(JSON.stringify(rows()) === JSON.stringify(["2026-10-05_1400_retro"]), "the tag and the search box filter together");
+  s.value = ""; s.dispatchEvent(new window.Event("input")); await sleep(250);
+  chips()[2].click(); await sleep(150);
+  check(rows().length === 5 && chips()[0].getAttribute("aria-pressed") === "true", "a second click on the lit chip shows all again");
+  s.value = "customer"; s.dispatchEvent(new window.Event("input")); await sleep(250);
+  check(JSON.stringify(rows()) === JSON.stringify(["2026-10-04_1600_kund", "2026-10-03_1000_fallo"]), "the search box finds a tag");
+  s.value = ""; s.dispatchEvent(new window.Event("input")); await sleep(250);
+  [...doc.querySelectorAll(".r-row")].find((li) => li.dataset.name === "2026-10-04_1600_kund").click(); await sleep(200);
+  const mine = () => [...doc.querySelectorAll("#r-d-taglist .r-d-tag")].map((c) => c.firstChild.textContent);
+  check(JSON.stringify(mine()) === JSON.stringify(["Customer A"]), "the meeting's page shows its tags");
+  const known = [...doc.querySelectorAll("#r-tag-known option")].map((o) => o.value);
+  check(JSON.stringify(known) === JSON.stringify(["Weekly ops", "Hiring"]), "Add tag suggests the tags in use it doesn't have: " + known);
+  const add = doc.querySelector("#r-tag-add");
+  add.value = "  weekly   OPS "; add.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true })); await sleep(100);
+  check(JSON.stringify(mine()) === JSON.stringify(["Customer A", "Weekly ops"]) && add.value === "", "Enter adds a tag, in the spelling another meeting has");
+  doc.querySelector('#r-d-taglist .vc-x[aria-label="Remove the tag Customer A"]').click(); await sleep(100);
+  check(JSON.stringify(window.__tags) === JSON.stringify(["Weekly ops"]) && JSON.stringify(mine()) === JSON.stringify(["Weekly ops"]), "× removes a tag");
+  doc.querySelector("#r-back").click(); await sleep(150);
+  check(chips().find((c) => label(c) === "Weekly ops")?.querySelector("b").textContent === "3", "back on the list the chips count again");
+  check(errors.length === 0, "no JS errors with tags: " + errors.join("; "));
+  const none = await load("page=reuniones&tags=0");
+  check(none.doc.querySelector("#r-tags").hidden, "no meeting has a tag: no chip row");
+}
 { // t0u.30: notes during a call, kept while the live view polls
   const { window, doc } = await load("page=reuniones/2026-10-05_1400_retro");
   await sleep(200);

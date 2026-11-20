@@ -13,6 +13,8 @@ Now you can ask Claude:
 - "Summarize yesterday's call", "what did Ana say about the budget?"
 - "My calls with Ana": it finds the calls where someone is a named speaker, a calendar guest or in the title (part of
   a name is enough, accents don't matter).
+- "My meetings tagged Customer A": it lists the meetings with one of your [tags](meetings.md#tags), and sees every
+  meeting's tags.
 - **Debrief my call:** pick it from Ecoscribe in Claude's + menu after a call. It lists the to-dos as tickets to make
   (only the ones you OK) and drafts a follow-up message for you to paste. It never opens your mail or calendar.
 

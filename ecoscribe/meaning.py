@@ -246,7 +246,7 @@ class Index:
             names = meta.get("speaker_names") or {}
             best = sorted(hits[:per_session], key=lambda h: h[1][1])
             out.append({"id": sid, "title": meta.get("title", ""), "date": export._date(meta),
-                        "found_by": "meaning", "score": round(hits[0][0], 3),
+                        "tags": sessions.tags_of(meta), "found_by": "meaning", "score": round(hits[0][0], 3),
                         "hits": [{"at": export._hms(r[1]), "score": round(s, 3),
                                   "speaker": names.get(r[2]) or export._SPEAKER.get(r[2], r[2]) or "", "text": r[3]}
                                  for s, r in best]})

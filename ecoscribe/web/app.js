@@ -117,13 +117,22 @@ function demoApi() {
   const S = (name, title, mins, status, extra = {}) => ({ name, title, created: iso(mins), status, lang: "sv", lang_name: "Swedish",
     duration_s: 1860, source: "meeting", pct: null, error: null, slow: false, ...extra });
   const rec = params.get("rec") !== "0";
+  // dictado-4vms: invented tags on a few meetings; ?tags=0: nobody has tagged anything yet
+  const tg = (...t) => (params.get("tags") === "0" ? [] : t);
   const sess = [
-    ...(rec ? [S("2026-10-05_1400_retro", "Sprint retro", 12, "recording", { duration_s: null })] : []),
+    ...(rec ? [S("2026-10-05_1400_retro", "Sprint retro", 12, "recording", { duration_s: null, tags: tg("Weekly ops") })] : []),
     S("2026-10-05_1130_podcast", "Super Easy Greek 12", 40, "running", { lang: "el", lang_name: "Greek", source: "import", pct: 42, duration_s: 412 }),
-    S("2026-10-05_0915_planering", "Planering vecka 41", 60 * 5, "done", { summary: "done" }),
-    S("2026-10-04_1600_kund", "Client call", 60 * 22, "done", { lang: "en", lang_name: "English", duration_s: 2710, speakers: "done", speaker_names: { "Speaker 2": "Ana" }, summary: "running" }),
-    S("2026-10-03_1000_fallo", "Meeting", 60 * 50, "failed", { error: "CUDA out of memory", duration_s: 300 }),
+    S("2026-10-05_0915_planering", "Planering vecka 41", 60 * 5, "done", { summary: "done", tags: tg("Weekly ops", "Hiring") }),
+    S("2026-10-04_1600_kund", "Client call", 60 * 22, "done", { lang: "en", lang_name: "English", duration_s: 2710, speakers: "done", speaker_names: { "Speaker 2": "Ana" }, summary: "running", tags: tg("Customer A") }),
+    S("2026-10-03_1000_fallo", "Meeting", 60 * 50, "failed", { error: "CUDA out of memory", duration_s: 300, tags: tg("Customer A") }),
   ];
+  const tagCounts = () => {  // like sessions.tag_counts: most used first, then by name
+    const c = {};
+    for (const x of sess) for (const t of x.tags || []) c[t] = (c[t] || 0) + 1;
+    return Object.entries(c).map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+  };
+  const hasTag = (x, t) => (x.tags || []).some((y) => y.toLowerCase() === t.toLowerCase());
   const SEGS = [
     { t0: 4.2, t1: 9.8, text: "Okej, ska vi köra? Jag tänkte att vi börjar med det som inte gick bra.", speaker: "Me" },
     { t0: 10.1, t1: 16.4, text: "Ja, deployen i torsdags tog nästan två timmar och ingen visste varför.", speaker: "Others" },
@@ -189,7 +198,19 @@ function demoApi() {
   const mstate = () => ({ meeting: rec && find("2026-10-05_1400_retro")?.status === "recording"
     ? { name: "2026-10-05_1400_retro", app: "ms-teams", lang: "sv", started: iso(12), status: "recording" } : null, job: null, queue: [] });
   return {
-    list_sessions: async (q) => ({ items: sess.filter((s) => !q || s.title.toLowerCase().includes(q.toLowerCase())), state: mstate() }),
+    list_sessions: async (q, tag) => ({ state: mstate(), tags: tagCounts(), items: sess.filter((s) => (!tag || hasTag(s, tag))
+      && (!q || [s.title, ...(s.tags || [])].some((x) => x.toLowerCase().includes(q.toLowerCase())))) }),
+    set_tags: async (n, tags) => {  // like sessions.normalize_tags, and another meeting's spelling wins
+      const known = sess.filter((x) => x.name !== n).flatMap((x) => x.tags || []), out = [];
+      for (let t of tags) {
+        t = String(t).replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 40).trim();
+        if (!t || out.some((y) => y.toLowerCase() === t.toLowerCase())) continue;
+        out.push(known.find((y) => y.toLowerCase() === t.toLowerCase()) || t);
+        if (out.length >= 10) break;
+      }
+      find(n).tags = out; window.__tags = out;
+      return { ok: true, tags: out };
+    },
     get_session: async (n) => ({ session: find(n), segments: find(n)?.status !== "done" ? [] : segsFor(n),
       exports: ["transcript.txt"], notes: notes[n] || "", summary: find(n)?.summary === "done" ? SUMMARY : null }),
     voices_info: async () => window.__noVoices ? { count: 0, names: [], on: true } : { count: 2, names: ["Ana", "Tom"], on: true },
@@ -453,7 +474,7 @@ async function show(page) {
   let card = null;  // "ajustes/claude": Settings, scrolled to that card, which lights up (dictado-1b7)
   if (page && page.startsWith("ajustes/")) { card = page.slice("ajustes/".length); page = "ajustes"; }
   if (page && page.startsWith("inicio/")) { card = page.slice("inicio/".length); page = "inicio"; }  // "inicio/todos" (dictado-xuu)
-  if (page && page.startsWith("reuniones/")) { r.open = page.slice("reuniones/".length); r.next = 0; r.status = null; $("#r-segs").innerHTML = ""; page = "reuniones"; }
+  if (page && page.startsWith("reuniones/")) { r.open = page.slice("reuniones/".length); r.next = 0; r.status = null; r.tagsShown = null; $("#r-segs").innerHTML = ""; page = "reuniones"; }
   if (!PAGES.includes(page)) page = "inicio";
   if (current === "ajustes" && page !== "ajustes") await stopMicTest();
   current = page;
@@ -1028,7 +1049,8 @@ const R_STATUS = {
   recording: "Recording", finalizing: "Saving", stopping: "Saving", queued: "Queued", new: "Queued",
   running: "Transcribing", downloading: "Downloading model", done: "Ready", failed: "Failed",
 };
-const r = { open: null, next: 0, timer: null, status: null, segs: 0, busy: false, speakers: null, names: {} };
+const r = { open: null, next: 0, timer: null, status: null, segs: 0, busy: false, speakers: null, names: {},
+  tag: params.get("rtag") || "", tagsKey: null, tags: [], tagsShown: null };  // ?rtag=: a demo shot with a tag picked
 const ACTIVE = new Set(["recording", "finalizing", "stopping", "queued", "new", "running", "downloading"]);
 function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
 function rLang() { return $("#r-lang").value || R_LANGS[0][0]; }
@@ -1056,7 +1078,10 @@ async function renderReuniones() {
   if (r.open) return renderDetail(r.open);
   $("#r-list-view").hidden = false; $("#r-detail-view").hidden = true;
   let out;
-  try { out = await api.list_sessions($("#r-search").value); } catch (e) { return; }
+  try { out = await api.list_sessions($("#r-search").value, r.tag); } catch (e) { return; }
+  const inUse = out.tags || [];
+  if (r.tag && !inUse.some((t) => same(t.name, r.tag))) { r.tag = ""; return renderReuniones(); }  // its last meeting lost the tag
+  paintTagFilter(inUse);
   paintNow(out.state);
   const list = $("#r-list");
   list.innerHTML = "";
@@ -1079,8 +1104,13 @@ async function renderReuniones() {
     if (row.status === "done") { st.className = "r-dur"; st.textContent = fmtDur(row.duration_s); }  // finished: just how long
     const meta = document.createElement("div");
     meta.className = "h-meta";
-    meta.textContent = [timeOf(row.created), row.source === "import" ? "file" : appName((row.app || "") + ".exe") || "meeting", row.lang_name,
+    const facts = document.createElement("span");
+    facts.textContent = [timeOf(row.created), row.source === "import" ? "file" : appName((row.app || "") + ".exe") || "meeting", row.lang_name,
       row.people && row.people.length ? row.people.slice(0, 3).join(", ") : ""].filter(Boolean).join(" · ");
+    meta.append(facts);
+    for (const t of row.tags || []) {  // its tags, as small badges (dictado-4vms)
+      const b = document.createElement("span"); b.className = "badge badge-tag"; b.textContent = t; meta.append(b);
+    }
     li.append(title, st, meta);
     li.onclick = () => openSession(row.name);
     li.onkeydown = (e) => { if (e.key === "Enter") openSession(row.name); };
@@ -1088,7 +1118,64 @@ async function renderReuniones() {
   }
   const q = $("#r-search").value;
   $("#r-empty").hidden = out.items.length > 0;
-  $("#r-empty-text").textContent = q ? `Nothing matches "${q}".` : "Your meetings and the audio you import will show up here.";
+  $("#r-empty-text").textContent = q && r.tag ? `Nothing tagged ${r.tag} matches "${q}".` : q ? `Nothing matches "${q}".`
+    : r.tag ? `No meetings tagged ${r.tag}.` : "Your meetings and the audio you import will show up here.";
+}
+/* tags (dictado-4vms): the user's own labels, e.g. a customer or a recurring meeting. Above the list: All and every
+   tag in use with how many meetings have it; one click shows only those, a second click (or All) shows all again. */
+const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
+function paintTagFilter(inUse) {
+  r.tags = inUse;
+  const box = $("#r-tags"), key = JSON.stringify([r.tag, inUse]);
+  box.hidden = !inUse.length;
+  if (key === r.tagsKey) return;  // the list repaints every second: keep the chips (and the focus on one)
+  r.tagsKey = key;
+  box.textContent = "";
+  const pick = (t) => { r.tag = t; renderReuniones(); };
+  const all = document.createElement("button");
+  all.type = "button"; all.className = "r-tag"; all.textContent = "All";
+  all.setAttribute("aria-pressed", String(!r.tag)); all.onclick = () => pick("");
+  box.append(all);
+  for (const t of inUse) {
+    const b = document.createElement("button"), on = same(t.name, r.tag);
+    b.type = "button"; b.className = "r-tag"; b.setAttribute("aria-pressed", String(on));
+    b.title = on ? "Show all meetings again" : `Show only the ${t.count === 1 ? "meeting" : `${t.count} meetings`} tagged ${t.name}`;
+    const n = document.createElement("b"); n.textContent = t.count;
+    b.append(t.name, n);
+    b.onclick = () => pick(on ? "" : t.name);
+    box.append(b);
+  }
+}
+function paintTags(tags) {  // the meeting's page: its tags, each with ×, and Add tag
+  r.tagsShown = JSON.stringify(tags);
+  const list = $("#r-d-taglist");
+  list.textContent = "";
+  for (const t of tags) {
+    const c = document.createElement("span"); c.className = "vc-chip r-d-tag"; c.textContent = t;
+    const x = document.createElement("button"); x.type = "button"; x.className = "vc-x"; x.textContent = "×";
+    x.setAttribute("aria-label", `Remove the tag ${t}`); x.title = "Remove this tag";
+    x.onclick = () => saveTags(tags.filter((y) => y !== t));
+    c.append(x); list.append(c);
+  }
+  const known = $("#r-tag-known");
+  known.textContent = "";
+  for (const t of r.tags) {
+    if (tags.some((y) => same(y, t.name))) continue;
+    const o = document.createElement("option"); o.value = t.name; known.append(o);
+  }
+  const add = $("#r-tag-add");
+  add.disabled = tags.length >= 10;
+  add.placeholder = add.disabled ? "10 tags at most" : "Add tag";
+}
+async function saveTags(tags) {
+  const name = r.open;
+  const out = await api.set_tags(name, tags).catch((e) => ({ ok: false, error: String(e) }));
+  if (!out.ok) { toast(out.error || "Couldn't save the tags."); return; }
+  if (r.open === name) paintTags(out.tags);
+  r.tagsKey = null;  // the chips above the list count again
+}
+async function loadKnownTags() {  // the suggestions: every tag in use (a deep link never saw the list)
+  try { r.tags = (await api.list_sessions("", "")).tags || []; } catch (e) { r.tags = []; }
 }
 function dayLabel(iso) {
   const d = new Date(iso || 0), t = new Date(), y = new Date(t); y.setDate(t.getDate() - 1);
@@ -1134,7 +1221,8 @@ function renameSpeaker(el) {
   input.onclick = (e) => e.stopPropagation();
 }
 async function openSession(name) {
-  r.open = name; r.next = 0; r.status = null; r.segs = 0; r.speakers = null; r.names = {};
+  r.open = name; r.next = 0; r.status = null; r.segs = 0; r.speakers = null; r.names = {}; r.tagsShown = null;
+  $("#r-tag-add").value = "";
   r.notesLoaded = false; clearTimeout(r.notesTimer);
   r.repAsked = false; paintReplace(null);
   $("#r-notes-text").value = "";
@@ -1307,6 +1395,8 @@ async function renderDetail(name) {
   const changed = s.status !== r.status || (s.speakers || null) !== r.speakers;  // a finished speakers pass relabels the lines
   r.status = s.status; r.speakers = s.speakers || null; r.names = s.speaker_names || {};
   if (document.activeElement !== $("#r-d-title")) $("#r-d-title").value = s.title || "";
+  if (r.tagsShown === null) await loadKnownTags();
+  if (JSON.stringify(s.tags || []) !== r.tagsShown) paintTags(s.tags || []);
   chip($("#r-d-status"), s);
   $("#r-d-meta").textContent = [when(s.created), s.lang_name, fmtDur(s.duration_s),
     s.source === "import" ? "imported file" : "mic and the computer's audio",
@@ -1485,6 +1575,15 @@ function rWire() {
   $("#r-import").onclick = async () => { const out = await api.pick_files(); rImport(out.paths); };
   $("#r-search").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(renderReuniones, 120); });
   $("#r-back").onclick = () => { r.open = null; renderReuniones(); };
+  $("#r-tag-add").addEventListener("keydown", (e) => {  // Enter adds the tag typed or picked from the suggestions
+    if (e.key === "Escape") { e.target.value = ""; return; }
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const v = e.target.value.trim();
+    if (!v) return;
+    e.target.value = "";
+    saveTags([...JSON.parse(r.tagsShown || "[]"), v]);
+  });
   $("#r-d-title").addEventListener("change", async () => {
     const out = await api.rename_session(r.open, $("#r-d-title").value);
     if (!out.ok) toast(out.error); else toast("Title saved.");

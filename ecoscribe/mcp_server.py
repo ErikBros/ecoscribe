@@ -23,9 +23,11 @@ TOOLS = [
     {"name": "list_meetings", "annotations": RO,
      "description": "List your recorded meetings, calls and transcribed files from Ecoscribe, newest first: "
                     "id, title, date, app (signal, msteams, slack...), duration, language, status, speaker names, "
-                    "calendar guests, whether a checked summary exists.",
+                    "calendar guests, whether a checked summary exists, and the user's tags (labels the user put on "
+                    "meetings, e.g. a customer or a recurring meeting). Give tag to list every meeting with that tag.",
      "inputSchema": {"type": "object", "properties": {
          "query": {"type": "string", "description": "Only titles containing this text"},
+         "tag": {"type": "string", "description": "Only meetings with this tag (the whole tag, case ignored)"},
          "since": {"type": "string", "description": "Only sessions on or after this date, YYYY-MM-DD"},
          "limit": {"type": "integer", "description": "At most this many (default 30)"}}}},
     {"name": "read_meeting", "annotations": RO,
@@ -37,7 +39,7 @@ TOOLS = [
      "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}},
     {"name": "search_meetings", "annotations": RO,
      "description": "Find the calls where some words were said, ranked best first and grouped by call: id, title, date, "
-                    "how many lines matched, and up to 3 of the best lines with time and speaker. Case and accents don't "
+                    "tags, how many lines matched, and up to 3 of the best lines with time and speaker. Case and accents don't "
                     "matter (Greek too). Every word must appear in the call; a word also finds longer words that start "
                     "with it; put an exact phrase in double quotes. Calls are mostly in Swedish, English and Spanish: "
                     "when looking for a topic, search again with the words in each of those languages. "
@@ -116,14 +118,16 @@ def _row(m: dict) -> dict:
             "duration": export._duration(m.get("duration_s") or m.get("recorded_s")), "language": export._lang(m),
             "status": m.get("status"), "speakers": m.get("speaker_names") or {},
             "guests": list((m.get("calendar") or {}).get("attendees") or []),
-            "summary": (Path(m["dir"]) / "summary.md").is_file()}
+            "summary": (Path(m["dir"]) / "summary.md").is_file(), "tags": sessions.tags_of(m)}
 
 
-def list_meetings(root: Path, query: str = "", since: str = "", limit: int = 30) -> list[dict]:
+def list_meetings(root: Path, query: str = "", since: str = "", limit: int = 30, tag: str = "") -> list[dict]:
     q = (query or "").lower()
     rows = []
     for m in sessions.list_sessions(root):
         if not _visible(m) or (q and q not in str(m.get("title", "")).lower()):
+            continue
+        if str(tag or "").strip() and not sessions.has_tag(m, tag):  # dictado-4vms
             continue
         if since and str(m.get("created", ""))[:10] < since[:10]:
             continue
@@ -254,8 +258,8 @@ def debrief(root: Path, sid: str = "") -> dict:
 def _call(root: Path, name: str, args: dict) -> dict:
     try:
         if name == "list_meetings":
-            out = json.dumps(list_meetings(root, args.get("query", ""), args.get("since", ""), args.get("limit", 30)),
-                             ensure_ascii=False, indent=1)
+            out = json.dumps(list_meetings(root, args.get("query", ""), args.get("since", ""), args.get("limit", 30),
+                                           args.get("tag", "")), ensure_ascii=False, indent=1)
         elif name == "read_meeting":
             out = read_meeting(root, args.get("id", ""))
         elif name == "search_meetings":

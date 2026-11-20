@@ -160,7 +160,8 @@ class Index:
                 continue
             names = meta.get("speaker_names") or {}
             best = sorted(rows[:per_session], key=lambda r: r[1])
-            out.append({"id": sid, "title": meta.get("title", ""), "date": export._date(meta), "lines": len(rows),
+            out.append({"id": sid, "title": meta.get("title", ""), "date": export._date(meta),
+                        "tags": sessions.tags_of(meta), "lines": len(rows),
                         "hits": [{"at": export._hms(r[1]), "speaker": names.get(r[2]) or export._SPEAKER.get(r[2], r[2]) or "",
                                   "text": snippet(r[3], q)} for r in best]})
             if len(out) >= max(1, int(limit)):
