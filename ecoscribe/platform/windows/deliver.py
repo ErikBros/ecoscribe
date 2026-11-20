@@ -96,6 +96,22 @@ def set_clipboard_text(s: str | None, private: bool = True) -> None:
         win32clipboard.CloseClipboard()
 
 
+def set_clipboard_files(paths) -> None:
+    """Files on the clipboard, as Explorer's Copy puts them (CF_HDROP): Ctrl+V in Slack, a chat or a
+    folder attaches them (Share in Slack, dictado-pnuy)."""
+    import struct
+    names = "".join(f"{p}\0" for p in paths) + "\0"
+    drop = struct.pack("<IiiII", 20, 0, 0, 0, 1) + names.encode("utf-16-le")  # DROPFILES: wide paths after 20 bytes
+    _open_clipboard()
+    try:
+        win32clipboard.EmptyClipboard()
+        win32clipboard.SetClipboardData(win32con.CF_HDROP, drop)
+        win32clipboard.SetClipboardData(win32clipboard.RegisterClipboardFormat("Preferred DropEffect"),
+                                        struct.pack("<I", 1))  # DROPEFFECT_COPY: a paste copies, never moves
+    finally:
+        win32clipboard.CloseClipboard()
+
+
 def foreground_pid() -> int:
     pid = w.DWORD()
     user32.GetWindowThreadProcessId(user32.GetForegroundWindow(), ctypes.byref(pid))

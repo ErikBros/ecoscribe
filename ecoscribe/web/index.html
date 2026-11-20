@@ -169,7 +169,11 @@
               <button type="button" class="menu-item" id="r-copy-claude">Copy for Claude <span>with date, app and language</span></button>
               <button type="button" class="menu-item" id="r-copy-summary">Copy a summary prompt <span>decisions and action items</span></button>
             </div></details>
-          <button class="btn btn-ghost btn-sm" id="r-email" title="A draft in your mail program, to the people in the calendar invite. You read it and press Send. No invite: Google Calendar opens on that day, for the event's Email guests button.">Email participants</button>
+          <details class="menu"><summary class="btn btn-ghost btn-sm">Share ▾</summary>  <!-- dictado-pnuy: Slack and email in one menu -->
+            <div class="menu-pop">
+              <button type="button" class="menu-item" id="r-slack" title="Copies the transcript as a .md file, named with the meeting, who spoke and how long, and opens Slack. Paste it in a chat. Nothing else is sent.">Share in Slack <span>the transcript as a .md file</span></button>
+              <button type="button" class="menu-item" id="r-email" title="A draft in your mail program, to the people in the calendar invite. You read it and press Send. No invite: Google Calendar opens on that day, for the event's Email guests button.">Email participants <span>a draft in your mail program</span></button>
+            </div></details>
           <details class="menu"><summary class="btn btn-ghost btn-sm" aria-label="More: download, open folder, delete">···</summary>
             <div class="menu-pop menu-right">
               <span class="menu-label">Download</span>

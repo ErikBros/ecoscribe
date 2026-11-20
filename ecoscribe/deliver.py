@@ -6,9 +6,9 @@ import sys
 if sys.platform == "darwin":  # NSPasteboard + Cmd+V
     from .platform.macos.deliver import (ClipboardBusy, DeliveryResult, copy_selection, deliver,  # noqa: F401
                                          foreground_exe,
-                                         foreground_window, get_clipboard_text, set_clipboard_text,
-                                         undo_paste)
+                                         foreground_window, get_clipboard_text, set_clipboard_files,
+                                         set_clipboard_text, undo_paste)
 else:  # clipboard + Ctrl+V, kept out of clipboard history
     from .platform.windows.deliver import (ClipboardBusy, DeliveryResult, copy_selection,  # noqa: F401
                                            deliver, foreground_exe, foreground_window, get_clipboard_text,
-                                           set_clipboard_text, undo_paste)
+                                           set_clipboard_files, set_clipboard_text, undo_paste)

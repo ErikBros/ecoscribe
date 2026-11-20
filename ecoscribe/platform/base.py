@@ -81,6 +81,10 @@ CAPABILITIES: dict[str, dict] = {
         "windows": "ecoscribe.platform.windows.deliver:deliver,set_clipboard_text",
         "macos": "ecoscribe.platform.macos.deliver:deliver,set_clipboard_text",
     },
+    "Copy a file to paste in another app (Meetings > Share in Slack)": {  # dictado-pnuy
+        "windows": "ecoscribe.platform.windows.deliver:set_clipboard_files",  # CF_HDROP, as Explorer copies
+        "macos": "ecoscribe.platform.macos.deliver:set_clipboard_files",  # file URLs, as Finder copies
+    },
     "Names on your screen": {
         "windows": "ecoscribe.platform.windows.context:window_texts",
         "macos": "ecoscribe.platform.macos.context:window_texts",

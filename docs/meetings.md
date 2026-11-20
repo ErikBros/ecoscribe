@@ -52,10 +52,14 @@ A box says **Transcript ready** (Open). Open the meeting from the Meetings tab:
 
 - **Copy ▾:** the transcript, **Copy for Claude** (with date, app and language, ready to paste into Claude), or **Copy a
   summary prompt** (decisions and action items).
-- **Email participants:** a draft in your own mail program, addressed to the calendar invite's guests, with the
+- **Share ▾ > Email participants:** a draft in your own mail program, addressed to the calendar invite's guests, with the
   transcript in it (or copied, to paste). You read it and press Send. No guests and no calendar connected: the
   transcript is copied and Google Calendar opens on the call's day, for the event's own **Email guests** button; a
   toast says the steps.
+- **Share ▾ > Share in Slack:** copies the transcript as a Markdown file and opens Slack. Open the chat and press Ctrl+V (Cmd+V
+  on a Mac) to attach it. The file name says it all: the meeting, who spoke and how long, for example
+  `Weekly planning · Ana, Bo · 42 min.md`. Your notes and the summary stay out of it, and Ecoscribe sends nothing
+  itself. No Slack app: Slack opens in the browser.
 - **···:** download as Text (.txt), Markdown (.md) or Subtitles (.srt), **Open folder**, **Delete**. Downloads go to
   your Downloads folder (Settings > Meetings > Downloads go to; **Use Downloads** resets it). The file is shown
   selected in its folder.

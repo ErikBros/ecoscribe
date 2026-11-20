@@ -266,6 +266,7 @@ function demoApi() {
     copy_transcript: async () => ({ ok: true }),
     week_todos: async (back) => weekOf(back || 0),
     todo_done: async (key, done) => { todoDone[key] = !!done; window.__todoDone = [key, !!done]; return { ok: true }; },
+    share_slack: async (name) => { window.__slacked = name; return { ok: true, file: "Weekly planning · Ana, Bo · 42 min.md", people: ["Ana", "Bo"] }; },
     email_participants: async (name, how) => {  // ?noguests=1: a call with no invite and no calendar (dictado-qxr)
       window.__emailed = name; window.__emailHow = how || "";
       if (how === "calendar" || (how !== "draft" && params.get("noguests") === "1"))
@@ -1468,6 +1469,11 @@ function rWire() {
     }
     const who = res.to.length ? `to ${res.to.length} ${res.to.length === 1 ? "person" : "people"}` : "with an empty To (no calendar invite)";
     toast(res.inline ? `Draft opened ${who}. Check it and press Send.` : `Draft opened ${who}. The transcript is copied: paste it in, then Send.`, 5000);
+  };
+  $("#r-slack").onclick = async () => {  // dictado-pnuy: the .md as a file on the clipboard; the user pastes it in Slack
+    const res = await api.share_slack(r.open);
+    if (!res.ok) { toast(res.error || "Couldn't copy the transcript."); return; }
+    toast(`Slack is opening with the transcript copied as a file. Open the chat and press ${MAC ? "Cmd" : "Ctrl"}+V.`, 7000);
   };
   $("#r-copy-summary").onclick = async () => { await api.copy_transcript(r.open, "summary"); toast("Summary prompt copied: paste it into Claude."); };
   for (const b of $$("[data-fmt]")) b.onclick = () => download(r.open, b.dataset.fmt);
@@ -2717,6 +2723,7 @@ async function boot() {
     if (p) show(p);
   }, 1000);
   if (params.get("demo") === "1" && params.get("replaced") === "1") setTimeout(() => $("#r-replace-go")?.click(), 500);  // screenshot (dictado-9lo)
+  if (params.get("demo") === "1" && params.get("slack") === "1") setTimeout(() => $("#r-slack")?.click(), 500);  // screenshot (dictado-pnuy)
   if (params.get("demo") === "1" && params.get("email") === "1") setTimeout(() => $("#r-email")?.click(), 500);  // screenshot (dictado-qxr)
   if (params.get("demo") === "1" && params.get("retrymenu") === "1") setTimeout(() => $(".h-retry button")?.click(), 300);  // screenshot
   if (params.get("demo") === "1" && params.get("models") === "scroll") setTimeout(() => $("#m-rows").scrollIntoView(), 300);  // screenshot

@@ -5,6 +5,7 @@ Whisper cuts speech at every short pause, so .txt, .md and Copy for Claude read 
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -132,6 +133,44 @@ NOTES_ASK = (" I took notes during the call (My notes, below the header): use th
 def summary_prompt(meta: dict, segments: list[dict], notes: str = "", me: str = "") -> str:
     """Copy summary prompt: the request on top, then the same text as Copy for Claude."""
     return SUMMARY_ASK + (NOTES_ASK if notes else "") + "\n\n" + for_claude(meta, segments, notes, me)
+
+
+GENERIC = re.compile(r"(Me|Others|Yo|Otros|Speaker \d+)")  # labels nobody named: left out of a shared file's name
+SHARE_MAX = 150  # characters before ".md": Windows paths stay short, Slack shows the whole name
+
+
+def participants(meta: dict, segments: list[dict], me: str = "") -> list[str]:
+    """Who spoke, by name, in the order they first spoke (Share in Slack, dictado-pnuy). Unnamed voices
+    are left out; with none named, the calendar invite's guests."""
+    names = {**({"Me": me} if me else {}), **(meta.get("speaker_names") or {})}
+    out: list[str] = []
+    for s in segments:
+        spk = s.get("speaker")
+        n = str(names.get(spk) or spk or "").strip()
+        if n and not GENERIC.fullmatch(n) and n not in out:
+            out.append(n)
+    if not out:
+        out = [str(p).strip() for p in (meta.get("calendar") or {}).get("attendees") or [] if str(p).strip()]
+    return out
+
+
+def _minutes(s) -> str:
+    if not s:
+        return ""
+    m = max(1, int(round(float(s) / 60)))
+    return f"{m} min" if m < 60 else f"{m // 60} h" + (f" {m % 60} min" if m % 60 else "")
+
+
+def share_name(meta: dict, segments: list[dict], me: str = "") -> str:
+    """The shared .md's file name, which Slack shows as its title: "<meeting> · <people> · <duration>.md"."""
+    people = participants(meta, segments, me)
+    who = ", ".join(people[:6]) + (f" +{len(people) - 6}" if len(people) > 6 else "")
+    parts = [str(meta.get("title") or "").strip() or "Transcript", who,
+             _minutes(meta.get("duration_s") or meta.get("recorded_s"))]
+    name = " · ".join(p for p in parts if p)
+    name = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', " ", name)
+    name = re.sub(r"\s+", " ", name).strip()[:SHARE_MAX].rstrip(" .·")
+    return (name or "Transcript") + ".md"
 
 
 def write_all(d: Path, me: str = "") -> list[Path]:

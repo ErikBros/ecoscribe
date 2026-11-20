@@ -143,6 +143,15 @@ def _copy(text: str) -> None:
     set_clipboard_text(text, private=False)
 
 
+def _copy_files(paths: list) -> None:
+    from .deliver import set_clipboard_files
+    set_clipboard_files([str(p) for p in paths])
+
+
+SHARE_DIR = "share"  # dictado-pnuy: the file Share in Slack puts on the clipboard (the last one only)
+SLACK_APP, SLACK_WEB = "slack://open", "https://app.slack.com/client"
+
+
 REPLACE_BACKUP = "transcript.before-replace.json"  # dictado-9lo: the transcript before the Replace list, for Undo
 BUSY = "It's still being written: try again when it has finished."
 
@@ -165,7 +174,7 @@ GUIDES = ("README", "windows", "mac", "dictation", "meetings", "claude", "insigh
 class Api:
     def __init__(self, data_dir: Path | None = None, config_path: Path | None = None, startup_mod=None,
                  signal_reload=None, list_mic_names=None, copy=None, send_command=None, downloads=None,
-                 page: str | None = None, open_url=None):
+                 page: str | None = None, open_url=None, copy_files=None):
         from . import startup as _startup
         self._page = page
         self._data_dir = Path(data_dir) if data_dir else paths.data_dir()
@@ -174,6 +183,7 @@ class Api:
         self._signal = signal_reload or ipc.signal_reload
         self._list_mic_names = list_mic_names or _mme_input_names
         self._copy = copy or _copy
+        self._copy_files = copy_files or _copy_files
         self._commands = send_command or commands.send
         self._downloads = Path(downloads) if downloads else paths.downloads_dir()
         self._mic = None  # (recorder, gate) during the mic check
@@ -1086,6 +1096,36 @@ class Api:
         self._copy(transcript)
         self._open_url(full if inline else url(note + "(The transcript follows: paste it here.)\n"))
         return {"ok": True, "to": to, "inline": inline, "chars": len(transcript), "via": "draft"}
+
+    def share_slack(self, name: str) -> dict:
+        """Meetings > Share in Slack (dictado-pnuy): the transcript .md goes on the clipboard as a file and
+        Slack opens; Ctrl+V in a chat attaches it. The file name is the whole message: the meeting, who
+        spoke, how long. No summary and no notes (they stay the user's). Ecoscribe posts nothing itself."""
+        d = self._session(name)
+        meta = sessions.read_meta(d)
+        try:
+            segs = json.loads((d / "transcript.json").read_text(encoding="utf-8"))["segments"]
+        except (OSError, ValueError, KeyError):
+            segs = []
+        if not segs:
+            return {"ok": False, "error": "There's no transcript to share yet."}
+        me = self._me()
+        out = self._data_dir / SHARE_DIR
+        out.mkdir(parents=True, exist_ok=True)
+        for old in out.glob("*.md"):  # only the last shared file is kept
+            old.unlink(missing_ok=True)
+        path = out / export.share_name(meta, segs, me)
+        path.write_text(export.to_md(meta, segs, "", me), encoding="utf-8")
+        try:
+            self._copy_files([path])
+        except Exception as e:
+            log.exception("share in Slack: clipboard")
+            return {"ok": False, "error": f"Couldn't copy the file ({e})."}
+        try:
+            self._open_url(SLACK_APP)
+        except OSError:  # no Slack app: Slack in the browser
+            self._open_url(SLACK_WEB)
+        return {"ok": True, "file": path.name, "people": export.participants(meta, segs, me)}
 
     def _has_calendar(self) -> bool:
         """An iCal link or a Google sign-in: somewhere Ecoscribe can look up a call's guests."""
