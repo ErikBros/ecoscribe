@@ -41,6 +41,10 @@ def test_notes_are_short_plain_lines():
             if "show" in n:  # Show me (dictado-3zfe): a window page, a place on its map, spots with a hint each
                 w = n["show"]
                 assert w["page"] in WINDOW_PAGES and 0 <= w.get("y", 0) <= 1 and w["spots"], (v, n)
+                assert set(w) <= {"page", "card", "y", "spots"}, (v, n)
+                if "card" in w:
+                    assert f'data-card="{w["card"]}"' in INDEX, f'no Settings card {w["card"]} ({v})'
+
                 for sel, hint in w["spots"]:
                     assert sel.startswith("#") and hint.strip() and len(hint) <= 90, (v, n)
                     assert f'id="{sel[1:].split()[0]}"' in INDEX, f"{sel} isn't in the window ({v})"
