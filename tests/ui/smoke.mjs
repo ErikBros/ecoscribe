@@ -287,7 +287,12 @@ async function load(query) {
   const { window, doc, errors } = await load("page=inicio&new=1");
   await sleep(50);
   const card = doc.querySelector("#new-card");
-  check(!card.hidden && doc.querySelector("#new-title").textContent === "What's new in Ecoscribe 1.28", "after an update Home says what's new");
+  check(!card.hidden && doc.querySelector("#new-title").textContent === "New in 1.28:", "after an update Home says what's new");
+  check(doc.querySelector("#new-line").textContent.startsWith("What's new on Home · Share in Slack"), "one line names the new features");
+  const more = doc.querySelector("#new-more");
+  check(!more.hidden && !card.classList.contains("open"), "closed at first, with See what's new");
+  more.click(); await sleep(20);
+  check(card.classList.contains("open") && more.textContent === "Show less", "See what's new opens the list");
   const items = [...doc.querySelectorAll("#new-list li")];
   check(items.length === 4 && items[1].querySelector("strong").textContent === "Share in Slack" && /Markdown file/.test(items[1].textContent),
     "each line: its title, then what it does");
