@@ -2,9 +2,10 @@
 
 Claude desktop (or any MCP client) starts it as a child process and talks newline-delimited
 JSON-RPC 2.0 over stdin/stdout. Four read-only tools over the transcripts folder:
-list_meetings, read_meeting, search_meetings, calls_with_person, and one prompt, "Debrief my call"
-(debrief_call). Nothing is sent anywhere and nothing is changed (only search.py's index, a cache next
-to the transcripts, is written): the client gets only what it asks for. No SDK: the protocol subset is small and stable.
+list_meetings, read_meeting, search_meetings, calls_with_person (each but read_meeting can keep to one
+tag), and two prompts, "Debrief my call" (debrief_call) and "Sum up a tag" (tag_digest). Nothing is
+sent anywhere and nothing is changed (only search.py's index, a cache next to the transcripts, is
+written): the client gets only what it asks for. No SDK: the protocol subset is small and stable.
 """
 from __future__ import annotations
 
@@ -19,6 +20,7 @@ from . import __version__, export, meaning, search, sessions
 log = logging.getLogger(__name__)
 VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
 RO = {"readOnlyHint": True, "openWorldHint": False}
+TAG = {"type": "string", "description": "Only meetings with this tag (the whole tag, case ignored)"}
 TOOLS = [
     {"name": "list_meetings", "annotations": RO,
      "description": "List your recorded meetings, calls and transcribed files from Ecoscribe, newest first: "
@@ -27,7 +29,7 @@ TOOLS = [
                     "meetings, e.g. a customer or a recurring meeting). Give tag to list every meeting with that tag.",
      "inputSchema": {"type": "object", "properties": {
          "query": {"type": "string", "description": "Only titles containing this text"},
-         "tag": {"type": "string", "description": "Only meetings with this tag (the whole tag, case ignored)"},
+         "tag": TAG,
          "since": {"type": "string", "description": "Only sessions on or after this date, YYYY-MM-DD"},
          "limit": {"type": "integer", "description": "At most this many (default 30)"}}}},
     {"name": "read_meeting", "annotations": RO,
@@ -46,10 +48,13 @@ TOOLS = [
                     "When no call has all the words, and search by meaning is on (it switches itself on after the "
                     "first such miss), the calls closest in meaning come back instead, in any language, marked "
                     "found_by: meaning with a score (about 0.7 unrelated to 0.9 the same thing said): read them "
-                    "before trusting them. by_meaning: true searches by meaning straight away (a topic, a question).",
+                    "before trusting them. by_meaning: true searches by meaning straight away (a topic, a question). "
+                    "Give tag to search only the meetings with that tag (a customer, a recurring meeting), "
+                    "by words or by meaning.",
      "inputSchema": {"type": "object", "properties": {
          "text": {"type": "string"},
          "by_meaning": {"type": "boolean", "description": "Search by meaning instead of by words"},
+         "tag": TAG,
          "since": {"type": "string", "description": "Only sessions on or after this date, YYYY-MM-DD"},
          "limit": {"type": "integer", "description": "At most this many calls (default 10)"}},
          "required": ["text"]}},
@@ -59,9 +64,11 @@ TOOLS = [
                     "with their name in the title. Each row says how it matched. Part of a name is enough (\"ana\" "
                     "finds \"Ana María\"; every word given must start a word of the name); case and accents don't "
                     "matter. Unnamed voices ('Others', 'Speaker N') can't match: when this finds nothing, try "
-                    "search_meetings with the name to find calls where it was said.",
+                    "search_meetings with the name to find calls where it was said. Give tag to keep to the meetings "
+                    "with that tag.",
      "inputSchema": {"type": "object", "properties": {
          "name": {"type": "string", "description": "The person's name, or part of it"},
+         "tag": TAG,
          "since": {"type": "string", "description": "Only sessions on or after this date, YYYY-MM-DD"},
          "limit": {"type": "integer", "description": "At most this many calls (default 30)"}},
          "required": ["name"]}},
@@ -83,12 +90,36 @@ by when. Plain words, no filler, in the language the call was held in.
 Never open my mailbox or calendar, never send, schedule or invite anything, and never create a ticket before \
 I say OK. Only use what the call says; when something is unclear, say so instead of guessing."""
 
+DIGEST = """Sum up my meetings tagged {tag}{since_words} ("Me" in the transcripts is me). Answer in the language I \
+write to you in; quotes stay in the language spoken.
+
+1. Find them: call list_meetings with {args} and limit 100. Only these meetings count; don't search others.
+2. Read each with read_meeting. When a meeting has a checked summary (summary: true), it comes first: start from \
+it, go to the transcript only for what it leaves out, and leave out items marked "not found in the call".
+3. Per meeting, newest first, under its title and date: the decisions, the promises (who promised what to whom, \
+by when if a date was said) and the open to-dos (what, who), each with its [hh:mm:ss] time. Leave out a heading \
+with nothing under it. A to-do counts as done only when a later meeting says so.
+4. End with every to-do still open, one per line: what, who, and the title and date of the meeting it comes from.
+
+Never open my mailbox or calendar, never create or send anything. Only use what the meetings say; when something \
+is unclear, say so instead of guessing."""
+
 PROMPTS = [
     {"name": "debrief_call", "title": "Debrief my call",
      "description": "Your call's to-dos as proposed tickets (made only after your OK) and a follow-up message to "
                     "paste. Reads nothing but the call.",
      "arguments": [{"name": "id", "required": False,
-                    "description": "The call's id from list_meetings; empty = your latest finished call"}]},
+                    "description": "The call's id from list_meetings; empty = your latest finished call"},
+                   {"name": "tag", "required": False,
+                    "description": "With no id: your latest finished call with this tag "
+                                   "(the whole tag, case ignored)"}]},
+    {"name": "tag_digest", "title": "Sum up a tag",
+     "description": "Decisions, promises and open to-dos from every meeting with one of your tags, newest first, "
+                    "each meeting named by title and date. Reads nothing but those meetings.",
+     "arguments": [{"name": "tag", "required": True,
+                    "description": "The tag, e.g. a customer or a recurring meeting (the whole tag, case ignored)"},
+                   {"name": "since", "required": False,
+                    "description": "Only meetings on or after this date, YYYY-MM-DD; empty = all of them"}]},
 ]
 
 
@@ -127,7 +158,7 @@ def list_meetings(root: Path, query: str = "", since: str = "", limit: int = 30,
     for m in sessions.list_sessions(root):
         if not _visible(m) or (q and q not in str(m.get("title", "")).lower()):
             continue
-        if str(tag or "").strip() and not sessions.has_tag(m, tag):  # dictado-4vms
+        if not _tagged(m, tag):  # dictado-4vms
             continue
         if since and str(m.get("created", ""))[:10] < since[:10]:
             continue
@@ -151,14 +182,19 @@ def _people(m: dict) -> dict[str, list[str]]:
             "title": [str(m.get("title") or "")]}
 
 
-def calls_with_person(root: Path, name: str, since: str = "", limit: int = 30) -> list[dict]:
+def _tagged(m: dict, tag: str) -> bool:
+    """No tag asked: every meeting; else only those with the whole tag, case ignored (dictado-rsk8)."""
+    return not str(tag or "").strip() or sessions.has_tag(m, tag)
+
+
+def calls_with_person(root: Path, name: str, since: str = "", limit: int = 30, tag: str = "") -> list[dict]:
     """dictado-igs: the calls with someone, by named speaker, calendar guest or title, newest first."""
     words = re.findall(r"\w+", search.fold(name))
     if not words:
         raise ValueError("say whose calls to find")
     rows = []
     for m in sessions.list_sessions(root):
-        if not _visible(m) or (since and str(m.get("created", ""))[:10] < since[:10]):
+        if not _visible(m) or not _tagged(m, tag) or (since and str(m.get("created", ""))[:10] < since[:10]):
             continue
         matched = {how: sorted({n for n in names if _name_matches(n, words)})
                    for how, names in _people(m).items()}
@@ -215,12 +251,15 @@ def _by_meaning(root: Path, text: str, limit: int, keep) -> list[dict]:
     return out
 
 
-def search_meetings(root: Path, text: str, limit: int = 10, since: str = "", by_meaning: bool = False) -> list[dict]:
+def search_meetings(root: Path, text: str, limit: int = 10, since: str = "", by_meaning: bool = False,
+                    tag: str = "") -> list[dict]:
     """dictado-8h8: ranked, accent-proof, grouped by call (search.py). Nothing found: the miss is
-    counted, and the search by meaning answers when it is on (dictado-2i1)."""
+    counted, and the search by meaning answers when it is on (dictado-2i1). keep runs before the
+    limit, so a tag never comes back empty because other meetings ranked higher (dictado-rsk8)."""
     if not str(text or "").strip():
         raise ValueError("say what to look for")
-    keep = lambda m: _visible(m) and (not since or str(m.get("created", ""))[:10] >= since[:10])  # noqa: E731
+    keep = lambda m: (_visible(m) and _tagged(m, tag)  # noqa: E731
+                      and (not since or str(m.get("created", ""))[:10] >= since[:10]))
     if by_meaning:
         return _by_meaning(root, text, int(limit or 5), keep)
     idx = search.open_index(root)
@@ -240,19 +279,36 @@ def search_meetings(root: Path, text: str, limit: int = 10, since: str = "", by_
         return []
 
 
-def _latest_call(root: Path) -> str:
+def _latest_call(root: Path, tag: str = "") -> str:
     for m in sessions.list_sessions(root):
-        if _visible(m) and m.get("status") == "done":
+        if _visible(m) and m.get("status") == "done" and _tagged(m, tag):
             return Path(m["dir"]).name
+    if str(tag or "").strip():
+        raise FileNotFoundError(f"no finished call tagged {sessions.clean_tag(tag)!r} yet")
     raise FileNotFoundError("no finished call yet")
 
 
-def debrief(root: Path, sid: str = "") -> dict:
-    """dictado-2mu: the 'Debrief my call' prompt: the steps, then the call itself (its summary first)."""
-    sid = str(sid or "").strip() or _latest_call(root)
+def debrief(root: Path, sid: str = "", tag: str = "") -> dict:
+    """dictado-2mu: the 'Debrief my call' prompt: the steps, then the call itself (its summary first).
+    No id: the latest finished call, with the tag when one is given (dictado-rsk8)."""
+    sid = str(sid or "").strip() or _latest_call(root, tag)
     text = read_meeting(root, sid)
     return {"description": f"Debrief of {sid}",
             "messages": [{"role": "user", "content": {"type": "text", "text": f"{DEBRIEF}\n\n---\n\n{text}"}}]}
+
+
+def tag_digest(root: Path, tag: str, since: str = "") -> dict:
+    """dictado-rsk8: the 'Sum up a tag' prompt: Claude lists the tag's meetings, reads them (summaries
+    first) and answers with decisions, promises and open to-dos per meeting, newest first."""
+    tag, since = sessions.clean_tag(tag), str(since or "").strip()
+    if not tag:
+        raise ValueError("say which tag to sum up")
+    if since and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", since):
+        raise ValueError("since is a date: YYYY-MM-DD")
+    args = f"tag={json.dumps(tag, ensure_ascii=False)}" + (f", since={json.dumps(since)}" if since else "")
+    text = DIGEST.format(tag=f'"{tag}"', since_words=f" since {since}" if since else "", args=args)
+    return {"description": f"Meetings tagged {tag}" + (f" since {since}" if since else ""),
+            "messages": [{"role": "user", "content": {"type": "text", "text": text}}]}
 
 
 def _call(root: Path, name: str, args: dict) -> dict:
@@ -264,11 +320,14 @@ def _call(root: Path, name: str, args: dict) -> dict:
             out = read_meeting(root, args.get("id", ""))
         elif name == "search_meetings":
             out = json.dumps(search_meetings(root, args.get("text", ""), args.get("limit", 10), args.get("since", ""),
-                                             bool(args.get("by_meaning"))), ensure_ascii=False, indent=1)
+                                             bool(args.get("by_meaning")), args.get("tag", "")),
+                             ensure_ascii=False, indent=1)
         elif name == "calls_with_person":
-            rows = calls_with_person(root, args.get("name", ""), args.get("since", ""), args.get("limit", 30))
+            tag = args.get("tag", "")
+            rows = calls_with_person(root, args.get("name", ""), args.get("since", ""), args.get("limit", 30), tag)
             out = json.dumps(rows, ensure_ascii=False, indent=1) if rows else (
-                "No call has this person as a named speaker, a calendar guest or in its title. Voices are named "
+                ("No call with that tag has" if str(tag or "").strip() else "No call has")
+                + " this person as a named speaker, a calendar guest or in its title. Voices are named "
                 "only when the user names them or Ecoscribe recognises them; try search_meetings with the name.")
         else:
             return {"content": [{"type": "text", "text": f"unknown tool {name}"}], "isError": True}
@@ -296,10 +355,14 @@ def handle(root: Path, msg: dict) -> dict | None:
     elif method == "prompts/list":
         result = {"prompts": PROMPTS}
     elif method == "prompts/get":
+        args = params.get("arguments") or {}
         try:
-            if params.get("name") != "debrief_call":
+            if params.get("name") == "debrief_call":
+                result = debrief(root, args.get("id", ""), args.get("tag", ""))
+            elif params.get("name") == "tag_digest":
+                result = tag_digest(root, args.get("tag", ""), args.get("since", ""))
+            else:
                 raise ValueError(f"unknown prompt {params.get('name')}")
-            result = debrief(root, (params.get("arguments") or {}).get("id", ""))
         except (OSError, ValueError) as e:
             return {"jsonrpc": "2.0", "id": mid, "error": {"code": -32602, "message": str(e)}}
     else:

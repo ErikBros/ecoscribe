@@ -221,7 +221,7 @@ def test_debrief_my_call_prompt(tmp_path):
     r = rpc(tmp_path, {"jsonrpc": "2.0", "id": 0, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}},
             {"jsonrpc": "2.0", "id": 1, "method": "prompts/list"})
     assert "prompts" in r[0]["result"]["capabilities"]
-    (p,) = r[1]["result"]["prompts"]
+    p = r[1]["result"]["prompts"][0]
     assert p["name"] == "debrief_call" and p["title"] == "Debrief my call" and not p["arguments"][0]["required"]
     old = make(tmp_path, "Planering", 3)
     new = make(tmp_path, "Retro", 5, speaker_names={"Speaker 1": "Ana"})
@@ -243,3 +243,79 @@ def test_debrief_errors(tmp_path):
     make(tmp_path, "Retro", 5)
     assert _get(tmp_path, name="debrief_call", arguments={"id": "nope"})["error"]["code"] == -32602
     assert _get(tmp_path, name="other")["error"]["code"] == -32602
+
+
+# dictado-rsk8: questions about one tag ("what did we promise Customer A?") draw only on that tag's meetings.
+
+def _rows(root, tool, **args):
+    r = call(root, tool, **args)
+    assert not r.get("isError"), r
+    return json.loads(r["content"][0]["text"])
+
+
+def test_search_keeps_to_a_tag_before_the_limit(tmp_path):
+    many = [{"t0": float(i), "t1": float(i) + 1, "text": "The release slips again.", "speaker": "Me"} for i in range(6)]
+    make(tmp_path, "Team sync", 5, segs=many, tags=["Weekly ops"])  # ranks first: more lines say it
+    make(tmp_path, "Vendor call", 6, segs=many)
+    make(tmp_path, "Kickoff", 3, segs=[{"t0": 2.0, "t1": 3.0, "text": "Release in May then.", "speaker": "Speaker 1"}],
+         tags=["Customer A", "Pilot"])
+    assert [r["title"] for r in _rows(tmp_path, "search_meetings", text="release", limit=1)] != ["Kickoff"]
+    rows = _rows(tmp_path, "search_meetings", text="release", tag="CUSTOMER a", limit=1)
+    assert [r["title"] for r in rows] == ["Kickoff"] and rows[0]["tags"] == ["Customer A", "Pilot"]
+    assert [r["title"] for r in _rows(tmp_path, "search_meetings", text="release", tag="weekly ops")] == ["Team sync"]
+    assert _rows(tmp_path, "search_meetings", text="release", tag="Customer") == []  # the whole tag only
+    assert _rows(tmp_path, "search_meetings", text="release", tag="Customer A", since="2026-10-04") == []
+
+
+def test_calls_with_person_keeps_to_a_tag_before_the_limit(tmp_path):
+    make(tmp_path, "Kickoff with Ana", 3, tags=["Customer A"])
+    make(tmp_path, "Lunch with Ana", 8)  # newer: first without a tag
+    make(tmp_path, "Ana and Tom", 9, tags=["Weekly ops"])
+    assert [r["title"] for r in _rows(tmp_path, "calls_with_person", name="ana", limit=1)] == ["Ana and Tom"]
+    assert [r["title"] for r in _rows(tmp_path, "calls_with_person", name="ana", tag="customer a", limit=1)] \
+        == ["Kickoff with Ana"]
+    none = call(tmp_path, "calls_with_person", name="ana", tag="Pilot")
+    assert not none.get("isError") and none["content"][0]["text"].startswith("No call with that tag")
+
+
+def test_tools_offer_the_tag_filter():
+    for t in mcp_server.TOOLS:
+        if t["name"] != "read_meeting":
+            assert t["inputSchema"]["properties"]["tag"] == mcp_server.TAG
+            assert "tag" in t["description"]
+    json.loads(json.dumps(mcp_server.TOOLS))  # still plain JSON schema
+
+
+def test_sum_up_a_tag_prompt(tmp_path):
+    """The 'Sum up a tag' prompt: Claude lists the tag's meetings and reads them, summaries first, and answers
+    per meeting, newest first, with decisions, promises and open to-dos, each meeting named by title and date."""
+    r = rpc(tmp_path, {"jsonrpc": "2.0", "id": 1, "method": "prompts/list"})
+    p = {x["name"]: x for x in r[0]["result"]["prompts"]}["tag_digest"]
+    assert p["title"] == "Sum up a tag"
+    assert [(a["name"], a["required"]) for a in p["arguments"]] == [("tag", True), ("since", False)]
+    res = _get(tmp_path, name="tag_digest", arguments={"tag": "  Customer   A ", "since": "2026-09-01"})["result"]
+    text = res["messages"][0]["content"]["text"]
+    assert res["messages"][0]["role"] == "user" and res["description"] == "Meetings tagged Customer A since 2026-09-01"
+    assert 'list_meetings with tag="Customer A", since="2026-09-01"' in text
+    assert "read_meeting" in text and "summary" in text and "not found in the call" in text
+    for words in ("newest first", "title and date", "decisions", "promises", "open to-dos", "Never open my mailbox"):
+        assert words in text
+    every = _get(tmp_path, name="tag_digest", arguments={"tag": "Weekly ops"})["result"]
+    every = every["messages"][0]["content"]["text"]
+    assert 'list_meetings with tag="Weekly ops" and' in every and "since" not in every.split("\n")[0]
+    for bad in ({}, {"tag": "  "}, {"tag": "Weekly ops", "since": "September"}):
+        assert _get(tmp_path, name="tag_digest", arguments=bad)["error"]["code"] == -32602
+
+
+def test_debrief_my_last_call_with_a_tag(tmp_path):
+    kickoff = make(tmp_path, "Kickoff", 3, tags=["Customer A"])
+    make(tmp_path, "Review", 4, tags=["customer a"], status="recording")  # not finished: never picked
+    make(tmp_path, "Team sync", 5, tags=["Weekly ops"])
+    r = rpc(tmp_path, {"jsonrpc": "2.0", "id": 1, "method": "prompts/list"})
+    arg = {x["name"]: x for x in r[0]["result"]["prompts"]}["debrief_call"]["arguments"][1]
+    assert arg["name"] == "tag" and arg["required"] is False and "latest finished call" in arg["description"]
+    res = _get(tmp_path, name="debrief_call", arguments={"tag": "CUSTOMER A"})["result"]
+    assert kickoff.name in res["description"] and "Kickoff" in res["messages"][0]["content"]["text"]
+    assert "Team sync" in _get(tmp_path, name="debrief_call")["result"]["messages"][0]["content"]["text"]
+    err = _get(tmp_path, name="debrief_call", arguments={"tag": "Pilot"})["error"]
+    assert err["code"] == -32602 and "Pilot" in err["message"]
