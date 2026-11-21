@@ -127,6 +127,26 @@ Label meetings to find them again, for example by customer or by a meeting that 
 - **In the list:** each meeting shows its tags as small labels under its title.
 - **Claude** sees the tags too: ask the Claude app for "my meetings tagged Weekly ops" (see [With Claude](claude.md)).
 
+### Auto tags
+
+Meetings from your calendar can tag themselves, so a tag stays complete without adding it to every meeting by hand.
+Both kinds need the meeting's calendar event (see [Meeting names from your calendar](#meeting-names-from-your-calendar)).
+
+- **A meeting that repeats:** when you add a tag to a meeting from a calendar event, a line under the tags asks
+  *Tag every "Weekly ops" meeting with Weekly ops?* and says how many earlier ones it would tag too. **Yes** tags them
+  now and every new meeting with that event title from then on (case and spacing don't matter). **No** doesn't ask
+  again for that tag and title.
+- **A customer:** a meeting with guests from another company suggests a tag named after their email domain, as a
+  dashed chip next to the tags: guests from customer-a.com suggest **+ Customer A**. Click it to tag this meeting and
+  every meeting, past and new, with someone from that domain. The × on it stops suggesting that domain. Your own
+  company is never suggested (Ecoscribe takes it from your calendar address, or else from the domain in most of your
+  meetings), and neither are personal addresses like Gmail or Outlook.com. If you already use the tag in another
+  spelling, the suggestion uses yours.
+- **Taking one off:** removing an auto tag from one meeting with its × keeps it off that meeting; the rule doesn't
+  put it back.
+- **Your rules:** **Settings > Meetings > Auto tags** lists them. The × removes a rule; the tags it already added stay
+  on the meetings.
+
 ## Search
 
 The search box on the Meetings tab finds titles, tags and what was said, ranked and grouped by call. Case and accents

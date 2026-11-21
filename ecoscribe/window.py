@@ -18,7 +18,7 @@ import time
 from datetime import date, timedelta
 from pathlib import Path
 
-from . import __version__, commands, config, diarize, hotkeys, export, ipc, meetings, paths, search, sessions, status, tomlw
+from . import __version__, autotags, commands, config, diarize, hotkeys, export, ipc, meetings, paths, search, sessions, status, tomlw
 from .languages import ALL as ALL_LANGS, BASE as BASE_LANGS, available, meeting_options, user_langs, valid_extra, valid_meeting_lang
 from .routing import LANG_NAMES
 
@@ -670,6 +670,7 @@ class Api:
         q = str(query or "").strip()
         me = self._me()
         metas = sessions.list_sessions(self._root())
+        self._autotag_catch_up(metas)
         tags = sessions.tag_counts(metas)
         if str(tag or "").strip():
             metas = [m for m in metas if sessions.has_tag(m, tag)]
@@ -691,11 +692,114 @@ class Api:
 
     def set_tags(self, name: str, tags: list) -> dict:
         """The meeting's own tags, replaced (dictado-4vms). A tag another meeting has in another case keeps
-        that spelling, so one label never splits in two."""
+        that spelling, so one label never splits in two. dictado-fnnr: a tag an auto-tag rule gave it that the
+        user takes off stays off; a tag just added to a calendar meeting comes with `offer`, to tag the series."""
         d = self._session(name)
-        known = [t for m in sessions.list_sessions(self._root()) if Path(m["dir"]).name != d.name
-                 for t in sessions.tags_of(m)]
-        return {"ok": True, "tags": sessions.set_tags(d, tags, known)}
+        metas = sessions.list_sessions(self._root())
+        known = [t for m in metas if Path(m["dir"]).name != d.name for t in sessions.tags_of(m)]
+        old = sessions.read_meta(d)
+        state = autotags.load(self._data_dir)
+        clean = sessions.normalize_tags(tags, known)
+        gone = autotags.removals(old, sessions.tags_of(old), clean, state["rules"])
+        changes = {"tags": clean}
+        if gone or "tags_removed" in old:
+            changes["tags_removed"] = gone
+        m = sessions.write_meta(d, **changes)
+        m["dir"] = str(d)
+        self._autotag_cache = None  # a tag's spelling may be new
+        before = {t.casefold() for t in sessions.tags_of(old)}
+        added = [t for t in clean if t.casefold() not in before]
+        offer = autotags.offer(m, added[-1], state, metas) if added else None
+        return {"ok": True, "tags": clean, "offer": offer}
+
+    # ---------------- auto tags (dictado-fnnr) ----------------
+    _autotag_cache = None  # (when, own domains, tags in use): get_session runs every second
+
+    def _autotag_context(self, metas=None) -> tuple[set, list]:
+        now = time.monotonic()
+        c = self._autotag_cache
+        if metas is None and c and now - c[0] < 60:
+            return c[1], c[2]
+        if metas is None:
+            metas = sessions.list_sessions(self._root())
+        own = autotags.own_domains(metas, autotags.owner_email(self._data_dir))
+        known = [t["name"] for t in sessions.tag_counts(metas)]
+        self._autotag_cache = (now, own, known)
+        return own, known
+
+    def _autotag_catch_up(self, metas) -> None:
+        """The list loads: a meeting a rule matches but that lacks its tag gets it (a rule made while it was
+        recording, a calendar found later). Never fails the list."""
+        try:
+            rules = autotags.load(self._data_dir)["rules"]
+            if rules and autotags.apply_all(metas, rules):
+                self._autotag_cache = None
+            if self._autotag_cache is None or time.monotonic() - self._autotag_cache[0] >= 60:
+                self._autotag_context(metas)
+        except Exception:
+            log.exception("auto tags: catch-up failed")
+
+    def _autotag_suggestion(self, m: dict) -> dict | None:
+        if not (m.get("calendar") or {}).get("emails"):
+            return None
+        try:
+            own, known = self._autotag_context()
+            return autotags.suggestion(m, own, autotags.load(self._data_dir), known)
+        except Exception:
+            log.exception("auto tags: no suggestion")
+            return None
+
+    def _autotag_apply(self, d: Path) -> dict:
+        metas = sessions.list_sessions(self._root())
+        n = autotags.apply_all(metas, autotags.load(self._data_dir)["rules"])
+        self._autotag_cache = None
+        return {"ok": True, "tags": sessions.tags_of(sessions.read_meta(d)), "count": n}
+
+    def autotag_title(self, name: str, tag: str) -> dict:
+        """Yes to the offer: every meeting of this calendar event gets `tag`, now and from now on."""
+        d = self._session(name)
+        title = (sessions.read_meta(d).get("calendar") or {}).get("title")
+        if not autotags.title_key(title) or not sessions.clean_tag(tag):
+            return {"ok": False, "error": "This meeting has no calendar event to follow."}
+        autotags.add_rule(self._data_dir, "title", title, tag)
+        return self._autotag_apply(d)
+
+    def autotag_domain(self, name: str, domain: str, tag: str) -> dict:
+        """The suggestion clicked: this meeting and every meeting with a guest from `domain` get `tag`."""
+        d = self._session(name)
+        tag = sessions.clean_tag(tag)
+        if not tag or "." not in autotags.registrable(domain):
+            return {"ok": False, "error": "Couldn't make that rule."}
+        m = sessions.read_meta(d)  # the user asked for it here: a hand removal no longer counts
+        gone = [t for t in m.get("tags_removed") or [] if isinstance(t, str) and t.casefold() != tag.casefold()]
+        if gone != (m.get("tags_removed") or []):
+            sessions.write_meta(d, tags_removed=gone)
+        autotags.add_rule(self._data_dir, "domain", domain, tag)
+        out = self._autotag_apply(d)
+        if sessions.has_tag(m, tag):
+            pass
+        elif any(t.casefold() == tag.casefold() for t in out["tags"]):
+            out["count"] = max(0, out["count"] - 1)  # the others: this one is where the user clicked
+        else:  # still recording (left for later) or no such guest any more: tagged here by hand
+            out["tags"] = self.set_tags(name, out["tags"] + [tag])["tags"]
+        return out
+
+    def dismiss_autotag(self, kind: str, match: str, tag: str = "") -> dict:
+        """No to a title offer (for that tag), or × on a domain suggestion: not offered again."""
+        if kind not in autotags.KINDS:
+            return {"ok": False}
+        autotags.dismiss(self._data_dir, kind, match, tag)
+        return {"ok": True}
+
+    def autotag_rules(self) -> dict:
+        """Settings > Meetings > Auto tags."""
+        return {"rules": [{k: r.get(k, "") for k in ("kind", "match", "label", "tag")}
+                          for r in autotags.load(self._data_dir)["rules"]]}
+
+    def remove_autotag_rule(self, kind: str, match: str, tag: str) -> dict:
+        """The tags the rule already added stay on the meetings."""
+        autotags.remove_rule(self._data_dir, kind, match, tag)
+        return {"ok": True, **self.autotag_rules()}
 
     def get_session(self, name: str) -> dict:
         d = self._session(name)
@@ -713,7 +817,7 @@ class Api:
         except (OSError, ValueError):
             pass
         return {"session": self._row(m, self._me()), "segments": export.turns(segs),  # read in turns, like the .md
-                "notes": export.read_notes(d), "summary": summ,
+                "notes": export.read_notes(d), "summary": summ, "autotag": self._autotag_suggestion(m),
                 "exports": [p.name for p in d.glob("transcript.*") if p.suffix in (".txt", ".md", ".srt")]}
 
     def week_todos(self, back: int = 0) -> dict:
@@ -751,7 +855,7 @@ class Api:
         m = sessions.read_meta(d)
         m["dir"] = str(d)
         return {"lines": lines, "next": int(since) + len(lines), "session": self._row(m, self._me()),
-                "notes": export.read_notes(d)}
+                "notes": export.read_notes(d), "autotag": self._autotag_suggestion(m)}
 
     # ---------------- Google Calendar (dictado-k19) ----------------
     _gcal_http = None  # tests swap in a fake Google
@@ -802,6 +906,7 @@ class Api:
             return None
         info = meta_info(ev)
         sessions.write_meta(self._session(name), calendar=info)
+        autotags.apply_one(self._session(name), self._data_dir)  # dictado-fnnr
         return info
 
     def claude_app(self) -> dict:

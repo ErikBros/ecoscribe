@@ -577,6 +577,64 @@ async function load(query) {
   const none = await load("page=reuniones&tags=0");
   check(none.doc.querySelector("#r-tags").hidden, "no meeting has a tag: no chip row");
 }
+{ // dictado-fnnr: auto tags. A tag added to a calendar meeting offers the series; a customer tag is suggested from the guests' domain
+  const { window, doc, errors } = await load("page=reuniones/2026-10-04_1600_kund&tags=0");
+  await sleep(300);
+  const offer = doc.querySelector("#r-tag-offer"), sug = doc.querySelector("#r-tag-suggest");
+  const mine = () => [...doc.querySelectorAll("#r-d-taglist .r-d-tag")].map((c) => c.firstChild.textContent);
+  check(offer.hidden, "no offer before a tag is added");
+  check(!sug.hidden && doc.querySelector("#r-tag-suggest-add").textContent === "+ Customer A", "the guests' company is suggested as a dashed chip: + Customer A");
+  const add = doc.querySelector("#r-tag-add");
+  add.value = "Renewal"; add.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true })); await sleep(100);
+  check(!offer.hidden && doc.querySelector("#r-tag-offer-text").textContent === "Tag every “Customer A weekly” meeting with Renewal? Also tags the earlier one.",
+    "adding a tag offers the series, with how many earlier ones: " + doc.querySelector("#r-tag-offer-text").textContent);
+  doc.querySelector("#r-tag-offer-no").click(); await sleep(100);
+  check(offer.hidden && JSON.stringify(window.__atDismissed) === JSON.stringify(["title|customer a weekly|renewal"]), "No hides it and remembers it for that tag and title");
+  doc.querySelector('#r-d-taglist .vc-x[aria-label="Remove the tag Renewal"]').click(); await sleep(100);
+  add.value = "Renewal"; add.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true })); await sleep(100);
+  check(offer.hidden, "after No, the same tag on the same series isn't offered again");
+  add.value = "Roadmap"; add.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true })); await sleep(100);
+  check(!offer.hidden && /with Roadmap\?/.test(offer.textContent), "another tag is offered");
+  doc.querySelector('#r-d-taglist .vc-x[aria-label="Remove the tag Roadmap"]').click(); await sleep(100);
+  check(offer.hidden, "removing the offered tag hides the offer");
+  add.value = "Roadmap"; add.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true })); await sleep(100);
+  doc.querySelector("#r-tag-offer-yes").click(); await sleep(150);
+  const rule = (window.__atRules || [])[0];
+  check(offer.hidden && rule?.kind === "title" && rule.match === "customer a weekly" && rule.tag === "Roadmap", "Yes makes a title rule");
+  check(/Tagged 1 earlier meeting too/.test(doc.querySelector("#toast").textContent), "and says how many earlier meetings it tagged: " + doc.querySelector("#toast").textContent);
+  doc.querySelector("#r-tag-suggest-add").click(); await sleep(150);
+  check(sug.hidden && JSON.stringify(mine()) === JSON.stringify(["Renewal", "Roadmap", "Customer A"]) && window.__atRules[1]?.match === "customer-a.example",
+    "clicking the suggestion adds the tag and makes a domain rule: " + mine());
+  check(/Added Customer A here and to 1 other meeting with people from customer-a.example/.test(doc.querySelector("#toast").textContent), "and says where else it went");
+  doc.querySelector("#r-back").click(); await sleep(200);
+  const badges = [...doc.querySelectorAll('.r-row[data-name="2026-10-03_1000_fallo"] .badge-tag')].map((b) => b.textContent);
+  check(JSON.stringify(badges) === JSON.stringify(["Roadmap", "Customer A"]), "the earlier meeting of the series got both: " + badges);
+  check(errors.length === 0, "no JS errors with auto tags: " + errors.join("; "));
+  const x = await load("page=reuniones/2026-10-04_1600_kund&tags=0");
+  await sleep(300);
+  x.doc.querySelector("#r-tag-suggest-x").click(); await sleep(1300);
+  check(x.doc.querySelector("#r-tag-suggest").hidden && JSON.stringify(x.window.__atDismissed) === JSON.stringify(["domain|customer-a.example"]),
+    "× dismisses the suggestion for that domain, and the next poll keeps it hidden");
+  const own = await load("page=reuniones/2026-10-05_0915_planering&tags=0");
+  await sleep(300);
+  check(own.doc.querySelector("#r-tag-suggest").hidden, "only the user's own company in the call: no suggestion");
+  const shot = await load("page=reuniones/2026-10-04_1600_kund&tags=0&offer=1");
+  await sleep(700);
+  check(!shot.doc.querySelector("#r-tag-offer").hidden && shot.doc.querySelector("#r-tag-suggest").hidden, "?offer=1 shows the offer (the screenshot)");
+}
+{ // dictado-fnnr: Settings > Meetings > Auto tags lists the rules, each with ×
+  const { window, doc, errors } = await load("page=ajustes&sec=meetings&autotags=1");
+  await sleep(200);
+  const rows = () => [...doc.querySelectorAll("#at-rows .at-row .row-label")].map((l) => l.textContent);
+  check(JSON.stringify(rows()) === JSON.stringify(["“Weekly ops” meetings→Weekly ops", "People from customer-a.example→Customer A"]) && doc.querySelector("#at-empty").hidden
+    && !doc.querySelector("#at-note").hidden, "two rules, one row each: " + rows());
+  doc.querySelector('#at-rows .vc-x[aria-label^="Remove the rule: People from customer-a.example"]').click(); await sleep(150);
+  check(JSON.stringify(rows()) === JSON.stringify(["“Weekly ops” meetings→Weekly ops"]) && /tags it added stay/.test(doc.querySelector("#toast").textContent), "× removes a rule");
+  doc.querySelector("#at-rows .vc-x").click(); await sleep(150);
+  check(rows().length === 0 && !doc.querySelector("#at-empty").hidden && doc.querySelector("#at-note").hidden, "no rules: one line says how they're made");
+  check(doc.querySelector("#savebar").hidden, "removing a rule needs no Save");
+  check(errors.length === 0, "no JS errors in Auto tags: " + errors.join("; "));
+}
 { // t0u.30: notes during a call, kept while the live view polls
   const { window, doc } = await load("page=reuniones/2026-10-05_1400_retro");
   await sleep(200);

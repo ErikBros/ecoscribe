@@ -64,7 +64,7 @@ def test_set_and_get_tags(env):
     api, root = env
     d = make(root, "Client call", 1)
     out = api.set_tags(d.name, ["Customer A", " customer a ", "Weekly ops"])
-    assert out == {"ok": True, "tags": ["Customer A", "Weekly ops"]}
+    assert out == {"ok": True, "tags": ["Customer A", "Weekly ops"], "offer": None}  # no calendar event: nothing to offer (dictado-fnnr)
     assert sessions.read_meta(d)["tags"] == ["Customer A", "Weekly ops"]
     assert api.get_session(d.name)["session"]["tags"] == ["Customer A", "Weekly ops"]
     assert api.list_sessions()["items"][0]["tags"] == ["Customer A", "Weekly ops"]

@@ -119,13 +119,45 @@ function demoApi() {
   const rec = params.get("rec") !== "0";
   // dictado-4vms: invented tags on a few meetings; ?tags=0: nobody has tagged anything yet
   const tg = (...t) => (params.get("tags") === "0" ? [] : t);
+  // dictado-fnnr: each call's calendar event (only the mock reads it), invented; ownco.example is the user's own company
+  const OWN = "ownco.example", ev = (title, ...who) => ({ title, emails: who.map((w) => w.includes("@") ? w : `${w}@${OWN}`) });
   const sess = [
-    ...(rec ? [S("2026-10-05_1400_retro", "Sprint retro", 12, "recording", { duration_s: null, tags: tg("Weekly ops") })] : []),
+    ...(rec ? [S("2026-10-05_1400_retro", "Sprint retro", 12, "recording", { duration_s: null, tags: tg("Weekly ops"), cal: ev("Weekly ops", "kim", "lee") })] : []),
     S("2026-10-05_1130_podcast", "Super Easy Greek 12", 40, "running", { lang: "el", lang_name: "Greek", source: "import", pct: 42, duration_s: 412 }),
-    S("2026-10-05_0915_planering", "Planering vecka 41", 60 * 5, "done", { summary: "done", tags: tg("Weekly ops", "Hiring") }),
-    S("2026-10-04_1600_kund", "Client call", 60 * 22, "done", { lang: "en", lang_name: "English", duration_s: 2710, speakers: "done", speaker_names: { "Speaker 2": "Ana" }, summary: "running", tags: tg("Customer A") }),
-    S("2026-10-03_1000_fallo", "Meeting", 60 * 50, "failed", { error: "CUDA out of memory", duration_s: 300, tags: tg("Customer A") }),
+    S("2026-10-05_0915_planering", "Planering vecka 41", 60 * 5, "done", { summary: "done", tags: tg("Weekly ops", "Hiring"), cal: ev("Weekly ops", "kim", "lee", "jo") }),
+    S("2026-10-04_1600_kund", "Client call", 60 * 22, "done", { lang: "en", lang_name: "English", duration_s: 2710, speakers: "done", speaker_names: { "Speaker 2": "Ana" }, summary: "running", tags: tg("Customer A"),
+      cal: ev("Customer A weekly", "ana@customer-a.example", "bo@customer-a.example", "kim") }),
+    S("2026-10-03_1000_fallo", "Meeting", 60 * 50, "failed", { error: "CUDA out of memory", duration_s: 300, tags: tg("Customer A"), cal: ev("Customer A weekly", "ana@customer-a.example", "kim") }),
   ];
+  // auto tags, like ecoscribe/autotags.py. ?autotags=1: two rules already made (Settings > Meetings)
+  const at = { rules: params.get("autotags") === "1" ? [{ kind: "title", match: "weekly ops", label: "Weekly ops", tag: "Weekly ops" },
+    { kind: "domain", match: "customer-a.example", label: "", tag: "Customer A" }] : [], dismissed: [] };
+  const tkey = (t) => String(t || "").split(/\s+/).filter(Boolean).join(" ").toLowerCase();
+  const atMatch = (rule, x) => (rule.kind === "title" ? tkey(x.cal?.title) === rule.match : (x.cal?.emails || []).some((e) => e.endsWith("@" + rule.match)));
+  const atApply = () => {
+    let n = 0;
+    for (const x of sess) {
+      const add = at.rules.filter((rule) => atMatch(rule, x) && !hasTag(x, rule.tag) && x.status !== "recording").map((rule) => rule.tag);
+      if (add.length) { x.tags = [...(x.tags || []), ...add]; n++; }
+    }
+    return n;
+  };
+  const atOffer = (n, tag) => {
+    const c = find(n)?.cal, k = tkey(c?.title);
+    if (!k || at.rules.some((x) => x.kind === "title" && x.match === k && x.tag.toLowerCase() === tag.toLowerCase())
+      || at.dismissed.includes(`title|${k}|${tag.toLowerCase()}`)) return null;
+    return { title: c.title, tag, others: sess.filter((x) => x.name !== n && tkey(x.cal?.title) === k && !hasTag(x, tag)).length };
+  };
+  const atSuggest = (n) => {
+    const x = find(n);
+    for (const d of new Set((x?.cal?.emails || []).map((e) => e.split("@")[1]))) {
+      if (d === OWN || at.dismissed.includes(`domain|${d}`) || at.rules.some((y) => y.kind === "domain" && y.match === d)) continue;
+      const name = d.split(".")[0].split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
+      const tag = sess.flatMap((y) => y.tags || []).find((t) => t.toLowerCase() === name.toLowerCase()) || name;
+      if (!hasTag(x, tag)) return { domain: d, tag };
+    }
+    return null;
+  };
   const tagCounts = () => {  // like sessions.tag_counts: most used first, then by name
     const c = {};
     for (const x of sess) for (const t of x.tags || []) c[t] = (c[t] || 0) + 1;
@@ -208,11 +240,30 @@ function demoApi() {
         out.push(known.find((y) => y.toLowerCase() === t.toLowerCase()) || t);
         if (out.length >= 10) break;
       }
+      const before = find(n).tags || [], added = out.filter((t) => !before.some((y) => y.toLowerCase() === t.toLowerCase()));
       find(n).tags = out; window.__tags = out;
-      return { ok: true, tags: out };
+      return { ok: true, tags: out, offer: added.length ? atOffer(n, added[added.length - 1]) : null };
     },
-    get_session: async (n) => ({ session: find(n), segments: find(n)?.status !== "done" ? [] : segsFor(n),
+    get_session: async (n) => ({ session: find(n), segments: find(n)?.status !== "done" ? [] : segsFor(n), autotag: atSuggest(n),
       exports: ["transcript.txt"], notes: notes[n] || "", summary: find(n)?.summary === "done" ? SUMMARY : null }),
+    autotag_title: async (n, tag) => {
+      at.rules.push({ kind: "title", match: tkey(find(n).cal.title), label: find(n).cal.title, tag }); window.__atRules = at.rules;
+      return { ok: true, tags: find(n).tags, count: atApply() };
+    },
+    autotag_domain: async (n, domain, tag) => {
+      at.rules.push({ kind: "domain", match: domain, label: "", tag }); window.__atRules = at.rules;
+      const count = atApply();
+      return { ok: true, tags: find(n).tags, count: Math.max(0, count - 1) };
+    },
+    dismiss_autotag: async (kind, match, tag = "") => {
+      at.dismissed.push(kind === "title" ? `title|${tkey(match)}|${tag.toLowerCase()}` : `domain|${match}`); window.__atDismissed = at.dismissed;
+      return { ok: true };
+    },
+    autotag_rules: async () => ({ rules: at.rules.map((x) => ({ ...x })) }),
+    remove_autotag_rule: async (kind, match, tag) => {
+      at.rules = at.rules.filter((x) => !(x.kind === kind && x.match === match && x.tag === tag)); window.__atRules = at.rules;
+      return { ok: true, rules: at.rules };
+    },
     voices_info: async () => window.__noVoices ? { count: 0, names: [], on: true } : { count: 2, names: ["Ana", "Tom"], on: true },
     crashes: async () => (params.get("crash") === "1" ? { items: [{ name: "2026-10-06_140325", when: "2026-10-06 140325", exit: MAC ? "unknown" : "0xC0000005 (access violation)" }], gave_up: false } : { items: [], gave_up: false }),
     copy_crash_report: async () => ({ ok: true }), dismiss_crash: async () => ({ ok: true }),
@@ -255,7 +306,7 @@ function demoApi() {
       liveN += 1;
       const lines = [];
       for (let i = since; i < liveN; i++) { const x = SEGS[i % SEGS.length], k = Math.floor(i / SEGS.length) * 30; lines.push({ ...x, t0: x.t0 + k, t1: x.t1 + k }); }
-      return { lines, next: Math.max(since, liveN), session: find(n), notes: notes[n] || "" };
+      return { lines, next: Math.max(since, liveN), session: find(n), notes: notes[n] || "", autotag: atSuggest(n) };
     },
     meetings_state: async () => mstate(),
     start_meeting: async () => ({ ok: true, dir: "C:/x/2026-10-05_1400_retro" }),
@@ -1113,7 +1164,7 @@ const R_STATUS = {
   running: "Transcribing", downloading: "Downloading model", done: "Ready", failed: "Failed",
 };
 const r = { open: null, next: 0, timer: null, status: null, segs: 0, busy: false, speakers: null, names: {},
-  tag: params.get("rtag") || "", tagsKey: null, tags: [], tagsShown: null };  // ?rtag=: a demo shot with a tag picked
+  tag: params.get("rtag") || "", tagsKey: null, tags: [], tagsShown: null, offer: null, suggest: null, suggestRaw: null, suggestKey: null, suggestGone: new Set() };  // ?rtag=: a demo shot with a tag picked
 const ACTIVE = new Set(["recording", "finalizing", "stopping", "queued", "new", "running", "downloading"]);
 function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
 function rLang() { return $("#r-lang").value || R_LANGS[0][0]; }
@@ -1229,13 +1280,77 @@ function paintTags(tags) {  // the meeting's page: its tags, each with ×, and A
   const add = $("#r-tag-add");
   add.disabled = tags.length >= 10;
   add.placeholder = add.disabled ? "10 tags at most" : "Add tag";
+  showSuggest();  // dictado-fnnr: a suggested tag the meeting now has goes
 }
 async function saveTags(tags) {
   const name = r.open;
   const out = await api.set_tags(name, tags).catch((e) => ({ ok: false, error: String(e) }));
   if (!out.ok) { toast(out.error || "Couldn't save the tags."); return; }
-  if (r.open === name) paintTags(out.tags);
+  if (r.open !== name) return;
+  paintTags(out.tags);
   r.tagsKey = null;  // the chips above the list count again
+  r.offer = out.offer || (r.offer && out.tags.some((t) => same(t, r.offer.tag)) ? r.offer : null);
+  paintOffer();
+}
+/* auto tags (dictado-fnnr): a tag added to a calendar meeting offers to tag the whole series; a dashed chip suggests a
+   customer tag from the guests' email domain. Both make a rule, listed in Settings > Meetings > Auto tags. */
+function paintOffer() {
+  const o = r.offer, box = $("#r-tag-offer");
+  box.hidden = !o;
+  if (!o) return;
+  const b = document.createElement("b"); b.textContent = o.tag;
+  $("#r-tag-offer-text").replaceChildren(`Tag every “${o.title}” meeting with `, b,
+    "?" + (o.others === 1 ? " Also tags the earlier one." : o.others > 1 ? ` Also tags the ${o.others} earlier ones.` : ""));
+}
+function paintSuggest(sug) {  // what the meeting's page got from Python; shown while the meeting lacks that tag
+  r.suggestRaw = sug && !r.suggestGone.has(sug.domain) ? sug : null;  // just clicked: the poll may not know yet
+  showSuggest();
+}
+function showSuggest() {
+  const tags = JSON.parse(r.tagsShown || "[]"), raw = r.suggestRaw;
+  const sug = raw && tags.length < 10 && !tags.some((t) => same(t, raw.tag)) ? raw : null;
+  const key = JSON.stringify(sug);
+  if (key === r.suggestKey) return;
+  r.suggestKey = key; r.suggest = sug || null;
+  $("#r-tag-suggest").hidden = !sug;
+  if (!sug) return;
+  const add = $("#r-tag-suggest-add");
+  add.textContent = `+ ${sug.tag}`;
+  add.title = `Tag this meeting and every meeting with people from ${sug.domain}`;
+  add.setAttribute("aria-label", `Tag ${sug.tag}: this meeting and every meeting with people from ${sug.domain}`);
+}
+async function offerYes() {
+  const o = r.offer, name = r.open;
+  if (!o) return;
+  r.offer = null; paintOffer();
+  const out = await api.autotag_title(name, o.tag).catch((e) => ({ ok: false, error: String(e) }));
+  if (!out.ok) { toast(out.error || "Couldn't make the rule."); return; }
+  if (r.open === name) paintTags(out.tags);
+  r.tagsKey = null;
+  const rest = `New “${o.title}” meetings get ${o.tag} by themselves.`;
+  toast(out.count ? `Tagged ${out.count} earlier meeting${out.count === 1 ? "" : "s"} too. ${rest}` : rest, 4000);
+}
+function offerNo() {
+  const o = r.offer;
+  r.offer = null; paintOffer();
+  if (o) api.dismiss_autotag("title", o.title, o.tag).catch(() => {});
+}
+async function suggestAdd() {
+  const g = r.suggest, name = r.open;
+  if (!g) return;
+  r.suggestGone.add(g.domain); paintSuggest(null);
+  const out = await api.autotag_domain(name, g.domain, g.tag).catch((e) => ({ ok: false, error: String(e) }));
+  if (!out.ok) { toast(out.error || "Couldn't make the rule."); return; }
+  if (r.open === name) paintTags(out.tags);
+  r.tagsKey = null;
+  toast(out.count ? `Added ${g.tag} here and to ${out.count} other meeting${out.count === 1 ? "" : "s"} with people from ${g.domain}.`
+    : `Added ${g.tag}. Meetings with people from ${g.domain} get it by themselves.`, 4000);
+}
+function suggestNo() {
+  const g = r.suggest;
+  if (!g) return;
+  r.suggestGone.add(g.domain); paintSuggest(null);
+  api.dismiss_autotag("domain", g.domain).catch(() => {});
 }
 async function loadKnownTags() {  // the suggestions: every tag in use (a deep link never saw the list)
   try { r.tags = (await api.list_sessions("", "")).tags || []; } catch (e) { r.tags = []; }
@@ -1286,6 +1401,7 @@ function renameSpeaker(el) {
 async function openSession(name) {
   r.open = name; r.next = 0; r.status = null; r.segs = 0; r.speakers = null; r.names = {}; r.tagsShown = null;
   $("#r-tag-add").value = "";
+  r.offer = null; paintOffer(); paintSuggest(null);
   r.notesLoaded = false; clearTimeout(r.notesTimer);
   r.repAsked = false; paintReplace(null);
   $("#r-notes-text").value = "";
@@ -1432,11 +1548,11 @@ async function renderSources(recording) {
 async function renderDetail(name) {
   $("#r-list-view").hidden = true; $("#r-detail-view").hidden = false;
   const live = r.status === null || r.status === "recording" || r.status === "stopping" || r.status === "finalizing";
-  let s, segs = null, summ = null;
+  let s, segs = null, summ = null, sug = null;
   try {
     if (live) {
       const out = await api.get_live(name, r.next);
-      s = out.session;
+      s = out.session; sug = out.autotag || null;
       notesIn(out.notes);
       if (s.status === "recording" || s.status === "finalizing" || s.status === "stopping") {
         const list = $("#r-segs"), follow = atBottom(list);  // scrolled up to read: stay there
@@ -1448,7 +1564,7 @@ async function renderDetail(name) {
     }
     if (!s || !(s.status === "recording" || s.status === "finalizing" || s.status === "stopping")) {
       const out = await api.get_session(name);
-      s = out.session; segs = out.segments; summ = out.summary || null;
+      s = out.session; segs = out.segments; summ = out.summary || null; sug = out.autotag || null;
       notesIn(out.notes);
     }
   } catch (e) {
@@ -1460,6 +1576,7 @@ async function renderDetail(name) {
   if (document.activeElement !== $("#r-d-title")) $("#r-d-title").value = s.title || "";
   if (r.tagsShown === null) await loadKnownTags();
   if (JSON.stringify(s.tags || []) !== r.tagsShown) paintTags(s.tags || []);
+  paintSuggest(sug);
   chip($("#r-d-status"), s);
   $("#r-d-meta").textContent = [when(s.created), s.lang_name, fmtDur(s.duration_s),
     s.source === "import" ? "imported file" : "mic and the computer's audio",
@@ -1638,6 +1755,8 @@ function rWire() {
   $("#r-import").onclick = async () => { const out = await api.pick_files(); rImport(out.paths); };
   $("#r-search").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(renderReuniones, 120); });
   $("#r-back").onclick = () => { r.open = null; renderReuniones(); };
+  $("#r-tag-offer-yes").onclick = offerYes; $("#r-tag-offer-no").onclick = offerNo;  // dictado-fnnr
+  $("#r-tag-suggest-add").onclick = suggestAdd; $("#r-tag-suggest-x").onclick = suggestNo;
   $("#r-tag-add").addEventListener("keydown", (e) => {  // Enter adds the tag typed or picked from the suggestions
     if (e.key === "Escape") { e.target.value = ""; return; }
     if (e.key !== "Enter") return;
@@ -2251,7 +2370,7 @@ async function renderSettings() {
   $("#f-screen-names").checked = s.values.screen_names !== false;
   $("#f-hold").checked = !!s.values.hold_to_talk; $("#f-numpad-enter").checked = !!s.values.numpad_enter;
   holdFits();
-  claudeRow(); gcalRow(); exportRow(s.values);
+  claudeRow(); gcalRow(); exportRow(s.values); autotagRows();
   $("#f-voice-memory").checked = s.values.voice_memory !== false;
   voicesRow();
   $("#f-calendar").value = s.values.calendar_url || "";
@@ -2436,6 +2555,28 @@ function exportRow(v) {  // dictado-yq9: where Download puts transcripts
   const done = (r) => { if (r.ok) { exportRow(r); toast("Downloads now go to " + r.export_dir); } else if (r.error) toast(r.error); };
   $("#export-change").onclick = async () => done(await api.pick_export_dir());
   $("#export-reset").onclick = async () => done(await api.set_export_dir(""));
+}
+async function autotagRows() {  // dictado-fnnr: Settings > Meetings > Auto tags, each rule with ×
+  const rules = (await api.autotag_rules().catch(() => ({ rules: [] }))).rules || [];
+  const box = $("#at-rows");
+  box.textContent = "";
+  $("#at-empty").hidden = rules.length > 0; $("#at-note").hidden = !rules.length;
+  for (const rule of rules) {
+    const row = document.createElement("div"); row.className = "row at-row";
+    const label = document.createElement("span"); label.className = "row-label";
+    const what = rule.kind === "title" ? `“${rule.label || rule.match}” meetings` : `People from ${rule.match}`;
+    const tag = document.createElement("span"); tag.className = "badge badge-tag"; tag.textContent = rule.tag;
+    const arrow = document.createElement("span"); arrow.className = "at-arrow"; arrow.textContent = "→"; arrow.setAttribute("aria-hidden", "true");
+    label.append(what, arrow, tag);
+    const x = document.createElement("button"); x.type = "button"; x.className = "vc-x"; x.textContent = "×";
+    x.title = "Remove this rule"; x.setAttribute("aria-label", `Remove the rule: ${what} get ${rule.tag}`);
+    x.onclick = async () => {
+      const out = await api.remove_autotag_rule(rule.kind, rule.match, rule.tag).catch(() => ({ ok: false }));
+      toast(out.ok ? "Rule removed. The tags it added stay." : "Couldn't remove the rule.");
+      autotagRows();
+    };
+    row.append(label, x); box.append(row);
+  }
 }
 async function claudeRow() {
   const st = await api.claude_app().catch(() => ({ connected: false }));
@@ -2921,6 +3062,11 @@ async function boot() {
   if (params.get("demo") === "1" && params.get("showme") === "1") setTimeout(() => $(".new-show")?.click(), 400);  // screenshot (dictado-3zfe)
   if (params.get("demo") === "1" && params.get("slack") === "1") setTimeout(() => $("#r-slack")?.click(), 500);  // screenshot (dictado-pnuy)
   if (params.get("demo") === "1" && params.get("email") === "1") setTimeout(() => $("#r-email")?.click(), 500);  // screenshot (dictado-qxr)
+  if (params.get("demo") === "1" && params.get("offer") === "1") setTimeout(() => {  // screenshot: a tag just added offers the series (dictado-fnnr)
+    const add = $("#r-tag-add"); add.value = params.get("offertag") || "Customer A";
+    add.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  }, 400);
+  if (params.get("demo") === "1" && params.get("autotags") === "1" && page === "ajustes") setTimeout(() => $("#at-rows")?.closest(".card")?.scrollIntoView?.({ block: "center" }), 300);  // screenshot
   if (params.get("demo") === "1" && params.get("retrymenu") === "1") setTimeout(() => $(".h-retry button")?.click(), 300);  // screenshot
   if (params.get("demo") === "1" && params.get("models") === "scroll") setTimeout(() => $("#m-rows").scrollIntoView(), 300);  // screenshot
   if (params.get("demo") === "1" && params.get("addlangs")) setTimeout(() => { sx.langs.push(...params.get("addlangs").split(",")); paintLangs(); }, 300);  // screenshot

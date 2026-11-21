@@ -54,6 +54,12 @@ SHOTS = {
     "reuniones-etiqueta": "page=reuniones&rtag=Customer%20A", "reuniones-etiqueta-oscuro": "page=reuniones&rtag=Customer%20A&theme=dark",
     "reuniones-sin-etiquetas": "page=reuniones&tags=0",
     "reunion-etiquetas": "page=reuniones/2026-10-05_0915_planering", "reunion-etiquetas-oscuro": "page=reuniones/2026-10-05_0915_planering&theme=dark",
+    # auto tags (dictado-fnnr): a tag just added offers the series, a customer tag suggested from the guests, the rules in Settings
+    "reunion-etiqueta-serie": "page=reuniones/2026-10-04_1600_kund&tags=0&offer=1",
+    "reunion-etiqueta-serie-oscuro": "page=reuniones/2026-10-04_1600_kund&tags=0&offer=1&theme=dark",
+    "reunion-etiqueta-sugerida": "page=reuniones/2026-10-04_1600_kund&tags=0",
+    "reunion-etiqueta-sugerida-oscuro": "page=reuniones/2026-10-04_1600_kund&tags=0&theme=dark",
+    "ajustes-etiquetas-auto": "page=ajustes&sec=meetings&autotags=1",
     "historial-editar": "page=historial&hedit=1", "historial-aprender": "page=historial&learn=1",
     "insights": "page=insights&insights=1",
     # dark mode (dictado-u9h)
