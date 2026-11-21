@@ -1315,7 +1315,7 @@ function showSuggest() {
   $("#r-tag-suggest").hidden = !sug;
   if (!sug) return;
   const add = $("#r-tag-suggest-add");
-  add.textContent = `+ ${sug.tag}`;
+  add.textContent = `+ Add ${sug.tag}`;  // a suggestion: dashed and blue, so it never reads as a tag it has
   add.title = `Tag this meeting and every meeting with people from ${sug.domain}`;
   add.setAttribute("aria-label", `Tag ${sug.tag}: this meeting and every meeting with people from ${sug.domain}`);
 }

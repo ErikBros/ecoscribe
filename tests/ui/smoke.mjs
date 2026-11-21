@@ -583,7 +583,7 @@ async function load(query) {
   const offer = doc.querySelector("#r-tag-offer"), sug = doc.querySelector("#r-tag-suggest");
   const mine = () => [...doc.querySelectorAll("#r-d-taglist .r-d-tag")].map((c) => c.firstChild.textContent);
   check(offer.hidden, "no offer before a tag is added");
-  check(!sug.hidden && doc.querySelector("#r-tag-suggest-add").textContent === "+ Customer A", "the guests' company is suggested as a dashed chip: + Customer A");
+  check(!sug.hidden && doc.querySelector("#r-tag-suggest-add").textContent === "+ Add Customer A", "the guests' company is suggested as a dashed chip: + Add Customer A");
   const add = doc.querySelector("#r-tag-add");
   add.value = "Renewal"; add.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true })); await sleep(100);
   check(!offer.hidden && doc.querySelector("#r-tag-offer-text").textContent === "Tag every “Customer A weekly” meeting with Renewal? Also tags the earlier one.",
