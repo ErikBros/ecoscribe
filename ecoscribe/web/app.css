@@ -260,6 +260,26 @@ h3 { margin: 0; font: 700 var(--fs-lead)/1.3 var(--font-display); letter-spacing
 .new-card[data-look="line"]:not(.open) .new-list, .new-card[data-look="line"]:not(.open) .new-all { display: none; }
 .new-card[data-look="line"].open { padding-bottom: 14px; }
 .new-card[data-look="list"] .new-line { display: none; }
+/* dictado-3zfe: Show me opens the screen and points at the new feature; data-map="on" adds a small map per line */
+.new-list li.has-show { display: flex; align-items: flex-start; gap: 12px; }
+.new-list li.has-show .new-li-text { flex: 1; min-width: 0; }
+.new-show { flex: none; margin-top: -2px; }
+.new-card[data-map="on"] .new-list { grid-template-columns: 1fr; }
+.new-card[data-map="on"] .new-list li.has-show { padding-left: 0; }
+.new-card[data-map="on"] .new-list li.has-show::before { display: none; }
+.new-card[data-map="off"] .mini-map { display: none; }
+.mini-map { flex: none; width: 96px; height: 61px; }
+.mini-map .w { fill: var(--card); stroke: var(--line); stroke-width: 1; }
+.mini-map .side { fill: var(--well); }
+.mini-map .nav { fill: var(--line); }
+.mini-map .nav.on { fill: var(--aegean); }
+.mini-map .bar { fill: var(--well); }
+.mini-map .spot { fill: var(--aegean-soft); stroke: var(--aegean); stroke-width: 1.5; }
+.spot-ring { position: fixed; z-index: 60; pointer-events: none; border: 2px solid var(--aegean); border-radius: var(--radius-menu);
+  box-shadow: 0 0 0 4px var(--aegean-soft); animation: spot-pulse 1.4s ease-in-out 3; }
+@keyframes spot-pulse { 50% { box-shadow: 0 0 0 9px var(--aegean-soft); } }
+.spot-tip { position: fixed; z-index: 61; max-width: 320px; padding: 9px 14px; border-radius: var(--radius-sm); background: var(--night);
+  color: var(--on-night); box-shadow: var(--shadow-float); font-size: var(--fs-ui); line-height: 1.45; animation: rise2 .18s ease-out; }
 .today { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
 .today-stat { padding: 16px 20px; display: flex; flex-direction: column; gap: 2px; }
 .today-stat .card-title { margin: 0; }

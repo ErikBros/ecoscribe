@@ -4,6 +4,9 @@ version bump adds its entry here (tests/test_whatsnew.py checks that the current
 
 Every line is public text (it becomes the release notes): plain words, no names, no quotes of anyone's
 dictation or meetings. `text` is optional (a short line is all title); `only` limits a line to "windows" or "mac".
+`show` (dictado-3zfe) is where the feature lives, for Home's Show me: {"page": a window page, "y": how far down
+that page it sits (0 top, 1 bottom, for the little map), "spots": [[selector, hint], ...], the first one on screen
+gets the ring and its hint}. The release notes leave it out.
 
 State lives in <data dir>/whatsnew.json: {"seen": "X.Y.Z"}, the newest version whose card was shown and
 closed. Pure apart from that file."""
@@ -22,7 +25,10 @@ MAX_LINES = 6  # a card, not the release page: the rest is behind "All release n
 NOTES: dict[str, list[dict]] = {
     "1.28.0": [
         {"title": "Tags on meetings", "text": "label a meeting, for example by customer or recurring call, then pick "
-         "a tag above the list to see only those. Search and Claude find tags too."},
+         "a tag above the list to see only those. Search and Claude find tags too.",
+         "show": {"page": "reuniones", "y": 0.2, "spots": [
+             ["#r-tags", "Click a tag to see only those meetings."],
+             ["#r-list > li", "Open a meeting and add a tag under its title."]]}},
         {"title": "What's new on Home", "text": "after an update, Home names what the new version brings, and the "
          "update notice says it before you install."},
     ],
@@ -47,7 +53,7 @@ def this_platform() -> str:
 def lines(version: str, platform: str | None = None) -> list[dict]:
     """The version's lines for this platform: [{"title", "text"}]."""
     platform = platform or this_platform()
-    return [{"title": n["title"], "text": n.get("text", "")} for n in NOTES.get(str(version).lstrip("v"), [])
+    return [{"title": n["title"], "text": n.get("text", ""), **({"show": n["show"]} if n.get("show") else {})} for n in NOTES.get(str(version).lstrip("v"), [])
             if n.get("only") in (None, platform)]
 
 

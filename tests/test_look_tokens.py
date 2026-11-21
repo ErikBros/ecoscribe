@@ -16,7 +16,7 @@ CSS = (WEB / "app.css").read_text(encoding="utf-8")
 TOKEN_BLOCK = re.compile(r":root(\[[^\]]*\])?\s*\{([^}]*)\}")
 COLOUR = re.compile(r"#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\(|(?<![\w-])(?:white|black)(?![\w-])", re.IGNORECASE)
 # drawings, not icons: their strokes are part of the picture
-DRAWINGS = (".hero-wave", ".r-now-wave", ".i-chart")
+DRAWINGS = (".hero-wave", ".r-now-wave", ".i-chart", ".mini-map")  # .mini-map: What's new, where a feature is (dictado-3zfe)
 
 
 def _blocks() -> dict[str, dict[str, str]]:

@@ -288,14 +288,27 @@ async function load(query) {
   await sleep(50);
   const card = doc.querySelector("#new-card");
   check(!card.hidden && doc.querySelector("#new-title").textContent === "New in 1.28:", "after an update Home says what's new");
-  check(doc.querySelector("#new-line").textContent.startsWith("What's new on Home · Share in Slack"), "one line names the new features");
+  check(doc.querySelector("#new-line").textContent.startsWith("Tags on meetings · What's new on Home · Share in Slack"), "one line names the new features");
   const more = doc.querySelector("#new-more");
   check(!more.hidden && !card.classList.contains("open"), "closed at first, with See what's new");
   more.click(); await sleep(20);
   check(card.classList.contains("open") && more.textContent === "Show less", "See what's new opens the list");
   const items = [...doc.querySelectorAll("#new-list li")];
-  check(items.length === 4 && items[1].querySelector("strong").textContent === "Share in Slack" && /Markdown file/.test(items[1].textContent),
+  check(items.length === 5 && items[2].querySelector("strong").textContent === "Share in Slack" && /Markdown file/.test(items[2].textContent),
     "each line: its title, then what it does");
+  const go = items[0].querySelector(".new-show");  // dictado-3zfe: Show me opens the screen and points at the spot
+  check(go && go.textContent === "Show me" && items[0].querySelector(".mini-map") && !items[2].querySelector(".new-show"),
+    "a line with a place has Show me (and its map); a line without one doesn't");
+  go.click(); await sleep(150);
+  check(!doc.querySelector("#page-reuniones").hidden && doc.querySelector(".spot-ring") && doc.querySelector(".spot-tip")?.textContent === "Click a tag to see only those meetings.",
+    "Show me opens Meetings and rings the tag chips with what to do");
+  doc.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape" })); await sleep(20);
+  check(!doc.querySelector(".spot-ring") && !doc.querySelector(".spot-tip"), "any key or click takes the ring away");
+  const { window: w2, doc: d2 } = await load("page=inicio&new=1&tags=0");
+  await sleep(50);
+  d2.querySelector("#new-more").click(); d2.querySelector(".new-show").click(); await sleep(150);
+  check(/add a tag under its title/.test(d2.querySelector(".spot-tip")?.textContent || ""), "no tags yet: it points at a meeting and says how to add one");
+  w2.close?.();
   doc.querySelector("#new-all").click(); await sleep(20);
   check(window.__notesOpened === true, "All release notes opens the release page");
   doc.querySelector("#new-x").click(); await sleep(50);
