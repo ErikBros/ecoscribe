@@ -661,13 +661,19 @@ class Api:
                 "speakers": m.get("speakers"), "speaker_names": {**({"Me": me} if me else {}), **(m.get("speaker_names") or {})},
                 "recognised": [(m.get("speaker_names") or {}).get(x, x) for x in m.get("speakers_recognised") or []],
                 "people": list((m.get("calendar") or {}).get("attendees") or []), "app": m.get("app"),  # dictado-6oe.4
-                "summary": m.get("summary")}  # dictado-nl5: running / done / failed, or None
+                "summary": m.get("summary"),  # dictado-nl5: running / done / failed, or None
+                "tags": sessions.tags_of(m)}  # dictado-4vms
 
-    def list_sessions(self, query: str = "") -> dict:
-        """The search box finds a title or anything said in the call, accents and case ignored (dictado-8h8)."""
+    def list_sessions(self, query: str = "", tag: str = "") -> dict:
+        """The search box finds a title, a tag or anything said in the call, accents and case ignored (dictado-8h8).
+        `tag` keeps the meetings with that tag (case ignored); `tags` is every tag in use with its count (dictado-4vms)."""
         q = str(query or "").strip()
         me = self._me()
-        rows = [self._row(m, me) for m in sessions.list_sessions(self._root())]
+        metas = sessions.list_sessions(self._root())
+        tags = sessions.tag_counts(metas)
+        if str(tag or "").strip():
+            metas = [m for m in metas if sessions.has_tag(m, tag)]
+        rows = [self._row(m, me) for m in metas]
         if q:
             said = set()
             try:
@@ -679,8 +685,17 @@ class Api:
             except Exception:
                 log.exception("meeting search failed; titles only")
             fq = search.fold(q)
-            rows = [r for r in rows if fq in search.fold(r["title"]) or r["name"] in said]
-        return {"items": rows, "state": self.meetings_state()}
+            rows = [r for r in rows if fq in search.fold(r["title"]) or r["name"] in said
+                    or any(fq in search.fold(t) for t in r["tags"])]
+        return {"items": rows, "state": self.meetings_state(), "tags": tags}
+
+    def set_tags(self, name: str, tags: list) -> dict:
+        """The meeting's own tags, replaced (dictado-4vms). A tag another meeting has in another case keeps
+        that spelling, so one label never splits in two."""
+        d = self._session(name)
+        known = [t for m in sessions.list_sessions(self._root()) if Path(m["dir"]).name != d.name
+                 for t in sessions.tags_of(m)]
+        return {"ok": True, "tags": sessions.set_tags(d, tags, known)}
 
     def get_session(self, name: str) -> dict:
         d = self._session(name)

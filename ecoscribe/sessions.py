@@ -112,6 +112,65 @@ def list_sessions(root: Path) -> list[dict]:
     return out
 
 
+# ---------- tags: the user's own labels on a meeting, e.g. a customer or a recurring call (dictado-4vms) ----------
+TAG_MAX_LEN = 40
+TAGS_MAX = 10
+
+
+def tags_of(m: dict) -> list[str]:
+    """A meta's tags, whatever meta.json holds (a hand-edited file may hold anything)."""
+    t = m.get("tags")
+    return [x for x in t if isinstance(x, str) and x.strip()] if isinstance(t, list) else []
+
+
+def clean_tag(tag) -> str:
+    """One tag: no control characters, spaces collapsed and trimmed, at most TAG_MAX_LEN characters."""
+    s = "".join(" " if unicodedata.category(c).startswith("C") else c for c in str(tag or ""))
+    return " ".join(s.split())[:TAG_MAX_LEN].strip()
+
+
+def normalize_tags(tags, known=()) -> list[str]:
+    """Cleaned, case-insensitive duplicates dropped (the first spelling stays), at most TAGS_MAX. A tag that
+    another meeting already has in another case takes that spelling (`known`, first one wins)."""
+    if isinstance(tags, str):
+        tags = [tags]
+    spelling: dict[str, str] = {}
+    for k in known or ():
+        spelling.setdefault(k.casefold(), k)
+    out, seen = [], set()
+    for t in tags or ():
+        t = clean_tag(t)
+        key = t.casefold()
+        if not t or key in seen:
+            continue
+        seen.add(key)
+        out.append(spelling.get(key, t))
+        if len(out) >= TAGS_MAX:
+            break
+    return out
+
+
+def tag_counts(metas: list[dict]) -> list[dict]:
+    """Every tag in use with how many meetings have it, most used first, then by name. Case-insensitive:
+    the spelling seen first (newest meeting first in list_sessions' order) names it."""
+    counts: dict[str, list] = {}
+    for m in metas:
+        for t in {x.casefold(): x for x in reversed(tags_of(m))}.values():
+            counts.setdefault(t.casefold(), [t, 0])[1] += 1
+    return [{"name": n, "count": c} for n, c in sorted(counts.values(), key=lambda x: (-x[1], x[0].casefold()))]
+
+
+def has_tag(m: dict, tag: str) -> bool:
+    key = clean_tag(tag).casefold()
+    return bool(key) and any(t.casefold() == key for t in tags_of(m))
+
+
+def set_tags(d: Path, tags, known=()) -> list[str]:
+    clean = normalize_tags(tags, known)
+    write_meta(d, tags=clean)
+    return clean
+
+
 def rename(d: Path, title: str) -> dict:
     return write_meta(d, title=title)
 

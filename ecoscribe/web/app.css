@@ -390,6 +390,19 @@ h3 { margin: 0; font: 700 var(--fs-lead)/1.3 var(--font-display); letter-spacing
 .r-chip[data-status="running"], .r-chip[data-status="downloading"], .r-chip[data-status="finalizing"], .r-chip[data-status="stopping"] { background: var(--aegean-soft); color: var(--aegean-ink); }
 .r-chip[data-status="done"] { background: var(--well); color: var(--ink); }
 .r-chip[data-status="failed"] { background: var(--night); color: var(--on-night-strong); }
+/* tags (dictado-4vms): the filter chips above the list, a row's tags (the .badge family) and the meeting's own (.vc-chip) */
+.r-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 4px; }
+.r-tag { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-pill);
+  background: var(--card); color: var(--ink); font: 600 var(--fs-ui) var(--font); cursor: pointer; }
+.r-tag b { font-weight: 600; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.r-tag:hover { border-color: var(--line-strong); }
+.r-tag[aria-pressed="true"] { background: var(--aegean-soft); border-color: var(--aegean); color: var(--aegean-ink); }
+.r-tag[aria-pressed="true"] b { color: var(--aegean-ink); }
+.r-tag:focus-visible { outline: 2px solid var(--aegean); outline-offset: 2px; }
+.badge.badge-tag { background: var(--well); color: var(--ink-soft); white-space: nowrap; }
+.r-row .h-meta { flex-wrap: wrap; row-gap: 4px; }
+.r-d-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -6px 0 14px; font-size: var(--fs-ui); }
+.r-d-taglist { display: contents; }
 .btn-link { background: none; border: 0; padding: 0; font: 600 var(--fs-body) var(--font); color: var(--aegean); cursor: pointer; }
 .btn-link:hover { color: var(--aegean-hover); }
 .menu { position: relative; display: inline-block; }

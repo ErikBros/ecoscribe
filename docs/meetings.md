@@ -113,7 +113,21 @@ Drag an mp3, m4a, wav, ogg, opus, flac, mp4 or webm onto the window, or use Home
 **Import file**. One job runs at a time; the rest wait in the queue. A file gets the same page, copies and downloads
 as a meeting.
 
+## Tags
+
+Label meetings to find them again, for example by customer or by a meeting that repeats every week.
+
+- **Add a tag:** on a meeting's page, type in **Add tag** under the title and press Enter. Tags you already use are
+  suggested as you type. A tag that another meeting has in another case keeps that spelling, so one label never splits
+  in two. Up to 10 tags per meeting, 40 characters each.
+- **Remove a tag:** the × on it.
+- **Show one tag's meetings:** the chips above the Meetings list show **All** and every tag in use with how many
+  meetings have it. Click a tag to see only those meetings; click it again, or **All**, to see every meeting. It works
+  together with the search box. The chips appear once a meeting has a tag.
+- **In the list:** each meeting shows its tags as small labels under its title.
+- **Claude** sees the tags too: ask the Claude app for "my meetings tagged Weekly ops" (see [With Claude](claude.md)).
+
 ## Search
 
-The search box on the Meetings tab finds titles and what was said, ranked and grouped by call. Case and accents
+The search box on the Meetings tab finds titles, tags and what was said, ranked and grouped by call. Case and accents
 don't matter, in any script. To ask questions about your calls in plain words, see [With Claude](claude.md).
