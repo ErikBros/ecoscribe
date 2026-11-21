@@ -286,7 +286,9 @@ function demoApi() {
       { title: "What's new on Home", text: "after an update, this card says what the new version brings." },
       { title: "Share in Slack", text: "a meeting's Share menu copies the transcript as a Markdown file and opens Slack. Paste it in a chat to attach it." },
       { title: "Meetings in another language", text: "when a call sounds like a different language than the one picked, Ecoscribe offers to switch." },
-      { title: "Voice commands", text: "pick the languages they work in." }] } : {}),
+      { title: "Voice commands", text: "pick the languages they work in." },
+      { title: "Auto tags", text: "rules tag past and new meetings.",
+        show: { page: "ajustes", card: "autotags", y: .75, spots: [["#autotags", "Your auto tags. Each rule tags past and new meetings; × removes it."]] } }] } : {}),
     dismiss_whats_new: async () => { window.__newDismissed = true; return { ok: true }; },
     open_release_notes: async () => { window.__notesOpened = true; return { ok: true }; },
     copy_debug_info: async () => ({ ok: true }), open_logs_folder: async () => ({ ok: true }),
@@ -1023,36 +1025,45 @@ function clearSpot() {
   for (const e of $$(".spot-ring, .spot-tip")) e.remove();
   document.removeEventListener("pointerdown", clearSpot, true);
   document.removeEventListener("keydown", clearSpot, true);
-  window.removeEventListener("scroll", clearSpot, true);
+  if (clearSpot.follow) { window.removeEventListener("scroll", clearSpot.follow, true); window.removeEventListener("resize", clearSpot.follow); }
+  clearSpot.follow = null;
   clearTimeout(clearSpot.timer);
 }
 
 async function showMe(w) {  // dictado-3zfe: open the page, ring the first spot that's on screen, say what to do there
   clearSpot();
-  await show(w.page);
+  await show(w.card ? `${w.page}/${w.card}` : w.page);  // a Settings card: its tab first (show() picks it)
   await new Promise((r) => setTimeout(r, 60));
   const on = (e) => e && !e.hidden && !e.closest("[hidden]");
   const hit = (w.spots || []).map(([sel, hint]) => [$(sel), hint]).find(([e]) => on(e));
   if (!hit) return;
   const [target, hint] = hit;
   target.scrollIntoView?.({ block: "center" });
-  const kids = [...target.children].map((c) => c.getBoundingClientRect()).filter((b) => b.width);  // the chips, not the empty row
-  const box = target.getBoundingClientRect(), r = kids.length ? {
-    left: Math.min(...kids.map((b) => b.left)), top: Math.min(...kids.map((b) => b.top)),
-    right: Math.max(...kids.map((b) => b.right)), bottom: Math.max(...kids.map((b) => b.bottom)) } : box, pad = 6;
-  r.width = r.right - r.left; r.height = r.bottom - r.top;
   const ring = document.createElement("div"), tip = document.createElement("div");
   ring.className = "spot-ring";
-  Object.assign(ring.style, { left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.width + 2 * pad}px`, height: `${r.height + 2 * pad}px` });
   tip.className = "spot-tip"; tip.setAttribute("role", "status"); tip.textContent = hint;
-  const below = r.bottom + pad + 10, roomBelow = innerHeight - below > 60;
-  Object.assign(tip.style, { left: `${Math.max(12, r.left)}px`, top: roomBelow ? `${below}px` : "", bottom: roomBelow ? "" : `${innerHeight - r.top + pad + 10}px` });
+  const place = () => {  // where the spot is now: a page still settling (Settings scrolls to its card) moves it
+    const box = target.getBoundingClientRect();
+    const kids = [...target.children].map((c) => c.getBoundingClientRect()).filter((b) => b.width);
+    const narrow = kids.length && Math.max(...kids.map((b) => b.right)) - Math.min(...kids.map((b) => b.left)) < box.width * .8;
+    const r = narrow ? {  // a row of chips: ring the chips, not the empty row
+      left: Math.min(...kids.map((b) => b.left)), top: Math.min(...kids.map((b) => b.top)),
+      right: Math.max(...kids.map((b) => b.right)), bottom: Math.max(...kids.map((b) => b.bottom)) } : box, pad = 6;
+    Object.assign(ring.style, { left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.right - r.left + 2 * pad}px`, height: `${r.bottom - r.top + 2 * pad}px` });
+    const below = r.bottom + pad + 10, roomBelow = innerHeight - below > 60;
+    Object.assign(tip.style, { left: `${Math.max(12, r.left)}px`, top: roomBelow ? `${below}px` : "", bottom: roomBelow ? "" : `${innerHeight - r.top + pad + 10}px` });
+  };
+  place();
   document.body.append(ring, tip);
+  const until = Date.now() + 1200;
+  const follow = () => { if (!ring.isConnected) return; place(); if (Date.now() < until) requestAnimationFrame(follow); };
+  requestAnimationFrame?.(follow);
   setTimeout(() => {  // the click that opened it doesn't close it
     document.addEventListener("pointerdown", clearSpot, true);
     document.addEventListener("keydown", clearSpot, true);
-    window.addEventListener("scroll", clearSpot, true);
   }, 0);
+  clearSpot.follow = place;  // scrolling moves the ring with the spot (Settings scrolls to its card a moment later)
+  window.addEventListener("scroll", place, true); window.addEventListener("resize", place);
   clearSpot.timer = setTimeout(clearSpot, 9000);
 }
 
@@ -3059,7 +3070,7 @@ async function boot() {
   }, 1000);
   if (params.get("demo") === "1" && params.get("replaced") === "1") setTimeout(() => $("#r-replace-go")?.click(), 500);  // screenshot (dictado-9lo)
   if (params.get("demo") === "1" && params.get("newopen") === "1") setTimeout(() => $("#new-more")?.click(), 400);  // screenshot (dictado-3zfe)
-  if (params.get("demo") === "1" && params.get("showme") === "1") setTimeout(() => $(".new-show")?.click(), 400);  // screenshot (dictado-3zfe)
+  if (params.get("demo") === "1" && params.get("showme")) setTimeout(() => document.querySelectorAll(".new-show")[Number(params.get("showme")) - 1]?.click(), 400);  // screenshot (dictado-3zfe)
   if (params.get("demo") === "1" && params.get("slack") === "1") setTimeout(() => $("#r-slack")?.click(), 500);  // screenshot (dictado-pnuy)
   if (params.get("demo") === "1" && params.get("email") === "1") setTimeout(() => $("#r-email")?.click(), 500);  // screenshot (dictado-qxr)
   if (params.get("demo") === "1" && params.get("offer") === "1") setTimeout(() => {  // screenshot: a tag just added offers the series (dictado-fnnr)

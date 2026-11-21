@@ -294,7 +294,7 @@ async function load(query) {
   more.click(); await sleep(20);
   check(card.classList.contains("open") && more.textContent === "Show less", "See what's new opens the list");
   const items = [...doc.querySelectorAll("#new-list li")];
-  check(items.length === 5 && items[2].querySelector("strong").textContent === "Share in Slack" && /Markdown file/.test(items[2].textContent),
+  check(items.length === 6 && items[2].querySelector("strong").textContent === "Share in Slack" && /Markdown file/.test(items[2].textContent),
     "each line: its title, then what it does");
   const go = items[0].querySelector(".new-show");  // dictado-3zfe: Show me opens the screen and points at the spot
   check(go && go.textContent === "Show me" && items[0].querySelector(".mini-map") && !items[2].querySelector(".new-show"),
@@ -304,6 +304,11 @@ async function load(query) {
     "Show me opens Meetings and rings the tag chips with what to do");
   doc.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape" })); await sleep(20);
   check(!doc.querySelector(".spot-ring") && !doc.querySelector(".spot-tip"), "any key or click takes the ring away");
+  doc.querySelector("#new-more").click(); await sleep(20);  // a Settings card: Show me opens its tab (dictado-fnnr)
+  [...doc.querySelectorAll("#new-list li")][5].querySelector(".new-show").click(); await sleep(200);
+  check(!doc.querySelector("#page-ajustes").hidden && !doc.querySelector("#autotags").closest("[hidden]")
+    && /Your auto tags/.test(doc.querySelector(".spot-tip")?.textContent || ""), "Show me opens Settings on the Auto tags card");
+  doc.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape" })); await sleep(20);
   const { window: w2, doc: d2 } = await load("page=inicio&new=1&tags=0");
   await sleep(50);
   d2.querySelector("#new-more").click(); d2.querySelector(".new-show").click(); await sleep(150);

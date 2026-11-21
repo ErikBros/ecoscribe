@@ -6,7 +6,7 @@ Every line is public text (it becomes the release notes): plain words, no names,
 dictation or meetings. `text` is optional (a short line is all title); `only` limits a line to "windows" or "mac".
 `show` (dictado-3zfe) is where the feature lives, for Home's Show me: {"page": a window page, "y": how far down
 that page it sits (0 top, 1 bottom, for the little map), "spots": [[selector, hint], ...], the first one on screen
-gets the ring and its hint}. The release notes leave it out.
+gets the ring and its hint, plus "card" to open a Settings card's tab first}. The release notes leave it out.
 
 State lives in <data dir>/whatsnew.json: {"seen": "X.Y.Z"}, the newest version whose card was shown and
 closed. Pure apart from that file."""
@@ -24,6 +24,14 @@ FIRST_CARD = "1.28.0"  # the first version with this card: a copy without whatsn
 MAX_LINES = 6  # a card, not the release page: the rest is behind "All release notes"
 
 NOTES: dict[str, list[dict]] = {
+    "1.29.0": [
+        {"title": "Auto tags", "text": "tag one recurring meeting and Ecoscribe offers to tag every one; a meeting "
+         "with people from another company suggests that company's tag. Rules tag past and new meetings.",
+         "show": {"page": "ajustes", "card": "autotags", "y": 0.75, "spots": [
+             ["#autotags", "Your auto tags. Each rule tags past and new meetings; × removes it."]]}},
+        {"title": "Ask Claude about one tag", "text": "Claude can search, debrief and sum up only the meetings "
+         "with one tag, like everything promised to one customer."},
+    ],
     "1.28.1": [
         {"title": "Show me", "text": "a new feature on this list opens its screen and points at it, with a small "
          "map of where it is."},
