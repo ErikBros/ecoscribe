@@ -153,6 +153,20 @@ def test_claude_search_falls_back_to_meaning_after_a_miss(tmp_path, ready):
     assert json.loads(search(tmp_path, text="trip", by_meaning=True, since="2026-10-04")[1])[0]["title"] == "Resa"
 
 
+def test_by_meaning_keeps_to_a_tag_before_the_limit(tmp_path, ready):
+    """dictado-rsk8: a tag filters the calls before the limit, by meaning and when an empty word search falls back."""
+    make(tmp_path, "Plata", 3, ["El presupuesto no alcanza, hay que pedir más dinero."])
+    make(tmp_path, "Kostnader", 4, ["Pengar och budget, budget och pengar."], tags=["Weekly ops"])
+    make(tmp_path, "Resa", 5, ["Vi bokar flyg till Kreta, och budgeten räcker."], tags=["Customer A"])
+    r, text = search(tmp_path, text="our trip", tag="WEEKLY OPS")  # no call has the words: the miss switches meaning on, and it answers
+    assert not r.get("isError") and [x["title"] for x in json.loads(text)] == ["Kostnader"]
+    top = json.loads(search(tmp_path, text="money budget", by_meaning=True, limit=1)[1])
+    assert [r["title"] for r in top] != ["Resa"]
+    rows = json.loads(search(tmp_path, text="money budget", by_meaning=True, limit=1, tag="customer A")[1])
+    assert [r["title"] for r in rows] == ["Resa"] and rows[0]["tags"] == ["Customer A"]
+    assert json.loads(search(tmp_path, text="money", by_meaning=True, tag="Customer")[1]) == []  # the whole tag
+
+
 def test_by_meaning_says_why_it_cannot(tmp_path, monkeypatch):
     monkeypatch.setattr(mcp_server, "MEANING", {"mode": "auto", "models_root": str(tmp_path / "models")})
     make(tmp_path, "Plata", 3, ["presupuesto"])

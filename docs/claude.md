@@ -14,9 +14,15 @@ Now you can ask Claude:
 - "My calls with Ana": it finds the calls where someone is a named speaker, a calendar guest or in the title (part of
   a name is enough, accents don't matter).
 - "My meetings tagged Customer A": it lists the meetings with one of your [tags](meetings.md#tags), and sees every
-  meeting's tags.
+  meeting's tags. Name a tag in a question and Claude looks only at those meetings: "what did we promise Customer A
+  since September?", "open to-dos from all Weekly ops meetings", "when did Ana mention the price in a Customer A
+  call?". The whole tag counts, capitals don't.
 - **Debrief my call:** pick it from Ecoscribe in Claude's + menu after a call. It lists the to-dos as tickets to make
-  (only the ones you OK) and drafts a follow-up message for you to paste. It never opens your mail or calendar.
+  (only the ones you OK) and drafts a follow-up message for you to paste. It never opens your mail or calendar. Give
+  it a tag to debrief your last call with that tag ("my last Customer A call").
+- **Sum up a tag:** also in the + menu. Give it a tag (and a date to start from, if you like): Claude reads that tag's
+  meetings, summaries first, and lists the decisions, promises and open to-dos of each, newest first, with its title
+  and date.
 
 **Search by meaning:** when a search finds no call with your words, Ecoscribe counts the miss (only how many, never
 the words) and from then on Claude can also search by meaning, so "the trip with friends" finds a call where it was
