@@ -166,6 +166,14 @@
           <input class="vc-add r-tag-add" id="r-tag-add" list="r-tag-known" placeholder="Add tag" maxlength="40" autocomplete="off" spellcheck="false"
             aria-label="Add a tag" title="A label to find this meeting by, like a customer or a recurring meeting. Enter adds it.">
           <datalist id="r-tag-known"></datalist>
+          <span class="vc-chip r-tag-suggest" id="r-tag-suggest" hidden>  <!-- dictado-fnnr: a customer tag from the guests' email domain -->
+            <button type="button" class="r-tag-suggest-add" id="r-tag-suggest-add"></button><button type="button" class="vc-x" id="r-tag-suggest-x"
+              aria-label="Don't suggest this tag" title="Don't suggest this">×</button></span>
+        </div>
+        <div class="r-tag-offer" id="r-tag-offer" role="group" aria-label="Tag the whole series" hidden>  <!-- dictado-fnnr -->
+          <span id="r-tag-offer-text"></span>
+          <button type="button" class="btn btn-ghost btn-sm" id="r-tag-offer-yes">Yes</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="r-tag-offer-no">No</button>
         </div>
         <div class="r-d-actions" id="r-d-live-actions" hidden>
           <span class="r-rec-dot"></span><span class="r-live-note">Transcribing live: the final version comes when you stop.</span>
@@ -546,6 +554,13 @@
             <span class="cal-field"><input type="password" class="cal-url" id="f-calendar" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics" spellcheck="false" autocomplete="off">
             <button type="button" class="btn btn-ghost btn-sm" id="cal-test">Test</button></span>
             <span class="muted small" id="cal-result"></span></span></div>
+        </div>
+
+        <div class="card group" data-sec="meetings">  <!-- dictado-fnnr -->
+          <div class="group-head"><h3>Auto tags</h3><p class="muted">Tags Ecoscribe adds by itself, to past and new meetings.</p></div>
+          <div id="at-rows"></div>
+          <p class="muted small at-empty" id="at-empty">None yet. Tag a meeting from your calendar and its page offers to tag the rest of the series, or everyone from the same company.</p>
+          <p class="muted small at-note" id="at-note" hidden>Removing a rule keeps the tags it already added.</p>
         </div>
 
         <div class="card group" data-sec="meetings">

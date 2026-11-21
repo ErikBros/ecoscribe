@@ -158,6 +158,8 @@ class Controller:
             from .calendar_ics import meta_info
             sessions.write_meta(d, calendar=meta_info(ev))
             log.info("meeting named from the calendar (%d attendees)", len(ev.attendees))
+            from . import autotags
+            autotags.apply_one(d, self.data)  # dictado-fnnr: the user's auto-tag rules
         return d
 
     def start_meeting(self, lang: str, title: str = "Meeting", app: str | None = None) -> Path:

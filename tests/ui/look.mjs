@@ -34,6 +34,9 @@ const PAGES = {
   "reunion-reemplazar": "page=reuniones/2026-10-04_1600_kund&replace=1", "reunion-reemplazado": "page=reuniones/2026-10-04_1600_kund&replace=1&replaced=1", "reunion-sin-invitados": "page=reuniones/2026-10-05_0915_planering&noguests=1&email=1",
   insights: "page=insights&insights=1", "reuniones-etiqueta": "page=reuniones&rtag=Customer%20A",
   "reunion-etiquetas": "page=reuniones/2026-10-05_0915_planering",
+  // auto tags (dictado-fnnr)
+  "reunion-etiqueta-serie": "page=reuniones/2026-10-04_1600_kund&tags=0&offer=1", "reunion-etiqueta-sugerida": "page=reuniones/2026-10-04_1600_kund&tags=0",
+  "ajustes-etiquetas-auto": "page=ajustes&sec=meetings&autotags=1",
 };
 
 async function load(query) {

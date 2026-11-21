@@ -29,6 +29,7 @@ commands**. See [Dictation](dictation.md#languages) and
 | **Recording** | **When a call starts** (*Ask*, *Start by itself* or *Don't detect*), **Stop recording after the call ends** (5 seconds to 2 minutes), **Meeting language** (when the call app doesn't say) |
 | **People** | **Your name** (your lines show it instead of "Me"), **Tell the other speakers apart**, **Remember voices**, **Forget all voices**. See [Meetings](meetings.md#who-said-what-speaker-add-on). |
 | **Calendar** | **Google Calendar > Connect**, or paste a **Calendar address**. See [Meetings](meetings.md#meeting-names-from-your-calendar). |
+| **Auto tags** | The rules that tag meetings by themselves, one per line, like *"Weekly ops" meetings → Weekly ops* or *People from customer-a.com → Customer A*. The × removes a rule; the tags it already added stay. See [Meetings](meetings.md#auto-tags). |
 | **Files and apps** | **Downloads go to** (**Change...**, **Use Downloads**) and **Claude app > Connect** (see [With Claude](claude.md)) |
 
 ## General
