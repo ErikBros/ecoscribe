@@ -20,9 +20,14 @@ from pathlib import Path
 from .updates import is_newer, parse
 
 STATE = "whatsnew.json"
+FIRST_CARD = "1.28.0"  # the first version with this card: a copy without whatsnew.json updated from before it
 MAX_LINES = 6  # a card, not the release page: the rest is behind "All release notes"
 
 NOTES: dict[str, list[dict]] = {
+    "1.28.1": [
+        {"title": "Show me", "text": "a new feature on this list opens its screen and points at it, with a small "
+         "map of where it is."},
+    ],
     "1.28.0": [
         {"title": "Tags on meetings", "text": "label a meeting, for example by customer or recurring call, then pick "
          "a tag above the list to see only those. Search and Claude find tags too.",
@@ -90,7 +95,8 @@ def mark_seen(data_dir: Path, version: str) -> None:
 def pending(data_dir: Path, current: str, updated: bool, platform: str | None = None) -> dict:
     """Home's card: {"version", "items"} when this copy was updated since the card was last closed; {} otherwise.
     updated: this isn't a fresh install (the welcome was finished). A fresh install marks the version seen and
-    shows nothing: everything is new to them. An update from before this card existed shows this version's lines.
+    shows nothing: everything is new to them. An update from before this card existed (no whatsnew.json) shows
+    every version since FIRST_CARD, so a jump from 1.27 to a later one still hears about 1.28's features.
     Several versions skipped: newest first, at most MAX_LINES lines."""
     current = str(current).lstrip("v")
     seen = load(data_dir).get("seen")
@@ -101,8 +107,8 @@ def pending(data_dir: Path, current: str, updated: bool, platform: str | None = 
         seen = None
     elif not is_newer(current, seen):
         return {}
-    versions = sorted((v for v in NOTES if parse(v) and not is_newer(v, current) and (seen is None and v == current
-                       or seen is not None and is_newer(v, seen))), key=parse, reverse=True)
+    versions = sorted((v for v in NOTES if parse(v) and not is_newer(v, current) and (
+        not is_newer(FIRST_CARD, v) if seen is None else is_newer(v, seen))), key=parse, reverse=True)
     items = [i for v in versions for i in lines(v, platform)][:MAX_LINES]
     if not items:
         return {}

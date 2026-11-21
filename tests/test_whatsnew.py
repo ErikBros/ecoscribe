@@ -21,6 +21,7 @@ WINDOW_PAGES = {"inicio", "reuniones", "historial", "insights", "ajustes"}
 @pytest.fixture
 def notes(monkeypatch):
     monkeypatch.setattr(whatsnew, "NOTES", NOTES)
+    monkeypatch.setattr(whatsnew, "FIRST_CARD", "1.4.0")
 
 
 def titles(card):
@@ -54,10 +55,13 @@ def test_fresh_install_shows_nothing_and_marks_seen(tmp_path, notes):
     assert whatsnew.pending(tmp_path, "1.6.0", updated=True) == {}
 
 
-def test_update_from_before_the_card_shows_this_version(tmp_path, notes):
+def test_update_from_before_the_card_shows_every_version_since_the_card(tmp_path, notes, monkeypatch):
+    monkeypatch.setattr(whatsnew, "FIRST_CARD", "1.6.0")
     card = whatsnew.pending(tmp_path, "1.6.0", updated=True, platform="windows")
     assert card["version"] == "1.6.0" and titles(card) == ["Six", "Six on Windows"]
     assert card["items"][0] == {"title": "Six", "text": "six is here."}
+    monkeypatch.setattr(whatsnew, "FIRST_CARD", "1.5.0")  # skipped the first version with the card: both
+    assert titles(whatsnew.pending(tmp_path, "1.6.0", True, "mac")) == ["Six", "Five", "Five on the Mac"]
 
 
 def test_skipped_versions_newest_first_per_platform(tmp_path, notes):
