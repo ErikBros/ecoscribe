@@ -230,6 +230,8 @@ function demoApi() {
     open_guide: async (p, s) => { window.__guide = p + (s ? "#" + s : ""); return { ok: true }; },
     dismiss_update: async (v) => { window.__updDismissed = v; return { ok: true }; },
     whats_new: async () => (params.get("new") && !window.__newDismissed ? { version: "1.28.0", url: "https://github.com/ErikBros/ecoscribe/releases/tag/v1.28.0", items: [
+      { title: "Tags on meetings", text: "label a meeting, for example by customer or recurring call, then pick a tag above the list to see only those.",
+        show: { page: "reuniones", y: .2, spots: [["#r-tags", "Click a tag to see only those meetings."], ["#r-list > li", "Open a meeting and add a tag under its title."]] } },
       { title: "What's new on Home", text: "after an update, this card says what the new version brings." },
       { title: "Share in Slack", text: "a meeting's Share menu copies the transcript as a Markdown file and opens Slack. Paste it in a chat to attach it." },
       { title: "Meetings in another language", text: "when a call sounds like a different language than the one picked, Ecoscribe offers to switch." },
@@ -932,7 +934,13 @@ async function whatsNew() {  // dictado-owyk: what this version brings, once aft
   $("#new-list").replaceChildren(...n.items.map((i) => {
     const li = document.createElement("li"), b = document.createElement("strong");
     b.textContent = i.title;
-    li.append(b, i.text ? `: ${i.text}` : "");
+    if (!i.show) { li.append(b, i.text ? `: ${i.text}` : ""); return li; }
+    const t = document.createElement("span"), go = document.createElement("button");  // dictado-3zfe: Show me
+    t.className = "new-li-text"; t.append(b, i.text ? `: ${i.text}` : "");
+    go.type = "button"; go.className = "btn btn-ghost btn-sm new-show"; go.textContent = "Show me";
+    go.onclick = () => showMe(i.show);
+    li.className = "has-show";
+    li.append(miniMap(i.show), t, go);
     return li;
   }));
   const more = $("#new-more");
@@ -940,6 +948,61 @@ async function whatsNew() {  // dictado-owyk: what this version brings, once aft
   more.onclick = () => { box.classList.toggle("open"); more.textContent = box.classList.contains("open") ? "Show less" : "See what's new"; };
   $("#new-all").onclick = (e) => { e.preventDefault(); api.open_release_notes(); };
   $("#new-x").onclick = async () => { await api.dismiss_whats_new(); box.hidden = true; };
+}
+
+const MAP_PAGES = ["inicio", "reuniones", "historial", "ajustes"];
+function miniMap(w) {  // dictado-3zfe: the window drawn small, the page's tab and the feature's place marked
+  const svg = document.createElementNS(SVGNS, "svg"), el = (tag, cls, a) => {
+    const e = document.createElementNS(SVGNS, tag); e.setAttribute("class", cls);
+    for (const [k, v] of Object.entries(a)) e.setAttribute(k, v);
+    svg.append(e); return e;
+  };
+  svg.setAttribute("class", "mini-map"); svg.setAttribute("viewBox", "0 0 96 61"); svg.setAttribute("aria-hidden", "true");
+  el("rect", "w", { x: .5, y: .5, width: 95, height: 60, rx: 5 });
+  el("rect", "side", { x: 1, y: 1, width: 22, height: 59, rx: 4.5 });
+  MAP_PAGES.forEach((p, k) => el("rect", "nav" + (p === w.page ? " on" : ""), { x: 5, y: 9 + k * 7, width: 14, height: 3, rx: 1.5 }));
+  el("rect", "bar", { x: 29, y: 6, width: 30, height: 5, rx: 2 });
+  for (let k = 0; k < 4; k++) el("rect", "bar", { x: 29, y: 17 + k * 10, width: 60, height: 6, rx: 2 });
+  const y = 14 + Math.max(0, Math.min(1, w.y ?? .3)) * 38;
+  el("rect", "spot", { x: 27, y, width: 64, height: 8, rx: 3 });
+  return svg;
+}
+
+function clearSpot() {
+  for (const e of $$(".spot-ring, .spot-tip")) e.remove();
+  document.removeEventListener("pointerdown", clearSpot, true);
+  document.removeEventListener("keydown", clearSpot, true);
+  window.removeEventListener("scroll", clearSpot, true);
+  clearTimeout(clearSpot.timer);
+}
+
+async function showMe(w) {  // dictado-3zfe: open the page, ring the first spot that's on screen, say what to do there
+  clearSpot();
+  await show(w.page);
+  await new Promise((r) => setTimeout(r, 60));
+  const on = (e) => e && !e.hidden && !e.closest("[hidden]");
+  const hit = (w.spots || []).map(([sel, hint]) => [$(sel), hint]).find(([e]) => on(e));
+  if (!hit) return;
+  const [target, hint] = hit;
+  target.scrollIntoView?.({ block: "center" });
+  const kids = [...target.children].map((c) => c.getBoundingClientRect()).filter((b) => b.width);  // the chips, not the empty row
+  const box = target.getBoundingClientRect(), r = kids.length ? {
+    left: Math.min(...kids.map((b) => b.left)), top: Math.min(...kids.map((b) => b.top)),
+    right: Math.max(...kids.map((b) => b.right)), bottom: Math.max(...kids.map((b) => b.bottom)) } : box, pad = 6;
+  r.width = r.right - r.left; r.height = r.bottom - r.top;
+  const ring = document.createElement("div"), tip = document.createElement("div");
+  ring.className = "spot-ring";
+  Object.assign(ring.style, { left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.width + 2 * pad}px`, height: `${r.height + 2 * pad}px` });
+  tip.className = "spot-tip"; tip.setAttribute("role", "status"); tip.textContent = hint;
+  const below = r.bottom + pad + 10, roomBelow = innerHeight - below > 60;
+  Object.assign(tip.style, { left: `${Math.max(12, r.left)}px`, top: roomBelow ? `${below}px` : "", bottom: roomBelow ? "" : `${innerHeight - r.top + pad + 10}px` });
+  document.body.append(ring, tip);
+  setTimeout(() => {  // the click that opened it doesn't close it
+    document.addEventListener("pointerdown", clearSpot, true);
+    document.addEventListener("keydown", clearSpot, true);
+    window.addEventListener("scroll", clearSpot, true);
+  }, 0);
+  clearSpot.timer = setTimeout(clearSpot, 9000);
 }
 
 async function renderInicio() {  // the dictate banner, today's numbers, recent dictations (dictado-6oe.3)
@@ -2854,6 +2917,8 @@ async function boot() {
     if (p) show(p);
   }, 1000);
   if (params.get("demo") === "1" && params.get("replaced") === "1") setTimeout(() => $("#r-replace-go")?.click(), 500);  // screenshot (dictado-9lo)
+  if (params.get("demo") === "1" && params.get("newopen") === "1") setTimeout(() => $("#new-more")?.click(), 400);  // screenshot (dictado-3zfe)
+  if (params.get("demo") === "1" && params.get("showme") === "1") setTimeout(() => $(".new-show")?.click(), 400);  // screenshot (dictado-3zfe)
   if (params.get("demo") === "1" && params.get("slack") === "1") setTimeout(() => $("#r-slack")?.click(), 500);  // screenshot (dictado-pnuy)
   if (params.get("demo") === "1" && params.get("email") === "1") setTimeout(() => $("#r-email")?.click(), 500);  // screenshot (dictado-qxr)
   if (params.get("demo") === "1" && params.get("retrymenu") === "1") setTimeout(() => $(".h-retry button")?.click(), 300);  // screenshot

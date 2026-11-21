@@ -4,6 +4,9 @@ version bump adds its entry here (tests/test_whatsnew.py checks that the current
 
 Every line is public text (it becomes the release notes): plain words, no names, no quotes of anyone's
 dictation or meetings. `text` is optional (a short line is all title); `only` limits a line to "windows" or "mac".
+`show` (dictado-3zfe) is where the feature lives, for Home's Show me: {"page": a window page, "y": how far down
+that page it sits (0 top, 1 bottom, for the little map), "spots": [[selector, hint], ...], the first one on screen
+gets the ring and its hint}. The release notes leave it out.
 
 State lives in <data dir>/whatsnew.json: {"seen": "X.Y.Z"}, the newest version whose card was shown and
 closed. Pure apart from that file."""
@@ -17,12 +20,20 @@ from pathlib import Path
 from .updates import is_newer, parse
 
 STATE = "whatsnew.json"
+FIRST_CARD = "1.28.0"  # the first version with this card: a copy without whatsnew.json updated from before it
 MAX_LINES = 6  # a card, not the release page: the rest is behind "All release notes"
 
 NOTES: dict[str, list[dict]] = {
+    "1.28.1": [
+        {"title": "Show me", "text": "a new feature on this list opens its screen and points at it, with a small "
+         "map of where it is."},
+    ],
     "1.28.0": [
         {"title": "Tags on meetings", "text": "label a meeting, for example by customer or recurring call, then pick "
-         "a tag above the list to see only those. Search and Claude find tags too."},
+         "a tag above the list to see only those. Search and Claude find tags too.",
+         "show": {"page": "reuniones", "y": 0.2, "spots": [
+             ["#r-tags", "Click a tag to see only those meetings."],
+             ["#r-list > li", "Open a meeting and add a tag under its title."]]}},
         {"title": "What's new on Home", "text": "after an update, Home names what the new version brings, and the "
          "update notice says it before you install."},
     ],
@@ -47,7 +58,7 @@ def this_platform() -> str:
 def lines(version: str, platform: str | None = None) -> list[dict]:
     """The version's lines for this platform: [{"title", "text"}]."""
     platform = platform or this_platform()
-    return [{"title": n["title"], "text": n.get("text", "")} for n in NOTES.get(str(version).lstrip("v"), [])
+    return [{"title": n["title"], "text": n.get("text", ""), **({"show": n["show"]} if n.get("show") else {})} for n in NOTES.get(str(version).lstrip("v"), [])
             if n.get("only") in (None, platform)]
 
 
@@ -84,7 +95,8 @@ def mark_seen(data_dir: Path, version: str) -> None:
 def pending(data_dir: Path, current: str, updated: bool, platform: str | None = None) -> dict:
     """Home's card: {"version", "items"} when this copy was updated since the card was last closed; {} otherwise.
     updated: this isn't a fresh install (the welcome was finished). A fresh install marks the version seen and
-    shows nothing: everything is new to them. An update from before this card existed shows this version's lines.
+    shows nothing: everything is new to them. An update from before this card existed (no whatsnew.json) shows
+    every version since FIRST_CARD, so a jump from 1.27 to a later one still hears about 1.28's features.
     Several versions skipped: newest first, at most MAX_LINES lines."""
     current = str(current).lstrip("v")
     seen = load(data_dir).get("seen")
@@ -95,8 +107,8 @@ def pending(data_dir: Path, current: str, updated: bool, platform: str | None = 
         seen = None
     elif not is_newer(current, seen):
         return {}
-    versions = sorted((v for v in NOTES if parse(v) and not is_newer(v, current) and (seen is None and v == current
-                       or seen is not None and is_newer(v, seen))), key=parse, reverse=True)
+    versions = sorted((v for v in NOTES if parse(v) and not is_newer(v, current) and (
+        not is_newer(FIRST_CARD, v) if seen is None else is_newer(v, seen))), key=parse, reverse=True)
     items = [i for v in versions for i in lines(v, platform)][:MAX_LINES]
     if not items:
         return {}

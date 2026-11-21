@@ -18,6 +18,8 @@ SHOTS = {
     "inicio-version-descarga": "page=inicio&update=dl", "inicio-version-lista": "page=inicio&update=ready",
     "inicio-novedades": "page=inicio&new=1", "inicio-novedades-oscuro": "page=inicio&new=1&theme=dark",  # dictado-owyk
     "inicio-novedades-version": "page=inicio&new=1&update=1",
+    "inicio-novedades-abierto": "page=inicio&new=1&newopen=1", "inicio-novedades-abierto-oscuro": "page=inicio&new=1&newopen=1&theme=dark",
+    "novedades-senala": "page=inicio&new=1&showme=1", "novedades-senala-oscuro": "page=inicio&new=1&showme=1&theme=dark",  # dictado-3zfe
     "inicio-version-fallo": "page=inicio&update=failed",  # Install when idle's steps (dictado-nmo)
     "detenido": "page=inicio&state=stopped",
     "cargando": "page=inicio&state=loading",
