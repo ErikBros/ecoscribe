@@ -20,6 +20,12 @@ STATE = "whatsnew.json"
 MAX_LINES = 6  # a card, not the release page: the rest is behind "All release notes"
 
 NOTES: dict[str, list[dict]] = {
+    "1.28.0": [
+        {"title": "Tags on meetings", "text": "label a meeting, for example by customer or recurring call, then pick "
+         "a tag above the list to see only those. Search and Claude find tags too."},
+        {"title": "What's new on Home", "text": "after an update, Home names what the new version brings, and the "
+         "update notice says it before you install."},
+    ],
     "1.27.0": [
         {"title": "Share in Slack", "text": "a meeting's Share menu copies the transcript as a Markdown file, named "
          "with the meeting, who spoke and how long, and opens Slack. Paste it in a chat to attach it."},
