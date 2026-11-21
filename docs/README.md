@@ -15,7 +15,8 @@ Download, install, first-run setup, where your files are.
 
 Open it from the tray icon (Mac: the menu bar icon) or the Start menu. **Home** has the state ("Ready"), today's
 numbers, your last dictations, Record a meeting and Transcribe a file, and the cards that need you (a new version, a
-crash report, your to-dos). **Meetings**, **History**, **Insights** (when switched on) and **Settings** are the other
+crash report, your to-dos). After an update, Home also shows **What's new** in that version once, until you close it
+with ×. **Meetings**, **History**, **Insights** (when switched on) and **Settings** are the other
 tabs.
 
 ## How-to

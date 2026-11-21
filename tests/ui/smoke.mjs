@@ -275,6 +275,33 @@ async function load(query) {
   check(note.hidden && window.__updDismissed === "1.18.0", "× hides it for that version");
   check(errors.length === 0, "no JS errors with the update notice: " + errors.join("; "));
 }
+{ // dictado-owyk: the notice names what the new version brings; after an update Home says what's new, once
+  const { doc: up } = await load("page=inicio&update=1");
+  await sleep(50);
+  check(/^New: Share in Slack, Meetings in another language and Voice commands\. You have \d+\.\d+/.test(up.querySelector("#update-sub").textContent),
+    "the update notice names the new features");
+  const { doc: plain } = await load("page=inicio&update=1&hl=0");
+  await sleep(50);
+  check(/Your settings and history stay/.test(plain.querySelector("#update-sub").textContent), "no highlights: the old line");
+  check((await load("page=inicio")).doc.querySelector("#new-card").hidden, "no update: no What's new card");
+  const { window, doc, errors } = await load("page=inicio&new=1");
+  await sleep(50);
+  const card = doc.querySelector("#new-card");
+  check(!card.hidden && doc.querySelector("#new-title").textContent === "New in 1.28:", "after an update Home says what's new");
+  check(doc.querySelector("#new-line").textContent.startsWith("What's new on Home · Share in Slack"), "one line names the new features");
+  const more = doc.querySelector("#new-more");
+  check(!more.hidden && !card.classList.contains("open"), "closed at first, with See what's new");
+  more.click(); await sleep(20);
+  check(card.classList.contains("open") && more.textContent === "Show less", "See what's new opens the list");
+  const items = [...doc.querySelectorAll("#new-list li")];
+  check(items.length === 4 && items[1].querySelector("strong").textContent === "Share in Slack" && /Markdown file/.test(items[1].textContent),
+    "each line: its title, then what it does");
+  doc.querySelector("#new-all").click(); await sleep(20);
+  check(window.__notesOpened === true, "All release notes opens the release page");
+  doc.querySelector("#new-x").click(); await sleep(50);
+  check(card.hidden && window.__newDismissed === true, "× closes it for good");
+  check(errors.length === 0, "no JS errors with What's new: " + errors.join("; "));
+}
 { // dictado-7e1: the GPU part downloading / failed shows in the engine fact
   const { doc } = await load("page=inicio&gpurt=downloading");
   check(doc.querySelector("#fact-engine").textContent === "CPU · getting GPU 44%"

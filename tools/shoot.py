@@ -16,6 +16,8 @@ SHOTS = {
        (("permissions", "&mac=1"), ("models", ""), ("mic", ""), ("shortcut", ""), ("try", ""), ("done", ""))},
     "inicio-version": "page=inicio&update=1",
     "inicio-version-descarga": "page=inicio&update=dl", "inicio-version-lista": "page=inicio&update=ready",
+    "inicio-novedades": "page=inicio&new=1", "inicio-novedades-oscuro": "page=inicio&new=1&theme=dark",  # dictado-owyk
+    "inicio-novedades-version": "page=inicio&new=1&update=1",
     "inicio-version-fallo": "page=inicio&update=failed",  # Install when idle's steps (dictado-nmo)
     "detenido": "page=inicio&state=stopped",
     "cargando": "page=inicio&state=loading",

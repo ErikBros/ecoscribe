@@ -28,7 +28,7 @@ const PAGES = {
   "setup-shortcut": "page=bienvenida&welcome=1&sstep=shortcut", "setup-try": "page=bienvenida&welcome=1&sstep=try",
   "setup-done": "page=bienvenida&welcome=1&sstep=done", detenido: "page=inicio&state=stopped",
   cargando: "page=inicio&state=loading", "inicio-version": "page=inicio&update=1", "inicio-version-descarga": "page=inicio&update=dl",
-  "inicio-version-lista": "page=inicio&update=ready", "inicio-version-fallo": "page=inicio&update=failed", reuniones: "page=reuniones", "reuniones-vacia": "page=reuniones&rec=0",
+  "inicio-version-lista": "page=inicio&update=ready", "inicio-version-fallo": "page=inicio&update=failed", "inicio-novedades": "page=inicio&new=1", reuniones: "page=reuniones", "reuniones-vacia": "page=reuniones&rec=0",
   "reunion-directo": "page=reuniones/2026-10-05_1400_retro", "reunion-lista": "page=reuniones/2026-10-05_0915_planering",
   "reunion-cola": "page=reuniones/2026-10-05_1130_podcast",
   "reunion-reemplazar": "page=reuniones/2026-10-04_1600_kund&replace=1", "reunion-reemplazado": "page=reuniones/2026-10-04_1600_kund&replace=1&replaced=1", "reunion-sin-invitados": "page=reuniones/2026-10-05_0915_planering&noguests=1&email=1",
