@@ -69,3 +69,22 @@ def test_gitleaks_rules_let_placeholders_and_fixtures_through(tmp_path):
         "tests/fixtures/hello.wav": "scripted test recording\n",
     })
     assert not found, found
+
+
+def test_wsl_finds_the_windows_app_folder_without_cmd_on_path(monkeypatch):
+    """A WSL session whose PATH has no Windows folders (a background job) still finds the app folder."""
+    seen = []
+
+    def fake_run(args, **kw):
+        seen.append(args[0])
+        out = "C:\\Users\\someone\\AppData\\Local" if args[0].endswith("cmd.exe") else "/mnt/c/Users/someone/AppData/Local"
+        return subprocess.CompletedProcess(args, 0, stdout=out + "\n", stderr="")
+
+    for var in ("ECOSCRIBE_PERSONAL_DIR", "LOCALAPPDATA"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setattr(guard.sys, "platform", "linux")
+    monkeypatch.setattr(guard.Path, "read_text", lambda self, **kw: "Linux microsoft-standard-WSL2")
+    monkeypatch.setattr(guard.shutil, "which", lambda name: None)
+    monkeypatch.setattr(guard.subprocess, "run", fake_run)
+    assert guard.data_dirs() == [Path("/mnt/c/Users/someone/AppData/Local/ecoscribe")]
+    assert seen[0] == guard.WIN_CMD
