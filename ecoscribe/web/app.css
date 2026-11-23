@@ -242,6 +242,27 @@ h3 { margin: 0; font: 700 var(--fs-lead)/1.3 var(--font-display); letter-spacing
 .update-text { flex: 1; min-width: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0 10px; align-items: baseline; }
 .update-text span { color: var(--ink-soft); }
 .update-note .home-tip-x { margin-top: 0; }
+/* dictado-9zeo.1: the pop-up when a new version is downloaded (over any page), and the Installing screen that
+   covers the whole window, sidebar included, until the new version opens. Above every other layer: .setup 20,
+   .i-tip 30, .spot-ring 60, .spot-tip 61, the toast. */
+.upd-ask { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px; background: var(--scrim); animation: fade .16s ease-out; }
+.upd-ask[hidden], .upd-installing[hidden] { display: none; }
+.upd-ask-box { width: min(440px, 100%); display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 26px 28px 22px;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-float); animation: rise2 .18s ease-out; }
+.upd-ask-icon { width: 34px; height: 34px; padding: 7px; flex: none; border-radius: var(--radius-sm); background: var(--aegean-soft);
+  fill: none; stroke: var(--aegean); stroke-width: var(--icon-stroke); stroke-linecap: round; stroke-linejoin: round; }
+.upd-ask-box h2 { margin-top: 4px; }
+.upd-ask-sub { margin: 0; color: var(--ink-soft); font-size: var(--fs-body); line-height: 1.5; }
+.upd-ask-btns { align-self: stretch; display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+.upd-installing { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 24px; background: var(--paper);
+  cursor: progress; outline: none; animation: fade .2s ease-out; }
+.upd-installing-box { width: min(460px, 100%); display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+.upd-installing-box .mark { width: 48px; height: 48px; margin-bottom: 8px; }
+.upd-installing-sub { margin: 0; color: var(--ink-soft); font-size: var(--fs-lead); }
+.upd-bar { position: relative; width: 240px; height: 6px; margin-top: 14px; overflow: hidden; border-radius: var(--radius-pill); background: var(--well); }
+.upd-bar span { position: absolute; top: 0; bottom: 0; width: 38%; border-radius: var(--radius-pill); background: var(--aegean); animation: upd-slide 1.4s ease-in-out infinite; }
+@keyframes upd-slide { from { left: -38%; } to { left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .upd-bar span { animation-duration: 3s; } }
 /* dictado-owyk: what's new after an update; above the hero, gone once closed */
 .new-card { padding: 14px 10px 14px 20px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 10px; }
 .new-head { display: flex; align-items: center; gap: 10px; min-width: 0; }

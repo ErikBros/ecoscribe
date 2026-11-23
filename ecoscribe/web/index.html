@@ -68,7 +68,7 @@
         <svg class="update-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10.5M7.5 10.5 12 15l4.5-4.5"/><path d="M5 19.5h14"/></svg>
         <p class="update-text"><strong id="update-title">A new version of Ecoscribe is out</strong>
           <span id="update-sub">Your settings and history stay as they are.</span></p>
-        <button type="button" class="btn btn-primary btn-sm" id="update-idle" hidden>Install when idle</button>  <!-- dictado-nmo -->
+        <button type="button" class="btn btn-primary btn-sm" id="update-now" hidden>Install now</button>  <!-- dictado-9zeo.1 -->
         <button type="button" class="btn btn-primary btn-sm" id="update-get">Download</button>
         <button type="button" class="home-tip-x" id="update-x" aria-label="Not now" title="Hide until a newer version is out">×</button>
       </div>
@@ -581,9 +581,9 @@
             <select name="theme" id="f-theme"></select></label>
           <label class="row toggle-row" id="row-startup"><span class="row-text"><span class="row-label">Start with Windows</span><span class="muted small" id="startup-hint">Ecoscribe starts by itself when you sign in.</span></span>
             <input type="checkbox" class="switch" name="startup" id="f-startup"></label>
-          <label class="row" id="row-updates"><span class="row-text"><span class="row-label">New versions</span><span class="muted small" id="updates-help">Never during a call or while you dictate. Nothing of yours is sent.</span></span>
+          <label class="row" id="row-updates"><span class="row-text"><span class="row-label">New versions</span><span class="muted small" id="updates-help">Nothing of yours is sent.</span></span>
             <select id="f-updates" aria-label="New versions">
-              <option value="auto">Install by itself</option><option value="tell">Tell me on Home</option><option value="off">Don't check</option>
+              <option value="auto">Download by itself</option><option value="tell">Tell me on Home</option><option value="off">Don't check</option>
             </select></label>
           <input type="checkbox" name="update_check" id="f-update-check" hidden><input type="checkbox" name="auto_update" id="f-auto-update" hidden>
           <label class="row toggle-row"><span class="row-text"><span class="row-label">Insights tab</span><span class="muted small">What your dictations say: time saved, languages, filler words. Worked out on this PC.</span></span>
@@ -747,6 +747,32 @@
     <button type="button" class="btn btn-link s-skip" id="s-skip" hidden>Cancel</button>
     <button type="button" class="btn btn-primary btn-lg" id="s-next">Continue →</button>
   </div>
+  </div>
+</div>
+
+<!-- dictado-9zeo.1: a new version is downloaded: install it now? Over any page; Later leaves Install now on Home -->
+<div class="upd-ask" id="upd-ask" role="dialog" aria-modal="true" aria-labelledby="upd-ask-title" aria-describedby="upd-ask-sub" hidden>
+  <div class="upd-ask-box">
+    <svg class="upd-ask-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10.5M7.5 10.5 12 15l4.5-4.5"/><path d="M5 19.5h14"/></svg>
+    <h2 id="upd-ask-title">Install the new version of Ecoscribe now?</h2>
+    <p class="upd-ask-sub" id="upd-ask-sub">Your settings and history stay as they are.</p>
+    <div class="upd-ask-btns">
+      <button type="button" class="btn btn-ghost" id="upd-ask-later">Later</button>
+      <button type="button" class="btn btn-primary" id="upd-ask-now">Install now</button>
+    </div>
+  </div>
+</div>
+<!-- dictado-9zeo.1: from the press until the new version opens; nothing in the window can be used meanwhile -->
+<div class="upd-installing" id="upd-installing" role="alertdialog" aria-modal="true" aria-labelledby="upd-installing-title" aria-busy="true" tabindex="-1" hidden>
+  <div class="upd-installing-box">
+    <svg class="mark" viewBox="0 0 48 48" aria-hidden="true">
+      <rect width="48" height="48" rx="11" fill="var(--logo)"/>
+      <path d="M13 15h22M13 24h15M13 33h22" stroke="var(--logo-line)" stroke-width="4.2" stroke-linecap="round"/>
+      <circle cx="34" cy="24" r="2.6" fill="var(--clay-light)"/>
+    </svg>
+    <h1 id="upd-installing-title">Installing the new version of Ecoscribe</h1>
+    <p class="upd-installing-sub">Ecoscribe opens again by itself when it's done.</p>
+    <div class="upd-bar" role="progressbar" aria-label="Installing"><span></span></div>
   </div>
 </div>
 

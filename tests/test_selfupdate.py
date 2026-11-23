@@ -706,3 +706,14 @@ def test_show_ui_keeps_an_open_window_on_its_page(monkeypatch):
     monkeypatch.setattr(ipc, "focus_ui", lambda: False)
     ipc.show_ui("inicio")
     assert spawned == [["--ui", "--page", "inicio"]]
+
+
+def test_no_update_text_tells_people_to_step_away_or_quit():
+    """dictado-9zeo.1 (points 5, 6): the texts say what happens and what to press; no idle install, no call rule
+    unless a call actually blocks the button, no "quit to update"."""
+    root = Path(__file__).resolve().parent.parent
+    bad = ("step away", "never during a call", "install when idle", "when idle", "or quit", "quit ecoscribe",
+           "install by itself")
+    for f in ("ecoscribe/web/app.js", "ecoscribe/web/index.html"):
+        text = (root / f).read_text(encoding="utf-8").lower()
+        assert not [b for b in bad if b in text], f

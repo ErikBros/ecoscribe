@@ -20,7 +20,12 @@ SHOTS = {
     "inicio-novedades-version": "page=inicio&new=1&update=1",
     "inicio-novedades-abierto": "page=inicio&new=1&newopen=1", "inicio-novedades-abierto-oscuro": "page=inicio&new=1&newopen=1&theme=dark",
     "novedades-senala": "page=inicio&new=1&showme=1", "novedades-senala-oscuro": "page=inicio&new=1&showme=1&theme=dark",  # dictado-3zfe
-    "inicio-version-fallo": "page=inicio&update=failed",  # Install when idle's steps (dictado-nmo)
+    "inicio-version-fallo": "page=inicio&update=failed",  # Install now's steps (dictado-nmo, 9zeo.1)
+    # dictado-9zeo.1: the pop-up when it's downloaded, the Installing screen, a call at the press, a stopped download
+    "inicio-version-pregunta": "page=inicio&update=ask", "inicio-version-pregunta-oscuro": "page=inicio&update=ask&theme=dark",
+    "inicio-version-instalando": "page=inicio&update=installing",
+    "inicio-version-instalando-oscuro": "page=inicio&update=installing&theme=dark",
+    "inicio-version-llamada": "page=inicio&update=call&tried=1", "inicio-version-error": "page=inicio&update=dlerr",
     "detenido": "page=inicio&state=stopped",
     "cargando": "page=inicio&state=loading",
     "gpu-descarga": "page=inicio&gpurt=downloading", "gpu-fallo": "page=inicio&gpurt=failed",  # dictado-7e1

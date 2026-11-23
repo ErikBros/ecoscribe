@@ -267,16 +267,27 @@ function demoApi() {
     voices_info: async () => window.__noVoices ? { count: 0, names: [], on: true } : { count: 2, names: ["Ana", "Tom"], on: true },
     crashes: async () => (params.get("crash") === "1" ? { items: [{ name: "2026-10-06_140325", when: "2026-10-06 140325", exit: MAC ? "unknown" : "0xC0000005 (access violation)" }], gave_up: false } : { items: [], gave_up: false }),
     copy_crash_report: async () => ({ ok: true }), dismiss_crash: async () => ({ ok: true }),
-    update_notice: async () => {  // update=1 offer, dl downloading, ready, failed (dictado-nmo)
+    update_notice: async () => {  // update=1 offer, dl downloading, ready, failed (dictado-nmo); ask the pop-up,
+      // installing, call (a call records: Finish the call first), dlerr (the download stopped) (dictado-9zeo.1)
       const u = params.get("update");
       if (!u || window.__updDismissed) return {};
       const n = { version: "1.18.0", url: "https://github.com/ErikBros/ecoscribe/releases/tag/v1.18.0",
         highlights: params.get("hl") === "0" ? [] : ["Share in Slack", "Meetings in another language", "Voice commands"] };
-      if (MAC) return n;
-      const install = window.__updInstall ? "downloading" : { 1: "offer", dl: "downloading", ready: "ready", failed: "failed" }[u] || "offer";
-      return { ...n, install, ...(install === "downloading" ? { pct: 42 } : {}) };
+      if (window.__updForce) return { ...n, ...window.__updForce };  // the smoke test moves the state on
+      const inCall = u === "call" && !window.__updCallOver;
+      if (window.__updNow) return { ...n, in_call: inCall, ...(["1", "dl", "dlerr"].includes(u) ? { install: "downloading", pct: 42, pressed: true } : { install: "installing" }) };
+      const later = window.__updLater === n.version;
+      const st = { 1: { install: "offer" }, dl: { install: "downloading", pct: 42 }, ready: { install: "ready" }, failed: { install: "failed" },
+        ask: { install: "ready", ask: !later }, installing: { install: "installing" }, call: { install: "ready", ask: !later },
+        dlerr: { install: "downloading", pct: 42, error: "The download stopped: no connection to GitHub.", retry_at: Date.now() / 1000 + 1800 },
+      }[u] || { install: "offer" };
+      return { ...n, ...st, in_call: inCall };
     },
-    install_update_when_idle: async (v) => { window.__updInstall = v; return { ok: true }; },
+    install_update_now: async (v) => {
+      if (params.get("update") === "call" && !window.__updCallOver) { window.__updTried = v; return { ok: false, blocked: "call" }; }
+      window.__updNow = v; return { ok: true };
+    },
+    update_later: async (v) => { window.__updLater = v; return { ok: true }; },
     open_update: async () => { window.__updOpened = true; return { ok: true }; },
     open_guide: async (p, s) => { window.__guide = p + (s ? "#" + s : ""); return { ok: true }; },
     dismiss_update: async (v) => { window.__updDismissed = v; return { ok: true }; },
@@ -945,35 +956,96 @@ async function crashCard() {  // t0u.37: a crash is never silent
   $("#crash-dismiss").onclick = async () => { for (const i of c.items) await api.dismiss_crash(i.name); crashCard(); };
 }
 
-async function updateNote() {  // dictado-cjk: a newer version is out (the app checks once a day)
+// dictado-cjk, nmo, 9zeo.1: a newer version. Home's notice: offer -> downloading -> ready -> installing (or failed:
+// Download). When it's downloaded a pop-up asks Install now / Later over any page; Install now shows the Installing
+// screen until the new version opens by itself. A call recording at the press: "Finish the call first".
+const upd = { n: {}, quit: "", tried: "", installing: false };
+function updCallBlocked(n) {
+  if (upd.tried && !n.in_call) upd.tried = "";  // the call ended: Install now is offered again
+  return n.blocked === "call" || (upd.tried === n.version && !!n.in_call);
+}
+function updWhen(t) {
+  const d = new Date(t * 1000);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+async function updPress(v) {  // Install now, on Home or the pop-up
+  const r = await api.install_update_now(v).catch(() => ({ ok: false }));
+  if (r.blocked === "call") upd.tried = v;
+  await updSync();
+}
+function updNowButton(b, n) {
+  const blocked = updCallBlocked(n);
+  b.disabled = blocked;
+  b.textContent = blocked ? "Finish the call first" : "Install now";
+  b.onclick = () => updPress(n.version);
+}
+function updInstalling(on, n) {  // the full-window Installing screen: no buttons, keys and clicks do nothing
+  const o = $("#upd-installing");
+  if (on) $("#upd-installing-title").textContent = `Installing Ecoscribe ${n.version}`;
+  if (on === upd.installing) return;
+  upd.installing = on;
+  o.hidden = !on;
+  $(".shell")?.toggleAttribute("inert", on);
+  if (on) { $("#upd-ask").hidden = true; o.focus?.(); }
+}
+function updBlock(e) {  // window capture: before every other handler
+  if (!upd.installing) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+}
+for (const t of ["keydown", "keyup", "keypress", "click", "mousedown", "pointerdown", "dblclick", "contextmenu", "wheel"])
+  window.addEventListener(t, updBlock, { capture: true, passive: false });
+function updAsk(n) {  // the pop-up: once it's downloaded, until Install now or Later
+  const box = $("#upd-ask");
+  const show = !!n.ask && !upd.installing && n.install === "ready";
+  box.hidden = !show;
+  if (!show) return;
+  $("#upd-ask-title").textContent = `Install Ecoscribe ${n.version} now?`;
+  const hl = (n.highlights || []).filter(Boolean);
+  $("#upd-ask-sub").textContent = hl.length ? `New: ${hl.length > 1 ? hl.slice(0, -1).join(", ") + " and " + hl.at(-1) : hl[0]}.`
+    : "Your settings and history stay as they are.";
+  updNowButton($("#upd-ask-now"), n);
+  $("#upd-ask-later").onclick = async () => { box.hidden = true; await api.update_later(n.version).catch(() => {}); updSync(); };
+}
+async function updSync() {  // every few seconds, on any page: the pop-up, the Installing screen and Home's notice
   const n = await api.update_notice().catch(() => ({}));
+  upd.n = n;
+  if (n.quit) upd.quit = n.quit;  // said once by the app; kept while this window is open
+  updInstalling(n.install === "installing", n);
+  updAsk(n);
+  if (current === "inicio") paintUpdateNote(n);
+  return n;
+}
+async function updateNote() { paintUpdateNote(await updSync()); }
+function paintUpdateNote(n) {
   const box = $("#update-note");
   box.hidden = !n.version;
   if (box.hidden) return;
-  // dictado-nmo: offer -> downloading -> ready (installs when idle or at Quit, never in a call); failed -> Download
   const step = n.install || "";
   const have = `You have ${lastStatus?.version || "an older version"}.`;
   const hl = (n.highlights || []).filter(Boolean);  // dictado-owyk: what the new version brings, before you install it
   const brings = hl.length ? `New: ${hl.length > 1 ? hl.slice(0, -1).join(", ") + " and " + hl.at(-1) : hl[0]}. ` : "";
+  const about = brings ? `${brings}${have}` : `${have} Your settings and history stay as they are.`;
+  const quit = upd.quit === "downloading" ? "Ecoscribe closed before the download finished; it goes on now. "
+    : upd.quit === "busy" ? "It wasn't installed when Ecoscribe closed, because something was still running. " : "";
+  const dl = n.error ? `${n.error}${n.retry_at ? ` Trying again at ${updWhen(n.retry_at)}.` : ""}`
+    : `Downloading, ${n.pct || 0}%.${n.pressed ? " It installs as soon as it's here." : ""}`;
   const [title, sub] = {
-    "": [`Ecoscribe ${n.version} is out`, brings ? `${brings}${have}` : `${have} Your settings and history stay as they are.`],
-    offer: [`Ecoscribe ${n.version} is out`, brings ? `${brings}${have}` : `${have} Your settings and history stay as they are.`],
-    downloading: [`Getting Ecoscribe ${n.version} ready`, n.error || `Downloading in the background, ${n.pct || 0}%. It installs when you step away or quit, never during a call.`],
-    ready: [`Ecoscribe ${n.version} is ready`, "It installs when you step away from the computer or quit Ecoscribe. Never during a call."],
-    failed: [`Ecoscribe ${n.version} is out`, "It couldn't install by itself. Download it and run the installer."],
+    offer: [`Ecoscribe ${n.version} is out`, about],
+    downloading: [`Getting Ecoscribe ${n.version}`, quit + dl],
+    ready: [`Ecoscribe ${n.version} is ready to install`, quit + about],
+    installing: [`Installing Ecoscribe ${n.version}`, "Ecoscribe opens again by itself when it's done."],
+    failed: [`Ecoscribe ${n.version} is out`, "Ecoscribe couldn't install it. Download it and run the installer."],
   }[step] || [`Ecoscribe ${n.version} is out`, `${brings}${have}`];
   box.dataset.step = step;
   $("#update-title").textContent = title;
   $("#update-sub").textContent = sub;
-  const get = $("#update-get"), idle = $("#update-idle");
-  idle.hidden = step !== "offer";
-  get.hidden = step === "downloading" || step === "ready";
+  const get = $("#update-get"), now = $("#update-now");
+  now.hidden = !(step === "offer" || step === "ready" || (step === "downloading" && (!n.pressed || n.error)));
+  updNowButton(now, n);
+  get.hidden = !(step === "" || step === "offer" || step === "failed");
   get.className = step === "offer" ? "btn btn-sm" : "btn btn-primary btn-sm";
   get.onclick = () => api.open_update();
-  idle.onclick = async () => { await api.install_update_when_idle(n.version); updateNote(); };
   $("#update-x").onclick = async () => { await api.dismiss_update(n.version); updateNote(); };
-  clearTimeout(updateNote.timer);
-  if (step === "downloading") updateNote.timer = setTimeout(() => { if (!box.hidden && current === "inicio") updateNote(); }, 5000);
 }
 
 async function whatsNew() {  // dictado-owyk: what this version brings, once after an update, until closed
@@ -3066,8 +3138,11 @@ async function boot() {
   }, 2000);
   setInterval(async () => {  // a notice's button asked this open window for a page (Windows; macOS calls show)
     const p = api.take_page ? await api.take_page().catch(() => null) : null;
-    if (p) show(p);
+    if (p && !upd.installing) show(p);
   }, 1000);
+  if (current !== "inicio") updSync();  // dictado-9zeo.1: the pop-up shows over any page (Home asks in renderInicio)
+  setInterval(updSync, 3000);
+  if (params.get("demo") === "1" && params.get("tried") === "1") setTimeout(() => $("#upd-ask-now")?.click(), 300);  // screenshot: Finish the call first (dictado-9zeo.1)
   if (params.get("demo") === "1" && params.get("replaced") === "1") setTimeout(() => $("#r-replace-go")?.click(), 500);  // screenshot (dictado-9lo)
   if (params.get("demo") === "1" && params.get("newopen") === "1") setTimeout(() => $("#new-more")?.click(), 400);  // screenshot (dictado-3zfe)
   if (params.get("demo") === "1" && params.get("showme")) setTimeout(() => document.querySelectorAll(".new-show")[Number(params.get("showme")) - 1]?.click(), 400);  // screenshot (dictado-3zfe)
@@ -3107,4 +3182,4 @@ function macify() {
 if (params.get("demo") === "1") boot();               // screenshots, smoke tests
 else if (window.pywebview && window.pywebview.api) boot();
 else window.addEventListener("pywebviewready", boot, { once: true });
-window.__ecoscribe = { show, openSetup, closeSetup, formValues, dropped: rDropped, openSession, get api() { return api; } };
+window.__ecoscribe = { show, openSetup, closeSetup, formValues, dropped: rDropped, openSession, updSync, get api() { return api; } };

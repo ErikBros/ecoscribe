@@ -329,30 +329,122 @@ async function load(query) {
     "GPU part download failed, why in the tooltip");
   check(doc.querySelector("#fact-engine") && (await load("page=inicio")).doc.querySelector("#fact-engine").textContent === "GPU · fast", "GPU as before");
 }
-{ // dictado-nmo: Install when idle, then the steps it goes through
+{ // dictado-nmo, 9zeo.1: Install now on Home, then the steps it goes through
   const { window, doc, errors } = await load("page=inicio&update=1");
   await sleep(50);
-  const idle = doc.querySelector("#update-idle"), get = doc.querySelector("#update-get");
-  check(!idle.hidden && !get.hidden, "the row offers Install when idle next to Download");
-  idle.click(); await sleep(50);
-  check(window.__updInstall === "1.18.0" && idle.hidden && get.hidden, "Install when idle okays that version; the buttons go");
-  check(/42%/.test(doc.querySelector("#update-sub").textContent) && /never during a call/.test(doc.querySelector("#update-sub").textContent),
-    "it says how far the download is and that it never installs during a call");
-  for (const [q, re] of [["ready", /is ready/], ["failed", /is out/]]) {
+  const now = doc.querySelector("#update-now"), get = doc.querySelector("#update-get");
+  check(!now.hidden && !now.disabled && now.textContent === "Install now" && !get.hidden, "the row offers Install now next to Download");
+  check(!doc.querySelector("#update-idle"), "no Install when idle button any more");
+  now.click(); await sleep(50);
+  check(window.__updNow === "1.18.0" && get.hidden, "Install now asks for that version; Download goes");
+  check(doc.querySelector("#update-sub").textContent === "Downloading, 42%. It installs as soon as it's here.",
+    "after the press the download says it installs as soon as it's here: " + doc.querySelector("#update-sub").textContent);
+  check(doc.querySelector("#upd-installing").hidden, "no Installing screen while it still downloads");
+  const { doc: dl } = await load("page=inicio&update=dl");
+  await sleep(50);
+  check(dl.querySelector("#update-sub").textContent === "Downloading, 42%.", "downloading by itself: the percentage, no install sentence");
+  check(!dl.querySelector("#update-now").hidden, "and Install now, to install as soon as it's here");
+  const { doc: err } = await load("page=inicio&update=dlerr");
+  await sleep(50);
+  const es = err.querySelector("#update-sub").textContent;
+  check(/^The download stopped: no connection to GitHub\. Trying again at \d\d:\d\d\.$/.test(es) && !/%/.test(es),
+    "a stopped download says why and when it tries again, no percentage: " + es);
+  check(!err.querySelector("#update-now").hidden, "Install now tries again at once");
+  for (const [q, re, nowShown, getShown] of [["ready", /is ready to install/, true, false], ["failed", /is out/, false, true]]) {
     const { doc: d } = await load("page=inicio&update=" + q);
     await sleep(50);
     check(re.test(d.querySelector("#update-title").textContent), q + ": the title says so");
-    check(d.querySelector("#update-idle").hidden && d.querySelector("#update-get").hidden === (q === "ready"), q + ": the right buttons");
+    check(d.querySelector("#update-now").hidden === !nowShown && d.querySelector("#update-get").hidden === !getShown, q + ": the right buttons");
   }
   const { doc: mac } = await load("page=inicio&update=1&mac=1");
   await sleep(50);
-  check(mac.querySelector("#update-idle").hidden && !mac.querySelector("#update-get").hidden, "the Mac keeps Download only");
-  check(errors.length === 0, "no JS errors with Install when idle: " + errors.join("; "));
+  check(!mac.querySelector("#update-now").hidden && !mac.querySelector("#update-get").hidden, "the Mac offers Install now too");
+  for (const q of ["1", "dl", "ready", "failed", "ask", "call", "dlerr", "installing"]) {
+    const { doc: d } = await load("page=inicio&update=" + q);
+    await sleep(50);
+    const text = [d.querySelector("#update-note"), d.querySelector("#upd-ask"), d.querySelector("#upd-installing")].map((e) => e.textContent).join(" ");
+    check(!/step away|never during a call|when idle|or quit|quit ecoscribe/i.test(text), q + ": no text about stepping away, idle, calls or quitting");
+  }
+  check(errors.length === 0, "no JS errors with Install now: " + errors.join("; "));
 }
-{ // ajustes: Install new versions by itself (dictado-nmo), off by default, Windows only
+{ // dictado-9zeo.1: the pop-up when the download is done; Later leaves Install now on Home
+  const { window, doc, errors } = await load("page=inicio&update=ask");
+  await sleep(50);
+  const ask = doc.querySelector("#upd-ask");
+  check(!ask.hidden && doc.querySelector("#upd-ask-title").textContent === "Install Ecoscribe 1.18.0 now?", "the pop-up asks to install the version");
+  const btns = [...ask.querySelectorAll("button")].map((b) => b.textContent);
+  check(btns.join("|") === "Later|Install now" && doc.querySelector("#upd-ask-now").classList.contains("btn-primary"), "two buttons, Install now the primary: " + btns);
+  check(!/call|step away|idle|quit/i.test(ask.textContent), "no text about calls, stepping away or quitting: " + ask.textContent);
+  doc.querySelector("#upd-ask-later").click(); await sleep(50);
+  check(ask.hidden && window.__updLater === "1.18.0", "Later closes it for that version");
+  const now = doc.querySelector("#update-now");
+  check(!now.hidden && !now.disabled && now.textContent === "Install now", "Home keeps an Install now button");
+  await window.__ecoscribe.updSync();
+  check(ask.hidden, "and it doesn't come back");
+  check(errors.length === 0, "no JS errors with the pop-up: " + errors.join("; "));
+}
+{ // dictado-9zeo.1: the pop-up over Settings with unsaved changes: the page and the changes stay
+  const { doc } = await load("page=ajustes&dirty=1&update=ask");
+  await sleep(80);
+  check(!doc.querySelector("#upd-ask").hidden, "the pop-up shows over Settings");
+  check(!doc.querySelector("#page-ajustes").hidden && !doc.querySelector("#savebar").hidden, "Settings stays open with its unsaved change");
+}
+{ // dictado-9zeo.1: a call recording when Install now is pressed: Finish the call first, then offered again
+  const { window, doc } = await load("page=inicio&update=call");
+  await sleep(50);
+  const b = doc.querySelector("#upd-ask-now");
+  check(!b.disabled && b.textContent === "Install now", "before the press: Install now");
+  b.click(); await sleep(50);
+  check(b.disabled && b.textContent === "Finish the call first" && window.__updTried === "1.18.0" && !window.__updNow,
+    "pressed during a call: the button says Finish the call first and nothing installs");
+  const h = doc.querySelector("#update-now");
+  check(h.disabled && h.textContent === "Finish the call first", "Home's button says it too");
+  check(doc.querySelector("#upd-installing").hidden, "no Installing screen");
+  window.__updCallOver = true;
+  await window.__ecoscribe.updSync(); await sleep(20);
+  check(!b.disabled && b.textContent === "Install now" && !doc.querySelector("#upd-ask").hidden, "the call ended: Install now is offered again");
+  b.click(); await sleep(50);
+  check(window.__updNow === "1.18.0" && !doc.querySelector("#upd-installing").hidden, "and it works");
+}
+{ // dictado-9zeo.1: Install now shows the Installing screen; nothing in the window can be used
+  const { window, doc, errors } = await load("page=inicio&update=ask");
+  await sleep(50);
+  doc.querySelector("#upd-ask-now").click(); await sleep(50);
+  const o = doc.querySelector("#upd-installing");
+  check(!o.hidden && doc.querySelector("#upd-ask").hidden, "the Installing screen replaces the pop-up");
+  check(doc.querySelector("#upd-installing-title").textContent === "Installing Ecoscribe 1.18.0"
+    && /Ecoscribe opens again by itself when it's done\./.test(o.textContent) && o.querySelector(".upd-bar"), "it says what happens, with a bar");
+  check(o.querySelectorAll("button, a, input, select").length === 0, "no buttons");
+  let reached = 0;
+  doc.addEventListener("keydown", () => reached++); doc.addEventListener("click", () => reached++);
+  for (const key of ["Escape", "Enter", "a"]) doc.body.dispatchEvent(new window.KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+  const nav = doc.querySelector('.side [data-page="ajustes"]') || doc.querySelector(".side button, .side a");
+  nav?.click(); await sleep(50);
+  check(reached === 0, "Esc, keys and clicks never reach the window under it");
+  check(!doc.querySelector("#page-inicio").hidden && doc.querySelector("#page-ajustes").hidden, "a click on the sidebar changes nothing");
+  check(!o.hidden, "the screen stays up");
+  const css = fs.readFileSync(path.join(web, "app.css"), "utf8");
+  const z = (sel) => Number((css.match(new RegExp(sel.replace(".", "\\.") + "\\s*\\{[^}]*z-index:\\s*(\\d+)")) || [])[1] || 0);
+  const others = [".setup", ".spot-ring", ".spot-tip", ".i-tip", ".toast", ".upd-ask", ".r-drop", ".menu-pop"].map(z);
+  check(z(".upd-installing") > Math.max(...others), "it lies above every other layer: " + z(".upd-installing") + " > " + Math.max(...others));
+  window.__updForce = { install: "ready" };  // the install couldn't start: Home is back
+  await window.__ecoscribe.updSync(); await sleep(20);
+  check(o.hidden, "the screen leaves when the app reports ready again");
+  window.__updForce = { install: "installing" };
+  await window.__ecoscribe.updSync();
+  window.__updForce = { install: "failed" };
+  await window.__ecoscribe.updSync(); await sleep(20);
+  check(o.hidden && /couldn't install/.test(doc.querySelector("#update-sub").textContent), "and when it reports failed");
+  check(errors.length === 0, "no JS errors with the Installing screen: " + errors.join("; "));
+  const { doc: opened } = await load("page=historial&update=installing");
+  await sleep(50);
+  check(!opened.querySelector("#upd-installing").hidden, "a window opened while it installs shows the screen at once");
+}
+{ // Settings > New versions: Download by itself (dictado-nmo, 9zeo.1), off by default
   const { window, doc } = await load("page=ajustes");
   const sw = doc.querySelector("#f-auto-update"), menu = doc.querySelector("#f-updates");
-  check(sw?.checked === false && menu.querySelector("[value=auto]"), "Install by itself is in the menu and off");
+  check(sw?.checked === false && menu.querySelector("[value=auto]")?.textContent === "Download by itself", "Download by itself is in the menu and off");
+  check(doc.querySelector("#updates-help").textContent === "Nothing of yours is sent.", "its help says nothing of yours is sent");
   menu.value = "auto"; menu.dispatchEvent(new window.Event("change", { bubbles: true }));
   let sent = null;
   const api = window.__ecoscribe.api, orig = api.save_settings;
@@ -360,7 +452,7 @@ async function load(query) {
   doc.querySelector("#save").click(); await sleep(100);
   check(sent && sent.auto_update === true && Object.keys(sent).length === 1, "turning it on saves only that: " + JSON.stringify(sent));
   const { doc: mac } = await load("page=ajustes&mac=1");
-  check(!!mac.querySelector("#f-updates [value=auto]"), "the Mac has Install by itself too (dictado-6gr)");
+  check(!!mac.querySelector("#f-updates [value=auto]"), "the Mac has Download by itself too (dictado-6gr)");
 }
 { // stopped
   const { doc } = await load("page=inicio&state=stopped");
