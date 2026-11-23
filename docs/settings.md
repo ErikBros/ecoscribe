@@ -50,7 +50,8 @@ commands**. See [Dictation](dictation.md#languages) and
   **Install now** downloads it (Home shows how far, "It installs as soon as it's here") and then installs it at once.
   Nothing from your dictations or meetings is sent. On a Mac, only a version that has a Mac download is shown.
 - *Download by itself*: every new version is downloaded in the background. When it's there, a pop-up asks
-  **Install Ecoscribe x.y.z now?** with **Install now** and **Later**. Later leaves **Install now** on Home, so you can
+  **Install Ecoscribe x.y.z now?** with **Install now** and **Later** (while a call records it waits until the call
+  ends). Later leaves **Install now** on Home, so you can
   install it any time.
 - *Don't check*.
 

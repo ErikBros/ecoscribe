@@ -389,20 +389,21 @@ async function load(query) {
   check(!doc.querySelector("#upd-ask").hidden, "the pop-up shows over Settings");
   check(!doc.querySelector("#page-ajustes").hidden && !doc.querySelector("#savebar").hidden, "Settings stays open with its unsaved change");
 }
-{ // dictado-9zeo.1: a call recording when Install now is pressed: Finish the call first, then offered again
+{ // dictado-9zeo.1: a call recording: no pop-up over it; Install now says Finish the call first, then it's offered again
   const { window, doc } = await load("page=inicio&update=call");
   await sleep(50);
-  const b = doc.querySelector("#upd-ask-now");
-  check(!b.disabled && b.textContent === "Install now", "before the press: Install now");
-  b.click(); await sleep(50);
-  check(b.disabled && b.textContent === "Finish the call first" && window.__updTried === "1.18.0" && !window.__updNow,
+  const ask = doc.querySelector("#upd-ask"), h = doc.querySelector("#update-now");
+  check(ask.hidden, "no pop-up while a call records");
+  check(!h.disabled && h.textContent === "Install now", "Home keeps Install now; before the press it's enabled");
+  h.click(); await sleep(50);
+  check(h.disabled && h.textContent === "Finish the call first" && window.__updTried === "1.18.0" && !window.__updNow,
     "pressed during a call: the button says Finish the call first and nothing installs");
-  const h = doc.querySelector("#update-now");
-  check(h.disabled && h.textContent === "Finish the call first", "Home's button says it too");
-  check(doc.querySelector("#upd-installing").hidden, "no Installing screen");
+  check(doc.querySelector("#upd-installing").hidden && ask.hidden, "no Installing screen, no pop-up");
   window.__updCallOver = true;
   await window.__ecoscribe.updSync(); await sleep(20);
-  check(!b.disabled && b.textContent === "Install now" && !doc.querySelector("#upd-ask").hidden, "the call ended: Install now is offered again");
+  const b = doc.querySelector("#upd-ask-now");
+  check(!ask.hidden && !b.disabled && b.textContent === "Install now", "the call ended: the pop-up offers Install now");
+  check(!h.disabled && h.textContent === "Install now", "and Home's button is back");
   b.click(); await sleep(50);
   check(window.__updNow === "1.18.0" && !doc.querySelector("#upd-installing").hidden, "and it works");
 }

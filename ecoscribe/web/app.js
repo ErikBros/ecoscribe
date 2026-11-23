@@ -1000,9 +1000,9 @@ function updBlock(e) {  // window capture: before every other handler
 }
 for (const t of ["keydown", "keyup", "keypress", "click", "mousedown", "pointerdown", "dblclick", "contextmenu", "wheel"])
   window.addEventListener(t, updBlock, { capture: true, passive: false });
-function updAsk(n) {  // the pop-up: once it's downloaded, until Install now or Later
-  const box = $("#upd-ask");
-  const show = !!n.ask && !upd.installing && n.install === "ready";
+function updAsk(n) {  // the pop-up: once it's downloaded, until Install now or Later; never over a recording call
+  const box = $("#upd-ask");  // (it shows when the call ends; Home's Install now says Finish the call first meanwhile)
+  const show = !!n.ask && !n.in_call && !upd.installing && n.install === "ready";
   box.hidden = !show;
   if (!show) return;
   $("#upd-ask-title").textContent = `Install Ecoscribe ${n.version} now?`;
@@ -3148,7 +3148,7 @@ async function boot() {
   }, 1000);
   if (current !== "inicio") updSync();  // dictado-9zeo.1: the pop-up shows over any page (Home asks in renderInicio)
   setInterval(updSync, 3000);
-  if (params.get("demo") === "1" && params.get("tried") === "1") setTimeout(() => $("#upd-ask-now")?.click(), 300);  // screenshot: Finish the call first (dictado-9zeo.1)
+  if (params.get("demo") === "1" && params.get("tried") === "1") setTimeout(() => $("#update-now")?.click(), 300);  // screenshot: Finish the call first (dictado-9zeo.1)
   if (params.get("demo") === "1" && params.get("replaced") === "1") setTimeout(() => $("#r-replace-go")?.click(), 500);  // screenshot (dictado-9lo)
   if (params.get("demo") === "1" && params.get("newopen") === "1") setTimeout(() => $("#new-more")?.click(), 400);  // screenshot (dictado-3zfe)
   if (params.get("demo") === "1" && params.get("showme")) setTimeout(() => document.querySelectorAll(".new-show")[Number(params.get("showme")) - 1]?.click(), 400);  // screenshot (dictado-3zfe)
