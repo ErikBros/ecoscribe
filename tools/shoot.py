@@ -31,6 +31,7 @@ SHOTS = {
     "inicio-version-pulsado": "page=inicio&update=pressed", "inicio-version-instalando-espera": "page=inicio&update=installbusy",
     "inicio-version-cierre-descarga": "page=inicio&update=quitdl", "inicio-version-cierre-ocupado": "page=inicio&update=quitbusy",
     "inicio-version-detenido": "page=inicio&state=stopped&update=stopped&tried=1",
+    "ajustes-versiones-descarga": "page=ajustes&sec=general&auto=1",  # Settings > New versions: Download by itself
     "detenido": "page=inicio&state=stopped",
     "cargando": "page=inicio&state=loading",
     "gpu-descarga": "page=inicio&gpurt=downloading", "gpu-fallo": "page=inicio&gpurt=failed",  # dictado-7e1
