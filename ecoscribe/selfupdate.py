@@ -57,7 +57,9 @@ MIN_SIZE = 1024 ** 2     # an "installer" smaller than this is not one
 CHUNK = 1024 ** 2
 TIMEOUT_S = 30.0
 RETRY_S = 30 * 60        # after a download that failed (not paused): wait this long before the next try
-INSTALL_ARGS = ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-"]
+NOW_ARGS = ["/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/OPENHOME=1"]  # Install now: Setup's progress shows,
+# then the new version starts and opens on Home (ecoscribe.iss: LaunchParams -> --after-update)
+QUIT_ARGS = ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/LAUNCH=0"]  # at Quit: unseen, stays closed
 AFTER_UPDATE = "--after-update"  # the new version's first start after an Install now: open the window on Home
 PRESS_S = 1.0            # how often the background app looks for an Install now press
 MAC = sys.platform == "darwin"
@@ -275,10 +277,7 @@ def installer_args(path: Path, data_dir: Path, relaunch: bool) -> list[str] | No
     if MAC:
         from .platform.macos import selfinstall
         return selfinstall.command(Path(path), folder(data_dir), relaunch)
-    args = [str(path), *INSTALL_ARGS, f"/LOG={folder(data_dir) / 'install.log'}"]
-    if not relaunch:
-        args.append("/LAUNCH=0")  # installed at Quit: stays closed (ecoscribe.iss reads it)
-    return args
+    return [str(path), *(NOW_ARGS if relaunch else QUIT_ARGS), f"/LOG={folder(data_dir) / 'install.log'}"]
 
 
 def _popen(args: list[str]):

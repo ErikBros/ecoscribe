@@ -533,17 +533,19 @@ def test_at_quit_ready_but_busy_says_so(tmp_path, caplog):
 
 
 # ---------------- running the installer (a fake process start) ----------------
-def test_run_installer_checks_the_file_and_starts_it_silently(tmp_path):
+def test_run_installer_checks_the_file_and_starts_it(tmp_path):
     p = selfupdate.download(tmp_path, ASSET, opener=Server(), free=plenty)
     started = []
     assert selfupdate.run_installer(tmp_path, p, ASSET, relaunch=True, popen=started.append, now=5.0)
     [args] = started
-    assert args[0] == str(p) and {"/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"} <= set(args)
-    assert "/LAUNCH=0" not in args and any(a.startswith("/LOG=") for a in args)
+    # Install now (dictado-9zeo.1): Setup's own progress window, then the new version opens on Home
+    assert args[0] == str(p) and {"/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/OPENHOME=1"} <= set(args)
+    assert "/VERYSILENT" not in args and "/LAUNCH=0" not in args and any(a.startswith("/LOG=") for a in args)
     assert updates.load(tmp_path)["install_started"] == {"version": "1.19.0", "at": 5.0}
     started.clear()
     selfupdate.run_installer(tmp_path, p, ASSET, relaunch=False, popen=started.append)
-    assert "/LAUNCH=0" in started[0]  # at Quit: stays closed
+    assert {"/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LAUNCH=0"} <= set(started[0])  # at Quit: unseen, closed
+    assert "/SILENT" not in started[0] and "/OPENHOME=1" not in started[0]
 
 
 def test_run_installer_refuses_a_changed_file(tmp_path):
@@ -577,6 +579,15 @@ def test_installer_script_honours_launch_0():
     iss = (Path(__file__).resolve().parent.parent / "packaging" / "windows" / "ecoscribe.iss").read_text(encoding="utf-8")
     assert "Check: ShouldLaunch" in iss and "{param:LAUNCH|1}" in iss
     assert "MeetingDone" in iss  # the installer's own refusal while a meeting worker is alive stays
+
+
+def test_installer_script_shows_progress_without_cancel_and_opens_home_after_install_now():
+    """dictado-9zeo.1: /SILENT shows Setup's progress (Cancel off); /OPENHOME=1 starts the new version on Home."""
+    iss = (Path(__file__).resolve().parent.parent / "packaging" / "windows" / "ecoscribe.iss").read_text(encoding="utf-8")
+    assert "AllowCancelDuringInstall=no" in iss
+    run = [ln for ln in iss.split("[Run]", 1)[1].split("\n[", 1)[0].splitlines() if "Ecoscribe.exe" in ln]
+    assert len(run) == 1 and "skipifsilent" not in run[0] and "{code:LaunchParams}" in run[0]
+    assert "{param:OPENHOME|0}" in iss and "'--after-update'" in iss and selfupdate.AFTER_UPDATE == "--after-update"
 
 
 # ---------------- Home row and Settings ----------------
