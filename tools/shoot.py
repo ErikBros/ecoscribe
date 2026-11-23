@@ -106,7 +106,7 @@ def shot(web: Path, query: str, out: Path, size=(980, 690), scale=1.0) -> Path:
     index = (Path(web) / "index.html").as_uri()
     subprocess.run([EDGE, "--headless=new", "--disable-gpu", "--hide-scrollbars",
                     f"--force-device-scale-factor={scale}", f"--window-size={size[0]},{size[1]}",
-                    "--virtual-time-budget=2500", f"--screenshot={out}", f"{index}?demo=1&{query}"],
+                    f"--virtual-time-budget={4500 if 'showme=' in query else 2500}", f"--screenshot={out}", f"{index}?demo=1&{query}"],
                    check=True, capture_output=True, timeout=60)
     return out
 

@@ -28,7 +28,7 @@ NOTES: dict[str, list[dict]] = {
         {"title": "Auto tags", "text": "tag one recurring meeting and Ecoscribe offers to tag every one; a meeting "
          "with people from another company suggests that company's tag. Off until you turn it on in Settings > Meetings.",
          "show": {"page": "ajustes", "card": "autotags", "y": 0.75, "spots": [  # dictado-ng5i.1: the opt-in switch
-             ["#at-head", "Turn auto tags on here. Each rule tags past and new meetings; × removes it."]]}},
+             ["#at-head", "Turn auto tags on here. Then tagging a meeting offers to tag the rest of the series."]]}},
         {"title": "Ask Claude about one tag", "text": "Claude can search, debrief and sum up only the meetings "
          "with one tag, like everything promised to one customer."},
     ],

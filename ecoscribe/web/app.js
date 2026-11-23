@@ -313,7 +313,7 @@ function demoApi() {
       { title: "Meetings in another language", text: "when a call sounds like a different language than the one picked, Ecoscribe offers to switch." },
       { title: "Voice commands", text: "pick the languages they work in." },
       { title: "Auto tags", text: "rules tag past and new meetings. Off until you turn it on in Settings > Meetings.",
-        show: { page: "ajustes", card: "autotags", y: .75, spots: [["#at-head", "Turn auto tags on here. Each rule tags past and new meetings; × removes it."]] } }] } : {}),
+        show: { page: "ajustes", card: "autotags", y: .75, spots: [["#at-head", "Turn auto tags on here. Then tagging a meeting offers to tag the rest of the series."]] } }] } : {}),
     dismiss_whats_new: async () => { window.__newDismissed = true; return { ok: true }; },
     open_release_notes: async () => { window.__notesOpened = true; return { ok: true }; },
     copy_debug_info: async () => ({ ok: true }), open_logs_folder: async () => ({ ok: true }),
