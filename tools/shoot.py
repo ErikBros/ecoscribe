@@ -26,6 +26,11 @@ SHOTS = {
     "inicio-version-instalando": "page=inicio&update=installing",
     "inicio-version-instalando-oscuro": "page=inicio&update=installing&theme=dark",
     "inicio-version-llamada": "page=inicio&update=call&tried=1", "inicio-version-error": "page=inicio&update=dlerr",
+    # after Install now while it still downloads; the Installing screen waiting for a job; the last Quit couldn't install
+    # (still downloading / something busy); Install now with the app stopped (the toast)
+    "inicio-version-pulsado": "page=inicio&update=pressed", "inicio-version-instalando-espera": "page=inicio&update=installbusy",
+    "inicio-version-cierre-descarga": "page=inicio&update=quitdl", "inicio-version-cierre-ocupado": "page=inicio&update=quitbusy",
+    "inicio-version-detenido": "page=inicio&state=stopped&update=stopped&tried=1",
     "detenido": "page=inicio&state=stopped",
     "cargando": "page=inicio&state=loading",
     "gpu-descarga": "page=inicio&gpurt=downloading", "gpu-fallo": "page=inicio&gpurt=failed",  # dictado-7e1

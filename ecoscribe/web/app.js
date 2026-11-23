@@ -268,7 +268,9 @@ function demoApi() {
     crashes: async () => (params.get("crash") === "1" ? { items: [{ name: "2026-10-06_140325", when: "2026-10-06 140325", exit: MAC ? "unknown" : "0xC0000005 (access violation)" }], gave_up: false } : { items: [], gave_up: false }),
     copy_crash_report: async () => ({ ok: true }), dismiss_crash: async () => ({ ok: true }),
     update_notice: async () => {  // update=1 offer, dl downloading, ready, failed (dictado-nmo); ask the pop-up,
-      // installing, call (a call records: Finish the call first), dlerr (the download stopped) (dictado-9zeo.1)
+      // installing, call (a call records: Finish the call first), dlerr (the download stopped), pressed (downloading after
+      // Install now), installbusy (the Installing screen waits for a job), quitdl / quitbusy (the last Quit couldn't
+      // install), stopped (the app isn't running: Install now says so) (dictado-9zeo.1)
       const u = params.get("update");
       if (!u || window.__updDismissed) return {};
       const n = { version: "1.18.0", url: "https://github.com/ErikBros/ecoscribe/releases/tag/v1.18.0",
@@ -280,11 +282,15 @@ function demoApi() {
       const st = { 1: { install: "offer" }, dl: { install: "downloading", pct: 42 }, ready: { install: "ready" }, failed: { install: "failed" },
         ask: { install: "ready", ask: !later }, installing: { install: "installing" }, call: { install: "ready", ask: !later },
         dlerr: { install: "downloading", pct: 42, error: "The download stopped: no connection to GitHub.", retry_at: Date.now() / 1000 + 1800 },
+        pressed: { install: "downloading", pct: 42, pressed: true }, installbusy: { install: "installing", waiting: "busy" },
+        quitdl: { install: "downloading", pct: 42, quit: "downloading" }, quitbusy: { install: "ready", quit: "busy" },
+        stopped: { install: "ready" },
       }[u] || { install: "offer" };
       return { ...n, ...st, in_call: inCall };
     },
     install_update_now: async (v) => {
       if (params.get("update") === "call" && !window.__updCallOver) { window.__updTried = v; return { ok: false, blocked: "call" }; }
+      if (params.get("update") === "stopped") { window.__updTried = v; return { ok: false, stopped: true }; }
       window.__updNow = v; return { ok: true };
     },
     update_later: async (v) => { window.__updLater = v; return { ok: true }; },

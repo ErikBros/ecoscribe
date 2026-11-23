@@ -359,13 +359,33 @@ async function load(query) {
   const { doc: mac } = await load("page=inicio&update=1&mac=1");
   await sleep(50);
   check(!mac.querySelector("#update-now").hidden && !mac.querySelector("#update-get").hidden, "the Mac offers Install now too");
-  for (const q of ["1", "dl", "ready", "failed", "ask", "call", "dlerr", "installing"]) {
+  for (const q of ["1", "dl", "ready", "failed", "ask", "call", "dlerr", "installing", "pressed", "installbusy", "quitdl", "quitbusy", "stopped"]) {
     const { doc: d } = await load("page=inicio&update=" + q);
     await sleep(50);
     const text = [d.querySelector("#update-note"), d.querySelector("#upd-ask"), d.querySelector("#upd-installing")].map((e) => e.textContent).join(" ");
     check(!/step away|never during a call|when idle|or quit|quit ecoscribe/i.test(text), q + ": no text about stepping away, idle, calls or quitting");
   }
   check(errors.length === 0, "no JS errors with Install now: " + errors.join("; "));
+}
+{ // dictado-9zeo.1: the demo states behind the screenshots say what they should
+  for (const [q, sel, re] of [
+    ["pressed", "#update-sub", /^Downloading, 42%\. It installs as soon as it's here\.$/],
+    ["installbusy", "#upd-installing-sub", /^Ecoscribe finishes what it's working on first, then installs and opens again by itself\.$/],
+    ["quitdl", "#update-sub", /^Ecoscribe closed before the download finished; it goes on now\. Downloading, 42%\.$/],
+    ["quitbusy", "#update-sub", /^It wasn't installed when Ecoscribe closed, because something was still running\. /],
+  ]) {
+    const { doc: d } = await load("page=inicio&update=" + q);
+    await sleep(50);
+    check(re.test(d.querySelector(sel).textContent), q + ": " + d.querySelector(sel).textContent);
+  }
+  const { doc: st, window: sw } = await load("page=inicio&state=stopped&update=stopped&tried=1");
+  await sleep(400);
+  check(st.querySelector("#toast").textContent === "Ecoscribe isn't running. Start it, then press Install now." && !st.querySelector("#toast").hidden
+    && st.querySelector("#upd-installing").hidden && sw.__updTried === "1.18.0", "Install now with the app stopped says so; no Installing screen");
+  const { doc: auto } = await load("page=ajustes&sec=general&auto=1");
+  await sleep(50);
+  const m = auto.querySelector("#f-updates");
+  check(m.value === "auto" && m.selectedOptions[0].textContent === "Download by itself", "Settings shows Download by itself when it's on");
 }
 { // dictado-9zeo.1: the pop-up when the download is done; Later leaves Install now on Home
   const { window, doc, errors } = await load("page=inicio&update=ask");
