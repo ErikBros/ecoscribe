@@ -216,11 +216,14 @@ def test_a_broken_config_reads_auto_tags_off(monkeypatch, tmp_path, text):
 # ---------- the window and a new meeting ----------
 
 @pytest.fixture
-def env(tmp_path):
+def env(tmp_path, monkeypatch):
+    """Auto tags switched on (dictado-ng5i.1) in both configs: the window's and the one the app reads by itself
+    (meetings.Controller._create -> apply_one)."""
     root = tmp_path / "transcripts"
     cfg_path = tmp_path / "cfg" / "config.toml"
     cfg_path.parent.mkdir()
-    cfg_path.write_text(f'[transcribe]\nroot = "{root.as_posix()}"\n', encoding="utf-8")
+    cfg_path.write_text(f'[transcribe]\nroot = "{root.as_posix()}"\n[meetings]\nauto_tags = true\n', encoding="utf-8")
+    app_config(monkeypatch, tmp_path, "[meetings]\nauto_tags = true\n")
     (tmp_path / "data").mkdir()
     api = Api(data_dir=tmp_path / "data", config_path=cfg_path, copy=lambda t: None, signal_reload=lambda: True,
               send_command=lambda d, cmd, args=None: {"ok": True})
@@ -338,3 +341,44 @@ def test_rule_spelling_follows_a_tag_in_use(env):
     a = make(root, "Call", 4, "Sync", ["ana@customer-a.com", "kim@ownco.com"])
     api.list_sessions()
     assert api.get_session(a.name)["autotag"]["tag"] == "CUSTOMER A"
+
+
+# ---------- switched off (dictado-ng5i.1) ----------
+
+def test_apply_one_tags_a_new_meeting_only_while_auto_tags_are_on(monkeypatch, tmp_path):
+    root, data = tmp_path / "transcripts", tmp_path / "data"
+    autotags.add_rule(data, "title", "Weekly ops", "Ops")
+    cfg = app_config(monkeypatch, tmp_path, None)  # a fresh install: no config at all
+    d = make(root, "Ops 1", 1, "WEEKLY OPS", tags=["Mine"])
+    before = (d / "meta.json").read_bytes()
+    assert autotags.apply_one(d, data) is None
+    assert (d / "meta.json").read_bytes() == before
+    cfg.write_text('[meetings]\nmode = "prompt"\n', encoding="utf-8")  # an existing install from before the switch
+    assert autotags.apply_one(d, data) is None and tags(d) == ["Mine"]
+    cfg.write_text("[meetings]\nauto_tags = true\n", encoding="utf-8")
+    assert autotags.apply_one(d, data) == ["Mine", "Ops"] and tags(d) == ["Mine", "Ops"]
+
+
+def test_apply_one_reads_the_config_it_is_given(monkeypatch, tmp_path):
+    root, data = tmp_path / "transcripts", tmp_path / "data"
+    autotags.add_rule(data, "title", "Weekly ops", "Ops")
+    app_config(monkeypatch, tmp_path, "[meetings]\nauto_tags = true\n")
+    own = tmp_path / "own.toml"
+    own.write_text("[meetings]\nauto_tags = false\n", encoding="utf-8")
+    d = make(root, "Ops 1", 1, "Weekly ops")
+    assert autotags.apply_one(d, data, own) is None and tags(d) == []
+    own.write_text("[meetings]\nauto_tags = true\n", encoding="utf-8")
+    assert autotags.apply_one(d, data, own) == ["Ops"]
+
+
+def test_a_new_meeting_from_the_calendar_gets_no_auto_tag_while_off(monkeypatch, tmp_path):
+    from ecoscribe import meetings
+    root, data = tmp_path / "transcripts", tmp_path / "data"
+    autotags.add_rule(data, "title", "Weekly ops", "Ops")
+    autotags.add_rule(data, "domain", "customer-a.example", "Customer A")
+    app_config(monkeypatch, tmp_path, '[meetings]\nmode = "prompt"\n')
+    ctl = SimpleNamespace(root=root, data=data)
+    ev = SimpleNamespace(title="Weekly ops", attendees=[], emails=["ana@customer-a.example"], conference="", uid="",
+                         start=datetime(2026, 10, 12, 9), end=datetime(2026, 10, 12, 10))
+    d = meetings.Controller._create(ctl, "Meeting", "en", ev)
+    assert tags(d) == []

@@ -909,7 +909,7 @@ class Api:
             return None
         info = meta_info(ev)
         sessions.write_meta(self._session(name), calendar=info)
-        autotags.apply_one(self._session(name), self._data_dir)  # dictado-fnnr
+        autotags.apply_one(self._session(name), self._data_dir, self._config_path)  # dictado-fnnr, ng5i.1
         return info
 
     def claude_app(self) -> dict:

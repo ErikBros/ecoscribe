@@ -304,9 +304,12 @@ def apply_all(metas, rules, known=()) -> int:
     return n
 
 
-def apply_one(d: Path, data_dir: Path) -> list[str] | None:
-    """A meeting's calendar info was just saved: give it the rules' tags. Never fails the caller."""
+def apply_one(d: Path, data_dir: Path, config_path: Path | None = None) -> list[str] | None:
+    """A meeting's calendar info was just saved: give it the rules' tags, only while auto tags are on (None and
+    meta.json untouched while off). config_path: the app's own config by default. Never fails the caller."""
     try:
+        if not enabled(config_path):
+            return None
         rules = load(data_dir)["rules"]
         if not rules:
             return None
