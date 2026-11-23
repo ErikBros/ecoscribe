@@ -20,6 +20,8 @@ SHOTS = {
     "inicio-novedades-version": "page=inicio&new=1&update=1",
     "inicio-novedades-abierto": "page=inicio&new=1&newopen=1", "inicio-novedades-abierto-oscuro": "page=inicio&new=1&newopen=1&theme=dark",
     "novedades-senala": "page=inicio&new=1&showme=1", "novedades-senala-oscuro": "page=inicio&new=1&showme=1&theme=dark",  # dictado-3zfe
+    # Show me on the Auto tags line rings the switch (dictado-ng5i.1: off until turned on)
+    "novedades-senala-etiquetas": "page=inicio&new=1&showme=2", "novedades-senala-etiquetas-oscuro": "page=inicio&new=1&showme=2&theme=dark",
     "inicio-version-fallo": "page=inicio&update=failed",  # Install now's steps (dictado-nmo, 9zeo.1)
     # dictado-9zeo.1: the pop-up when it's downloaded, the Installing screen, a call at the press, a stopped download
     "inicio-version-pregunta": "page=inicio&update=ask", "inicio-version-pregunta-oscuro": "page=inicio&update=ask&theme=dark",
