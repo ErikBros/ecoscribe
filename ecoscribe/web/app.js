@@ -57,6 +57,7 @@ function demoInsights(days) {  // invented numbers and text for the demo and scr
 
 const DEMO_LANG_NAMES = { en: "English", sv: "Swedish", es: "Spanish", el: "Greek", de: "German", fr: "French" };
 function demoApi() {
+  const atParam = params.get("autotags");  // auto tags in the demo (dictado-ng5i.1): see `at` below
   const demoLangs = (params.get("langs") || "en").split(",").filter((c) => DEMO_LANG_NAMES[c]);  // ?langs=en,sv,es
   const now = new Date();
   const iso = (mins) => new Date(now - mins * 60000).toISOString().slice(0, 19);
@@ -72,7 +73,7 @@ function demoApi() {
       size: 3.09e9, required: false, checked: false, ready: false }];
   let settings = {
     values: { hotkey: "rctrl", mic: "Anker PowerConf", languages: demoLangs.join(","), extra_languages: demoLangs.filter((c) => !["en", "sv"].includes(c)), sounds: true, overlay: true, live_text: true, insights: params.get("insights") === "1", speech_feedback: false, unmute: true, startup: true,
-      meet_mode: "prompt", meet_end: "10", meet_lang: demoLangs[0], on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: params.get("styles") === "1" && params.get("vc") !== "0", self_corrections: false, command_mode: params.get("cm") === "1", command_key: params.get("cmkey") || "e", command_style_file: params.get("cmstyle") === "1" ? "C:/Users/you/Documents/writing-style.md" : "", voice_phrases: params.get("vp") === "1" ? { line: { en: ["new line", "next line"] }, enter: { en: ["send it", "press enter", "ship it"] } } : {}, voice_langs: params.get("vl") ? params.get("vl").split(",") : [], screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, update_check: true, auto_update: params.get("auto") === "1", theme: params.get("theme") || "system",
+      meet_mode: "prompt", meet_end: "10", meet_lang: demoLangs[0], on_demand: true, speakers: true, vocabulary: "Göteborg\npyannote", voice_commands: params.get("styles") === "1" && params.get("vc") !== "0", self_corrections: false, command_mode: params.get("cm") === "1", command_key: params.get("cmkey") || "e", command_style_file: params.get("cmstyle") === "1" ? "C:/Users/you/Documents/writing-style.md" : "", voice_phrases: params.get("vp") === "1" ? { line: { en: ["new line", "next line"] }, enter: { en: ["send it", "press enter", "ship it"] } } : {}, voice_langs: params.get("vl") ? params.get("vl").split(",") : [], screen_names: true, hold_to_talk: false, numpad_enter: false, voice_memory: true, auto_tags: atParam === "1" || atParam === "on", update_check: true, auto_update: params.get("auto") === "1", theme: params.get("theme") || "system",
       export_dir: "C:/x/Downloads", export_default: true,
       snippets: [{ trigger: "my email", text: "alex@example.com" }], replacements: [{ heard: "poll request", write: "pull request" }],
       per_app_styles: params.get("styles") === "1",
@@ -129,8 +130,11 @@ function demoApi() {
       cal: ev("Customer A weekly", "ana@customer-a.example", "bo@customer-a.example", "kim") }),
     S("2026-10-03_1000_fallo", "Meeting", 60 * 50, "failed", { error: "CUDA out of memory", duration_s: 300, tags: tg("Customer A"), cal: ev("Customer A weekly", "ana@customer-a.example", "kim") }),
   ];
-  // auto tags, like ecoscribe/autotags.py. ?autotags=1: two rules already made (Settings > Meetings)
-  const at = { rules: params.get("autotags") === "1" ? [{ kind: "title", match: "weekly ops", label: "Weekly ops", tag: "Weekly ops" },
+  // auto tags, like ecoscribe/autotags.py. Off by default (dictado-ng5i.1). ?autotags=1: on, with two rules already made
+  // (Settings > Meetings); ?autotags=on: on, no rules yet; ?autotags=paused: the two rules, switched off; ?autotags=off: the
+  // default, Settings scrolled to the card (screenshots)
+  const atOn = () => settings.values.auto_tags === true;
+  const at = { rules: atParam === "1" || atParam === "paused" ? [{ kind: "title", match: "weekly ops", label: "Weekly ops", tag: "Weekly ops" },
     { kind: "domain", match: "customer-a.example", label: "", tag: "Customer A" }] : [], dismissed: [] };
   const tkey = (t) => String(t || "").split(/\s+/).filter(Boolean).join(" ").toLowerCase();
   const atMatch = (rule, x) => (rule.kind === "title" ? tkey(x.cal?.title) === rule.match : (x.cal?.emails || []).some((e) => e.endsWith("@" + rule.match)));
@@ -143,12 +147,14 @@ function demoApi() {
     return n;
   };
   const atOffer = (n, tag) => {
+    if (!atOn()) return null;
     const c = find(n)?.cal, k = tkey(c?.title);
     if (!k || at.rules.some((x) => x.kind === "title" && x.match === k && x.tag.toLowerCase() === tag.toLowerCase())
       || at.dismissed.includes(`title|${k}|${tag.toLowerCase()}`)) return null;
     return { title: c.title, tag, others: sess.filter((x) => x.name !== n && tkey(x.cal?.title) === k && !hasTag(x, tag)).length };
   };
   const atSuggest = (n) => {
+    if (!atOn()) return null;
     const x = find(n);
     for (const d of new Set((x?.cal?.emails || []).map((e) => e.split("@")[1]))) {
       if (d === OWN || at.dismissed.includes(`domain|${d}`) || at.rules.some((y) => y.kind === "domain" && y.match === d)) continue;
@@ -247,10 +253,12 @@ function demoApi() {
     get_session: async (n) => ({ session: find(n), segments: find(n)?.status !== "done" ? [] : segsFor(n), autotag: atSuggest(n),
       exports: ["transcript.txt"], notes: notes[n] || "", summary: find(n)?.summary === "done" ? SUMMARY : null }),
     autotag_title: async (n, tag) => {
+      if (!atOn()) return { ok: false, error: "Auto tags are off. Turn them on in Settings > Meetings." };
       at.rules.push({ kind: "title", match: tkey(find(n).cal.title), label: find(n).cal.title, tag }); window.__atRules = at.rules;
       return { ok: true, tags: find(n).tags, count: atApply() };
     },
     autotag_domain: async (n, domain, tag) => {
+      if (!atOn()) return { ok: false, error: "Auto tags are off. Turn them on in Settings > Meetings." };
       at.rules.push({ kind: "domain", match: domain, label: "", tag }); window.__atRules = at.rules;
       const count = atApply();
       return { ok: true, tags: find(n).tags, count: Math.max(0, count - 1) };
@@ -259,10 +267,10 @@ function demoApi() {
       at.dismissed.push(kind === "title" ? `title|${tkey(match)}|${tag.toLowerCase()}` : `domain|${match}`); window.__atDismissed = at.dismissed;
       return { ok: true };
     },
-    autotag_rules: async () => ({ rules: at.rules.map((x) => ({ ...x })) }),
+    autotag_rules: async () => ({ rules: at.rules.map((x) => ({ ...x })), on: atOn() }),
     remove_autotag_rule: async (kind, match, tag) => {
       at.rules = at.rules.filter((x) => !(x.kind === kind && x.match === match && x.tag === tag)); window.__atRules = at.rules;
-      return { ok: true, rules: at.rules };
+      return { ok: true, rules: at.rules, on: atOn() };
     },
     voices_info: async () => window.__noVoices ? { count: 0, names: [], on: true } : { count: 2, names: ["Ana", "Tom"], on: true },
     crashes: async () => (params.get("crash") === "1" ? { items: [{ name: "2026-10-06_140325", when: "2026-10-06 140325", exit: MAC ? "unknown" : "0xC0000005 (access violation)" }], gave_up: false } : { items: [], gave_up: false }),
@@ -396,7 +404,12 @@ function demoApi() {
     },
     check_hotkey: async (v) => (/^(ctrl\+[cvxzyasfpwnt]|alt\+tab|[a-z0-9])$/.test(v) ? { ok: false, error: `${v} is not allowed` }
       : { ok: true, value: v, label: hotkeyLabel(v) }),
-    save_settings: async (v) => { Object.assign(settings.values, v); return { ok: true, restarting: true }; },
+    save_settings: async (v) => {
+      const was = atOn();
+      Object.assign(settings.values, v);
+      if (atOn() && !was) atApply();  // dictado-ng5i.1: switched on, the rules tag past meetings at once
+      return { ok: true, restarting: true };
+    },
     mic_test_start: async () => ({ device: "Microphone (Anker PowerConf C20", fell_back: false }),
     mic_test_level: async () => { t += 1; return Math.abs(Math.sin(t / 3)) * 0.08; },
     mic_test_stop: async () => ({ ok: true }),
@@ -2139,7 +2152,7 @@ function formValues() {
     command_style_file: $("#f-command-style-file").value,  // dictado-jq7p
     screen_names: $("#f-screen-names").checked, hold_to_talk: $("#f-hold").checked, numpad_enter: $("#f-numpad-enter").checked,
     theme: $("#f-theme").value || "system",
-    voice_memory: $("#f-voice-memory").checked, debug_log: $("#f-debug-log").checked, update_check: $("#f-update-check").checked, auto_update: $("#f-auto-update").checked, calendar_url: $("#f-calendar").value.trim(), my_name: $("#f-my-name").value.trim(),
+    voice_memory: $("#f-voice-memory").checked, auto_tags: $("#f-auto-tags").checked, debug_log: $("#f-debug-log").checked, update_check: $("#f-update-check").checked, auto_update: $("#f-auto-update").checked, calendar_url: $("#f-calendar").value.trim(), my_name: $("#f-my-name").value.trim(),
     vocabulary: $("#f-vocabulary").value.split("\n").map((w) => w.trim()).filter(Boolean).join("\n"),
     snippets: $$(".snip").map((r) => ({ trigger: $(".snip-trigger", r).value.trim().toLowerCase().replace(/\s+/g, " "),
                                        text: $(".snip-text", r).value }))
@@ -2465,6 +2478,7 @@ async function renderSettings() {
   $("#f-screen-names").checked = s.values.screen_names !== false;
   $("#f-hold").checked = !!s.values.hold_to_talk; $("#f-numpad-enter").checked = !!s.values.numpad_enter;
   holdFits();
+  $("#f-auto-tags").checked = s.values.auto_tags === true;  // dictado-ng5i.1: opt-in, a missing value is off
   claudeRow(); gcalRow(); exportRow(s.values); autotagRows();
   $("#f-voice-memory").checked = s.values.voice_memory !== false;
   voicesRow();
@@ -2553,7 +2567,7 @@ async function save() {
   $("#savebar").hidden = true;
   if ("insights" in changed) $("#nav-insights").hidden = !v.insights;
   if ("theme" in changed) applyTheme(v.theme);
-  const needsRestart = Object.keys(changed).some((k) => k !== "startup" && k !== "insights" && k !== "theme");
+  const needsRestart = Object.keys(changed).some((k) => k !== "startup" && k !== "insights" && k !== "theme" && k !== "auto_tags");
   toast(!needsRestart ? "Saved." : r.restarting ? "Saved. Ecoscribe restarts, a few seconds."
     : "Saved. It applies the next time Ecoscribe starts.");
   refreshStatus();
@@ -2651,11 +2665,20 @@ function exportRow(v) {  // dictado-yq9: where Download puts transcripts
   $("#export-change").onclick = async () => done(await api.pick_export_dir());
   $("#export-reset").onclick = async () => done(await api.set_export_dir(""));
 }
+let atRules = [];
 async function autotagRows() {  // dictado-fnnr: Settings > Meetings > Auto tags, each rule with ×
-  const rules = (await api.autotag_rules().catch(() => ({ rules: [] }))).rules || [];
+  atRules = (await api.autotag_rules().catch(() => ({ rules: [] }))).rules || [];
+  atPaint();
+}
+function atPaint() {  // dictado-ng5i.1: the switch decides the card. Off: one line; rules made earlier stay, greyed and paused
+  const rules = atRules, on = $("#f-auto-tags").checked, card = $("#autotags");
+  card.classList.toggle("at-on", on);
+  card.classList.toggle("at-paused-rules", !on && rules.length > 0);
+  $("#at-on-text").hidden = !on; $("#at-off-text").hidden = on;
+  $("#at-paused").hidden = on || !rules.length;
   const box = $("#at-rows");
   box.textContent = "";
-  $("#at-empty").hidden = rules.length > 0; $("#at-note").hidden = !rules.length;
+  $("#at-empty").hidden = !on || rules.length > 0; $("#at-note").hidden = !on || !rules.length;
   for (const rule of rules) {
     const row = document.createElement("div"); row.className = "row at-row";
     const label = document.createElement("span"); label.className = "row-label";
@@ -2798,6 +2821,7 @@ function cmStyleWire() {
   $("#cm-style-clear").onclick = () => cmStyleSet("");
   $("#cm-style-open").onclick = async () => { const r = await api.open_style_file($("#f-command-style-file").value); if (!r.ok) toast(r.error); };
   $("#f-command-mode").addEventListener("change", cmStylePaint);
+  $("#f-auto-tags").addEventListener("change", atPaint);  // dictado-ng5i.1: the card follows the switch at once
 }
 function hkWire() {
   keyPicker({ label: $("#hk-label"), input: $("#f-hotkey"), button: $("#hk-change"), hint: $("#hk-hint"), lone: true,
@@ -3164,7 +3188,7 @@ async function boot() {
     const add = $("#r-tag-add"); add.value = params.get("offertag") || "Customer A";
     add.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
   }, 400);
-  if (params.get("demo") === "1" && params.get("autotags") === "1" && page === "ajustes") setTimeout(() => $("#at-rows")?.closest(".card")?.scrollIntoView?.({ block: "center" }), 300);  // screenshot
+  if (params.get("demo") === "1" && ["1", "on", "off", "paused"].includes(params.get("autotags")) && page === "ajustes") setTimeout(() => $("#at-rows")?.closest(".card")?.scrollIntoView?.({ block: "center" }), 300);  // screenshot
   if (params.get("demo") === "1" && params.get("retrymenu") === "1") setTimeout(() => $(".h-retry button")?.click(), 300);  // screenshot
   if (params.get("demo") === "1" && params.get("models") === "scroll") setTimeout(() => $("#m-rows").scrollIntoView(), 300);  // screenshot
   if (params.get("demo") === "1" && params.get("addlangs")) setTimeout(() => { sx.langs.push(...params.get("addlangs").split(",")); paintLangs(); }, 300);  // screenshot

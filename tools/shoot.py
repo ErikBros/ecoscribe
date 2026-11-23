@@ -65,12 +65,22 @@ SHOTS = {
     "reuniones-etiqueta": "page=reuniones&rtag=Customer%20A", "reuniones-etiqueta-oscuro": "page=reuniones&rtag=Customer%20A&theme=dark",
     "reuniones-sin-etiquetas": "page=reuniones&tags=0",
     "reunion-etiquetas": "page=reuniones/2026-10-05_0915_planering", "reunion-etiquetas-oscuro": "page=reuniones/2026-10-05_0915_planering&theme=dark",
-    # auto tags (dictado-fnnr): a tag just added offers the series, a customer tag suggested from the guests, the rules in Settings
-    "reunion-etiqueta-serie": "page=reuniones/2026-10-04_1600_kund&tags=0&offer=1",
-    "reunion-etiqueta-serie-oscuro": "page=reuniones/2026-10-04_1600_kund&tags=0&offer=1&theme=dark",
-    "reunion-etiqueta-sugerida": "page=reuniones/2026-10-04_1600_kund&tags=0",
-    "reunion-etiqueta-sugerida-oscuro": "page=reuniones/2026-10-04_1600_kund&tags=0&theme=dark",
+    # auto tags (dictado-fnnr): a tag just added offers the series, a customer tag suggested from the guests, the rules in Settings.
+    # Opt-in since dictado-ng5i.1: autotags=on switches the demo on (no rules), autotags=1 on with two rules, =paused off with them
+    "reunion-etiqueta-serie": "page=reuniones/2026-10-04_1600_kund&tags=0&autotags=on&offer=1",
+    "reunion-etiqueta-serie-oscuro": "page=reuniones/2026-10-04_1600_kund&tags=0&autotags=on&offer=1&theme=dark",
+    "reunion-etiqueta-sugerida": "page=reuniones/2026-10-04_1600_kund&tags=0&autotags=on",
+    "reunion-etiqueta-sugerida-oscuro": "page=reuniones/2026-10-04_1600_kund&tags=0&autotags=on&theme=dark",
     "ajustes-etiquetas-auto": "page=ajustes&sec=meetings&autotags=1",
+    # switched off (dictado-ng5i.1): no suggestion, no offer after a tag is added, the one-line card, the paused rules
+    "reunion-etiqueta-sin-auto": "page=reuniones/2026-10-04_1600_kund&tags=0",
+    "reunion-etiqueta-sin-auto-oscuro": "page=reuniones/2026-10-04_1600_kund&tags=0&theme=dark",
+    "reunion-etiqueta-sin-oferta": "page=reuniones/2026-10-04_1600_kund&tags=0&offer=1",
+    "reunion-etiqueta-sin-oferta-oscuro": "page=reuniones/2026-10-04_1600_kund&tags=0&offer=1&theme=dark",
+    "ajustes-etiquetas-apagadas": "page=ajustes&sec=meetings&autotags=off",
+    "ajustes-etiquetas-apagadas-oscuro": "page=ajustes&sec=meetings&autotags=off&theme=dark",
+    "ajustes-etiquetas-pausadas": "page=ajustes&sec=meetings&autotags=paused",
+    "ajustes-etiquetas-pausadas-oscuro": "page=ajustes&sec=meetings&autotags=paused&theme=dark",
     "historial-editar": "page=historial&hedit=1", "historial-aprender": "page=historial&learn=1",
     "insights": "page=insights&insights=1",
     # dark mode (dictado-u9h)

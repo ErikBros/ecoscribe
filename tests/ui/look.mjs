@@ -34,9 +34,11 @@ const PAGES = {
   "reunion-reemplazar": "page=reuniones/2026-10-04_1600_kund&replace=1", "reunion-reemplazado": "page=reuniones/2026-10-04_1600_kund&replace=1&replaced=1", "reunion-sin-invitados": "page=reuniones/2026-10-05_0915_planering&noguests=1&email=1",
   insights: "page=insights&insights=1", "reuniones-etiqueta": "page=reuniones&rtag=Customer%20A",
   "reunion-etiquetas": "page=reuniones/2026-10-05_0915_planering",
-  // auto tags (dictado-fnnr)
-  "reunion-etiqueta-serie": "page=reuniones/2026-10-04_1600_kund&tags=0&offer=1", "reunion-etiqueta-sugerida": "page=reuniones/2026-10-04_1600_kund&tags=0",
+  // auto tags (dictado-fnnr), opt-in since dictado-ng5i.1 (autotags=on: the demo switched on)
+  "reunion-etiqueta-serie": "page=reuniones/2026-10-04_1600_kund&tags=0&autotags=on&offer=1", "reunion-etiqueta-sugerida": "page=reuniones/2026-10-04_1600_kund&tags=0&autotags=on",
   "ajustes-etiquetas-auto": "page=ajustes&sec=meetings&autotags=1",
+  "reunion-etiqueta-sin-auto": "page=reuniones/2026-10-04_1600_kund&tags=0", "reunion-etiqueta-sin-oferta": "page=reuniones/2026-10-04_1600_kund&tags=0&offer=1",
+  "ajustes-etiquetas-apagadas": "page=ajustes&sec=meetings&autotags=off", "ajustes-etiquetas-pausadas": "page=ajustes&sec=meetings&autotags=paused",
 };
 
 async function load(query) {
