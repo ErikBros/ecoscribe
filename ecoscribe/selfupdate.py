@@ -14,7 +14,7 @@ for that one version (`install` in update.json), the background app:
 2. asks: when the download is done, the window opens on Home with a pop-up, Install now or Later (`on_ready`;
    once per version, `popup_shown`, and only after a dictation or a recording call has ended). Later (`asked`)
    leaves an Install now button on Home.
-3. installs only when the user pressed Install now (`install_now`, read at once by PressWatcher) or quits: never
+3. installs only when the user pressed Install now (`install_now`, read at once by PressWatcher), or at Quit: never
    by itself while the app is in use. The press must find nothing busy: no meeting recording, saving or waiting,
    no file or speakers job, nothing queued, no dictation recording or being transcribed. A press during a call is
    refused by the window ("Finish the call first"); other blockers hold it until they clear. The file is checked
@@ -531,7 +531,7 @@ class PressWatcher(threading.Thread):
 def home_state(state: dict, current: str, auto: bool, supported: bool | None = None) -> dict:
     """What Home's version row and the pop-up add (dictado-nmo, dictado-9zeo.1): {"install": "offer" |
     "downloading" | "ready" | "installing" | "failed", "pct", "pressed", "error", "retry_at", "ask", "blocked",
-    "quit"}; {} where this platform can't install by itself (the row keeps Download only).
+    "quit"}; {} where this platform can't update itself (the row keeps Download only).
     ask: the pop-up is due (downloaded, Later not pressed, no press). blocked "call": a press waits on a call.
     quit: the last Quit couldn't install ("downloading" or "busy")."""
     a = state.get("asset")

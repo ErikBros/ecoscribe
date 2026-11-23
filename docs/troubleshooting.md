@@ -20,7 +20,8 @@ meeting text.
 | Meeting transcript only has "Me" | The computer's sound wasn't captured. During the call the meters next to Stop show it: when "hearing them" stays silent, press the **Record** button the warning offers. |
 | "Ecoscribe hears nothing from your mic" during a call | The call uses another mic: press **Record** + its name in the warning, or pick the mic in Settings. |
 | The meeting pill is in the way | Drag it somewhere else; double-click puts it back. |
-| Installing an update says a meeting is recording | Stop the meeting first, wait for it to show Ready, then click Retry. Setup won't cut a recording. **Install when idle** waits by itself. |
+| Installing an update says a meeting is recording | Stop the meeting first, wait for it to show Ready, then click Retry. Setup won't cut a recording. In the app, **Install now** says **Finish the call first** and works once the call ends. |
+| A new version says "The download stopped" | Home names the reason and when it tries again. Check the connection or free disk space, then press **Install now** to try at once. |
 | A crash card on Home | Ecoscribe restarted itself and kept the dictation you were in. **Copy crash report for Claude** and paste it. |
 | Anything else | Open the log: tray icon > **Open log**, or Settings > General > Help > Logs and crash reports > Open folder. |
 

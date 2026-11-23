@@ -48,9 +48,9 @@ From **[Releases](https://github.com/ErikBros/ecoscribe/releases/latest)**:
 4. Keep **"Start Ecoscribe with Windows"** ticked if you want it always ready.
 5. At the end it opens Ecoscribe and the first-run setup.
 
-**Updating:** install the new Setup over the old one; your settings, history and transcripts stay. Ecoscribe can
-also tell you about a new version and install it by itself when you step away (see [Settings](settings.md#new-versions)).
-Setup waits if a meeting is recording.
+**Updating:** press **Install now** on Home when Ecoscribe says a new version is out: it downloads and installs it,
+shows Setup's progress and opens again by itself (see [Settings](settings.md#new-versions)). Installing the new Setup
+over the old one by hand works too. Your settings, history and transcripts stay. Setup waits if a meeting is recording.
 
 **Optional, the speaker add-on:** download it from **[its release](https://github.com/ErikBros/ecoscribe/releases/tag/speakers-1.2.0)** and run **`Ecoscribe-Speakers-Setup-<version>.exe`** the same way (same SmartScreen
 steps). It installs separately in `%LOCALAPPDATA%\Programs\Ecoscribe Speakers` and Ecoscribe picks it up on its own.

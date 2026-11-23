@@ -33,9 +33,10 @@ is listed at the end of this page.
    Ecoscribe has a Developer ID.
 3. The first-run setup opens (next section).
 
-**Updating:** quit Ecoscribe, drag the new one over the old one in Applications, then Open Anyway once more (step 2).
-Your settings, history and transcripts stay, and so do the permissions (same signing certificate). Home tells you
-when a new version is out (Settings > General > New versions).
+**Updating:** when Home says a new version is out, press **Install now**: Ecoscribe downloads it, swaps it in while
+an Installing screen shows, and opens again by itself (Settings > General > New versions). Your settings, history and
+transcripts stay, and so do the permissions (same signing certificate). A copy you install by hand (drag the new one
+over the old one in Applications) needs Open Anyway once more (step 2).
 
 ## 3. First-run setup
 

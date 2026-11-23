@@ -46,12 +46,20 @@ commands**. See [Dictation](dictation.md#languages) and
 **New versions** has three choices:
 
 - *Tell me on Home* (the default): once a day Ecoscribe asks GitHub for the newest version number. When there is one,
-  Home says so, names what the new version brings, and offers **Download** (the Releases page) and ×. **Install when idle** next to it gets the new version in
-  the background and installs it when you step away or quit Ecoscribe. Nothing from your dictations or meetings is
-  sent. On a Mac, only a version that has a Mac download is shown.
-- *Install by itself*: the same for every new version, without asking. Never during a call, while a meeting
-  is being saved or while you dictate.
+  Home says so, names what the new version brings, and offers **Install now**, **Download** (the Releases page) and ×.
+  **Install now** downloads it (Home shows how far, "It installs as soon as it's here") and then installs it at once.
+  Nothing from your dictations or meetings is sent. On a Mac, only a version that has a Mac download is shown.
+- *Download by itself*: every new version is downloaded in the background. When it's there, a pop-up asks
+  **Install Ecoscribe x.y.z now?** with **Install now** and **Later**. Later leaves **Install now** on Home, so you can
+  install it any time.
 - *Don't check*.
+
+**Install now** shows an **Installing Ecoscribe x.y.z** screen over the whole window; the window can't be used until
+the new version opens by itself, on Home. On Windows, Setup's own progress window shows while the files are replaced.
+If a call is recording when you press it, the button says **Finish the call first** and offers it again when the call
+ends. A download that stops says why and when it tries again; **Install now** tries again at once. Quitting Ecoscribe
+with a downloaded version installs it as Ecoscribe closes; if it couldn't (still downloading, or something still
+running), Home says so the next time.
 
 After an update, Home shows **What's new** in that version once: a few lines on what changed and **All release notes**.
 × hides it until the next update. A fresh install doesn't show it.

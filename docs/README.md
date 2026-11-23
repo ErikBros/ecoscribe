@@ -29,7 +29,7 @@ One page per thing you do with Ecoscribe. Keys are written for Windows (Right Ct
 | [Meetings](meetings.md) | Before you record, taking notes in a call, what it's recording, the meeting pill, after the call, calendars, speakers, call summaries and to-dos, files |
 | [With Claude](claude.md) | Ask the Claude app about your calls, Debrief my call, Copy for Claude, fix it when you correct yourself, Command mode |
 | [Insights](insights.md) | How clearly you speak, filler words, pace, your share of the talking |
-| [Settings](settings.md) | Every Settings tab, the look (dark mode), new versions and Install when idle, speech models, start at login |
+| [Settings](settings.md) | Every Settings tab, the look (dark mode), new versions and Install now, speech models, start at login |
 
 ## Troubleshooting
 
