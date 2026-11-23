@@ -132,6 +132,10 @@ Label meetings to find them again, for example by customer or by a meeting that 
 Meetings from your calendar can tag themselves, so a tag stays complete without adding it to every meeting by hand.
 Both kinds need the meeting's calendar event (see [Meeting names from your calendar](#meeting-names-from-your-calendar)).
 
+Auto tags are off until you turn them on: the switch on **Settings > Meetings > Auto tags**. While they're off, a
+meeting's page makes no offer and suggests no tag, and no rule tags a meeting. Tags you add by hand work either way.
+Turning them on tags past meetings with the rules you already have, at once.
+
 - **A meeting that repeats:** when you add a tag to a meeting from a calendar event, a line under the tags asks
   *Tag every "Weekly ops" meeting with Weekly ops?* and says how many earlier ones it would tag too. **Yes** tags them
   now and every new meeting with that event title from then on (case and spacing don't matter). **No** doesn't ask
@@ -145,7 +149,7 @@ Both kinds need the meeting's calendar event (see [Meeting names from your calen
 - **Taking one off:** removing an auto tag from one meeting with its × keeps it off that meeting; the rule doesn't
   put it back.
 - **Your rules:** **Settings > Meetings > Auto tags** lists them. The × removes a rule; the tags it already added stay
-  on the meetings.
+  on the meetings. Turning auto tags off keeps your rules, greyed and paused, and keeps every tag they added.
 
 ## Search
 
