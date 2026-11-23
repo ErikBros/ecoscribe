@@ -31,6 +31,8 @@ WizardStyle=modern
 Compression=lzma2/normal
 SolidCompression=yes
 CloseApplications=no
+; Install now runs Setup with /SILENT: its progress window shows, without a Cancel button (dictado-9zeo.1)
+AllowCancelDuringInstall=no
 ; tell Windows to refresh icons, or the taskbar keeps the old one from its cache after an update (dictado-d4h)
 ChangesAssociations=yes
 
@@ -55,7 +57,8 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Run]
 ; a silent self-update at Quit passes /LAUNCH=0: Ecoscribe stays closed (dictado-nmo)
-Filename: "{app}\Ecoscribe.exe"; Description: "Open Ecoscribe"; Flags: nowait postinstall; Check: ShouldLaunch
+; Install now passes /OPENHOME=1: the new version opens its window on Home (dictado-9zeo.1)
+Filename: "{app}\Ecoscribe.exe"; Parameters: "{code:LaunchParams}"; Description: "Open Ecoscribe"; Flags: nowait postinstall; Check: ShouldLaunch
 
 [InstallDelete]
 ; the 1.0 script deploy started itself from here; the installed app uses the Run key
@@ -77,6 +80,15 @@ const
 function ShouldLaunch(): Boolean;
 begin
   Result := ExpandConstant('{param:LAUNCH|1}') <> '0';
+end;
+
+{ /OPENHOME=1 (Install now in the app): the first start of the new version opens the window on Home. }
+function LaunchParams(Param: String): String;
+begin
+  if ExpandConstant('{param:OPENHOME|0}') = '1' then
+    Result := '--after-update'
+  else
+    Result := '';
 end;
 
 procedure StopEcoscribe();

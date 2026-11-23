@@ -193,9 +193,9 @@ CAPABILITIES: dict[str, dict] = {
         "windows": "ecoscribe.gpu_runtime:ensure,Fetcher,dll_root",  # %LOCALAPPDATA%\\ecoscribe\\runtime\\<version> (dictado-7e1)
         "macos": ("not_needed", "no CUDA: mlx runs on Metal, which comes with macOS"),
     },
-    "Install a new version by itself: when idle or at Quit, never in a call (Settings switch, off by default; Home > Install when idle)": {
-        "windows": "ecoscribe.selfupdate:SelfUpdater,run_installer,input_idle_s",  # the Inno Setup installer, silent
-        "macos": "ecoscribe.platform.macos.selfinstall:command,app_bundle,requirement",  # the .dmg: swaps Ecoscribe.app
+    "Install a new version when the user presses Install now (pop-up when it's downloaded, Installing screen, opens again by itself)": {
+        "windows": "ecoscribe.selfupdate:SelfUpdater,run_installer,request_install",  # the Inno Setup installer
+        "macos": "ecoscribe.platform.macos.selfinstall:command,app_bundle,requirement,script",  # the .dmg: swaps Ecoscribe.app
     },
     "Installer": {
         "windows": "file:packaging/windows/ecoscribe.iss",

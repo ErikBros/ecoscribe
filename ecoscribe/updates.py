@@ -5,8 +5,8 @@ release isn't offered there).
 
 State lives in <data dir>/update.json: when we last asked, what the latest release was (and its
 installer, `asset`, for selfupdate.py), and the version the user dismissed (hidden until a newer one
-appears) or okayed for Install when idle (`install`). The app writes the first ones and the self-update
-progress, the window `dismissed` and `install`; each write reloads the file and changes only its own keys.
+appears) or pressed Install now for (`install`, `install_now`). The app writes the first ones and the self-update
+progress, the window `dismissed`, the press and Later; each write reloads the file and changes only its own keys.
 Pure apart from the file and the one fetch, which tests replace."""
 from __future__ import annotations
 
@@ -169,8 +169,8 @@ def dismiss(data_dir: Path, version: str) -> None:
 def start(data_dir: Path, enabled: bool, fetch=fetch_release, delay_s: float = FIRST_DELAY_S,
           updater=None) -> threading.Thread | None:
     """The app's background thread: first look a minute after start, then every minute; asks GitHub
-    only when due. updater: selfupdate.SelfUpdater (dictado-nmo), whose tick() gets and installs a new
-    version when allowed and safe."""
+    only when due. updater: selfupdate.SelfUpdater (dictado-nmo), whose tick() gets a new version when allowed
+    and installs it after an Install now press when nothing is busy."""
     if not enabled:
         log.info("update check off")
         return None

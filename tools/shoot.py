@@ -20,7 +20,18 @@ SHOTS = {
     "inicio-novedades-version": "page=inicio&new=1&update=1",
     "inicio-novedades-abierto": "page=inicio&new=1&newopen=1", "inicio-novedades-abierto-oscuro": "page=inicio&new=1&newopen=1&theme=dark",
     "novedades-senala": "page=inicio&new=1&showme=1", "novedades-senala-oscuro": "page=inicio&new=1&showme=1&theme=dark",  # dictado-3zfe
-    "inicio-version-fallo": "page=inicio&update=failed",  # Install when idle's steps (dictado-nmo)
+    "inicio-version-fallo": "page=inicio&update=failed",  # Install now's steps (dictado-nmo, 9zeo.1)
+    # dictado-9zeo.1: the pop-up when it's downloaded, the Installing screen, a call at the press, a stopped download
+    "inicio-version-pregunta": "page=inicio&update=ask", "inicio-version-pregunta-oscuro": "page=inicio&update=ask&theme=dark",
+    "inicio-version-instalando": "page=inicio&update=installing",
+    "inicio-version-instalando-oscuro": "page=inicio&update=installing&theme=dark",
+    "inicio-version-llamada": "page=inicio&update=call&tried=1", "inicio-version-error": "page=inicio&update=dlerr",
+    # after Install now while it still downloads; the Installing screen waiting for a job; the last Quit couldn't install
+    # (still downloading / something busy); Install now with the app stopped (the toast)
+    "inicio-version-pulsado": "page=inicio&update=pressed", "inicio-version-instalando-espera": "page=inicio&update=installbusy",
+    "inicio-version-cierre-descarga": "page=inicio&update=quitdl", "inicio-version-cierre-ocupado": "page=inicio&update=quitbusy",
+    "inicio-version-detenido": "page=inicio&state=stopped&update=stopped&tried=1",
+    "ajustes-versiones-descarga": "page=ajustes&sec=general&auto=1",  # Settings > New versions: Download by itself
     "detenido": "page=inicio&state=stopped",
     "cargando": "page=inicio&state=loading",
     "gpu-descarga": "page=inicio&gpurt=downloading", "gpu-fallo": "page=inicio&gpurt=failed",  # dictado-7e1

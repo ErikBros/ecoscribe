@@ -35,7 +35,24 @@ def parse(argv):
     ap.add_argument("--meaning-index", action="store_true", help="bring the search-by-meaning index up to date, then exit")
     ap.add_argument("--supervise", action="store_true", help=argparse.SUPPRESS)  # the watchdog (t0u.37)
     ap.add_argument("--after-crash", metavar="REPORT", help=argparse.SUPPRESS)
+    ap.add_argument("--after-update", action="store_true", help=argparse.SUPPRESS)  # dictado-9zeo.1
     return ap.parse_args(argv)
+
+
+def again_args(argv: list[str]) -> list[str]:
+    """The arguments to start this app again with (a Settings restart, a failed install): never the one-off
+    --restarted and --after-update (dictado-9zeo.1: only the start right after an Install now opens the window)."""
+    return [a for a in argv if a not in ("--restarted", "--after-update")]
+
+
+def open_after_update(args, open_ui) -> bool:
+    """dictado-9zeo.1: the new version's first start after an Install now (Setup's /OPENHOME=1, the Mac script's
+    `open --args --after-update`) opens the window on Home, so the update visibly finishes by itself. A start from
+    the login Run key or login item, a watchdog restart or a Quit-time install opens nothing."""
+    if not getattr(args, "after_update", False):
+        return False
+    open_ui("inicio")
+    return True
 
 
 def _migrate_from_script(log) -> None:
@@ -520,8 +537,8 @@ def main(argv=None) -> int:
         data, __version__, auto=lambda: cfg.ui.auto_update,
         meetings=lambda: meet_ctl.state() if meet_ctl else read_meetings(data),
         app_busy=lambda: app.state != "idle" or app._pending > 0,
-        last_dictation=lambda: app._t_start or None,  # monotonic, like the updater's clock
-        install=lambda p, a, relaunch: root.after(0, lambda: install_now(p, a, relaunch)))
+        install=lambda p, a, relaunch: root.after(0, lambda: install_now(p, a, relaunch)),
+        on_ready=lambda v: ipc.show_ui("inicio"))  # dictado-9zeo.1: the pop-up, over the page if already open
 
     def quit_app():
         log.info("quit requested")
@@ -580,19 +597,14 @@ def main(argv=None) -> int:
 
     def install_now(path, asset, relaunch):
         """dictado-nmo, on the main thread: still nothing busy? Then quit; the installer starts as we end."""
-        why = updater.blockers()
-        if why:
-            log.info("self-update: not now (%s)", "; ".join(why))
-            return
-        pending_install.append((path, asset, relaunch))
-        quit_app()
+        updater.start_install(path, asset, relaunch, pending_install, quit_app)
 
     def restart():
         """Settings were saved: come back with the new config (a clean re-exec)."""
         from .restart import do_restart
         log.info("reload requested: restarting")
         status.write(status_path, state="restarting")
-        argv = [a for a in (sys.argv[1:] if argv_in is None else argv_in) if a != "--restarted"]
+        argv = again_args(sys.argv[1:] if argv_in is None else argv_in)
         do_restart(
             spawn=lambda: ipc.spawn(argv + ["--restarted"]),
             cleanup_steps=[("app", app.shutdown), ("engine", getattr(engine, "close", lambda: None)), ("hook", hook.stop),
@@ -652,6 +664,8 @@ def main(argv=None) -> int:
     watcher.start()
     if not args.test and not (data / "welcome_done").exists():
         ipc.open_ui("bienvenida")
+    elif not args.test:
+        open_after_update(args, ipc.open_ui)
 
     def load_model():
         if cfg.whisper.on_demand:
@@ -704,6 +718,8 @@ def main(argv=None) -> int:
         except Exception:
             log.exception("self-update: after start")
         updates.start(data, cfg.ui.update_check, updater=updater if selfupdate.SUPPORTED else None)
+        if selfupdate.SUPPORTED and cfg.ui.update_check:  # dictado-9zeo.1: Install now is read within a second
+            selfupdate.PressWatcher(data, updater).start()
     if not args.test and (sys.platform == "darwin" or getattr(sys, "frozen", False)
                           or os.environ.get("ECOSCRIBE_SUPERVISE")):
         from . import supervise
@@ -737,8 +753,7 @@ def main(argv=None) -> int:
             if not started and relaunch:  # quit only to install: don't leave the user without Ecoscribe
                 try:
                     winutil.release_instance()
-                    ipc.spawn([a for a in (sys.argv[1:] if argv_in is None else argv_in) if a != "--restarted"]
-                              + ["--restarted"])
+                    ipc.spawn(again_args(sys.argv[1:] if argv_in is None else argv_in) + ["--restarted"])
                 except Exception:
                     log.exception("self-update: Ecoscribe not started again")
         log.info("ecoscribe stopped")

@@ -173,3 +173,77 @@ def test_the_script_swaps_only_an_app_signed_like_this_one(tmp_path, same_signat
         subprocess.run(["codesign", "--verify", "--deep", "--strict", str(installed)], check=True)
     else:
         assert "not installed" in log and not swapped and "echo old" in exe.read_text()
+
+
+# ---------------- Install now: the swap runs behind the window's Installing screen (dictado-9zeo.1) ----------------
+def _text(relaunch):
+    return selfinstall.script(Path("/x/Ecoscribe-1.19.0.dmg"), Path("/Applications/Ecoscribe.app"), 'identifier "x"',
+                              Path("/x/install.log"), relaunch)
+
+
+def test_install_now_script_does_not_wait_for_the_window_and_opens_home():
+    s = _text(True)
+    assert 'busy() { pgrep -lf "$app/Contents/MacOS/" | grep -v -e " --ui" >/dev/null; }' in s  # the window may stay
+    lines = s.splitlines()
+    swap = lines.index('    if ditto "$new" "$app.new" && mv "$app" "$app.old" && mv "$app.new" "$app"; then')
+    end, reopen = lines.index("end_window"), lines.index('open "$app" --args --after-update')
+    assert swap < end < reopen  # swapped, then the old window ended, then the new app opened on Home
+    assert selfinstall.AFTER_UPDATE == selfupdate.AFTER_UPDATE == "--after-update"
+
+
+def test_quit_script_waits_for_every_process_and_stays_closed():
+    s = _text(False)
+    assert 'busy() { pgrep -f "$app/Contents/MacOS/" >/dev/null; }' in s
+    assert "end_window\n" not in s.split("}\n", 2)[-1] and "--after-update" not in s and 'open "$app"' not in s
+
+
+@pytest.mark.skipif(sys.platform != "darwin" or not shutil.which("hdiutil"), reason="the Mac's hdiutil and codesign")
+@pytest.mark.parametrize("same_signature", [True, False])
+def test_install_now_swaps_behind_the_open_window_then_opens_home(tmp_path, same_signature):
+    """The real script on a throwaway app, a stand-in window process still running (`... --ui`) and a stand-in for
+    `open`: the swap doesn't wait for the window (seconds, not WAIT_S), the window is ended, the app is opened with
+    the Home flag; with a wrong signature the old window is ended too and the old app opened again."""
+    import time
+    installed = _app(tmp_path / "installed", "old")
+    req = selfinstall.requirement(installed)
+    src = tmp_path / "src"
+    if same_signature:
+        src.mkdir()
+        subprocess.run(["ditto", str(installed), str(src / "Ecoscribe.app")], check=True)
+    else:
+        _app(src, "evil")
+    dmg = _dmg(src / "Ecoscribe.app", tmp_path / DMG)
+    upd = tmp_path / "updates"
+    upd.mkdir()
+    opened = tmp_path / "opened.txt"
+    fake_open = tmp_path / "fake-open.sh"
+    fake_open.write_text(f'#!/bin/sh\necho "$@" >> "{opened}"\n')
+    fake_open.chmod(0o755)
+    window = subprocess.Popen(["/bin/sh", "-c", "sleep 60; :", str(installed / "Contents" / "MacOS" / "Ecoscribe"), "--ui"])
+    try:
+        s = upd / "install.sh"
+        s.write_text(selfinstall.script(dmg, installed, req, upd / "install.log", relaunch=True, open_cmd=str(fake_open)))
+        before = (installed / "Contents" / "MacOS" / "Ecoscribe").stat().st_ino
+        t0 = time.monotonic()
+        subprocess.run(["/bin/sh", str(s)], check=True, timeout=90)
+        took = time.monotonic() - t0
+        assert took < 30, took  # not after WAIT_S: the window doesn't hold the swap
+        window.wait(timeout=10)  # ended by the script
+        log = (upd / "install.log").read_text()
+        swapped = (installed / "Contents" / "MacOS" / "Ecoscribe").stat().st_ino != before
+        assert opened.read_text().split() == [str(installed), "--args", "--after-update"]
+        assert not (installed.parent / "Ecoscribe.app.old").exists() and not (installed.parent / "Ecoscribe.app.new").exists()
+        if same_signature:
+            assert "installed" in log.splitlines() and swapped
+        else:
+            assert "not installed" in log and not swapped
+    finally:
+        if window.poll() is None:
+            window.kill()
+
+
+def test_install_now_script_still_reopens_when_no_temp_folder():
+    """No temporary folder for the .dmg: the script goes on to the end step (old window ended, app reopened)."""
+    s = selfinstall.script(Path("/u/Ecoscribe-1.19.0.dmg"), Path("/Applications/Ecoscribe.app"), "req", Path("/u/l"), True)
+    assert "|| exit 1" not in s and '[ -n "$mnt" ] && hdiutil attach' in s
+    assert s.index("end_window\n") > s.index("mktemp")
