@@ -306,6 +306,7 @@ async function load(query) {
   check(!doc.querySelector(".spot-ring") && !doc.querySelector(".spot-tip"), "any key or click takes the ring away");
   doc.querySelector("#new-more").click(); await sleep(20);  // a Settings card: Show me opens its tab (dictado-fnnr)
   [...doc.querySelectorAll("#new-list li")][5].querySelector(".new-show").click(); await sleep(200);
+  for (let i = 0; i < 40 && !doc.querySelector(".spot-tip"); i++) await sleep(50);  // Settings loads first: slower on a busy PC
   check(!doc.querySelector("#page-ajustes").hidden && !doc.querySelector("#autotags").closest("[hidden]")
     && /Turn auto tags on here/.test(doc.querySelector(".spot-tip")?.textContent || ""), "Show me opens Settings on the Auto tags card");
   check(doc.querySelector(".spot-ring") && doc.querySelector("#at-head")?.contains(doc.querySelector("#f-auto-tags")),
