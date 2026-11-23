@@ -1418,6 +1418,8 @@ class Api:
             updates._update(self._data_dir, quit_skipped=None)
         if out.get("install"):
             out["in_call"] = selfupdate.in_call(meetings.read_state(self._data_dir))
+        if out.get("install") == "installing" and not st.get("install_started") and not self.get_status()["alive"]:
+            out["install"] = "ready"  # nobody to install it (the app was quit): never an Installing screen that waits forever
         return out
 
     def install_update_now(self, version: str = "") -> dict:
@@ -1430,6 +1432,8 @@ class Api:
             return {"ok": False}
         if selfupdate.in_call(meetings.read_state(self._data_dir)):
             return {"ok": False, "blocked": "call"}
+        if not self.get_status()["alive"]:  # the background app installs it: it must be running
+            return {"ok": False, "stopped": True}
         return {"ok": selfupdate.request_install(self._data_dir, version)}
 
     def update_later(self, version: str = "") -> dict:

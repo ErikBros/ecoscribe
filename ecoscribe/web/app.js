@@ -971,6 +971,7 @@ function updWhen(t) {
 async function updPress(v) {  // Install now, on Home or the pop-up
   const r = await api.install_update_now(v).catch(() => ({ ok: false }));
   if (r.blocked === "call") upd.tried = v;
+  if (r.stopped) toast("Ecoscribe isn't running. Start it, then press Install now.");
   await updSync();
 }
 function updNowButton(b, n) {

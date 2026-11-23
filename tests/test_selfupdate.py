@@ -623,6 +623,7 @@ def api(tmp_path, monkeypatch):
     (tmp_path / "data").mkdir()
     monkeypatch.setattr("ecoscribe.window.__version__", "1.18.0")
     monkeypatch.setattr(selfupdate, "SUPPORTED", True)
+    monkeypatch.setattr("ecoscribe.window._pid_alive", lambda pid: True)  # the background app runs (9zeo.1)
     updates._update(a._data_dir, latest=TAG, asset=ASSET, checked_at=1.0)
     return a
 
@@ -729,3 +730,14 @@ def test_no_update_text_tells_people_to_step_away_or_quit():
     for f in ("ecoscribe/web/app.js", "ecoscribe/web/index.html"):
         text = (root / f).read_text(encoding="utf-8").lower()
         assert not [b for b in bad if b in text], f
+
+
+def test_no_installing_screen_without_the_background_app(api, monkeypatch):
+    """Criterion 17: with the app quit, nobody would install: the press says so and the screen never waits forever."""
+    updates._update(api._data_dir, downloaded={"version": "1.19.0", "name": NAME, "size": len(BLOB)}, install="1.19.0")
+    monkeypatch.setattr("ecoscribe.window._pid_alive", lambda pid: False)
+    assert api.install_update_now("1.19.0") == {"ok": False, "stopped": True}
+    selfupdate.request_install(api._data_dir, "1.19.0")  # pressed, then the app was quit
+    assert api.update_notice()["install"] == "ready"
+    monkeypatch.setattr("ecoscribe.window._pid_alive", lambda pid: True)
+    assert api.update_notice()["install"] == "installing"
