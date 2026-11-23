@@ -116,7 +116,7 @@ class UiCfg:
     sounds: bool = True
     debug_log: bool = False  # t0u.37: Settings > Troubleshooting > Detailed logging (DEBUG level)
     update_check: bool = True  # dictado-cjk: once a day, ask GitHub if a newer release is out (updates.py)
-    auto_update: bool = False  # dictado-nmo: get a new version in the background, install it when idle or at Quit, never in a call
+    auto_update: bool = False  # dictado-nmo, 9zeo.1: Download by itself; a pop-up then asks Install now or Later
     theme: str = "system"  # dictado-u9h: the window's look: "system" (follows the OS), "light" or "dark"
 
 

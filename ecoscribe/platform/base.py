@@ -194,7 +194,7 @@ CAPABILITIES: dict[str, dict] = {
         "macos": ("not_needed", "no CUDA: mlx runs on Metal, which comes with macOS"),
     },
     "Install a new version by itself: when idle or at Quit, never in a call (Settings switch, off by default; Home > Install when idle)": {
-        "windows": "ecoscribe.selfupdate:SelfUpdater,run_installer,input_idle_s",  # the Inno Setup installer, silent
+        "windows": "ecoscribe.selfupdate:SelfUpdater,run_installer,request_install",  # the Inno Setup installer
         "macos": "ecoscribe.platform.macos.selfinstall:command,app_bundle,requirement",  # the .dmg: swaps Ecoscribe.app
     },
     "Installer": {

@@ -520,7 +520,6 @@ def main(argv=None) -> int:
         data, __version__, auto=lambda: cfg.ui.auto_update,
         meetings=lambda: meet_ctl.state() if meet_ctl else read_meetings(data),
         app_busy=lambda: app.state != "idle" or app._pending > 0,
-        last_dictation=lambda: app._t_start or None,  # monotonic, like the updater's clock
         install=lambda p, a, relaunch: root.after(0, lambda: install_now(p, a, relaunch)))
 
     def quit_app():
@@ -580,12 +579,7 @@ def main(argv=None) -> int:
 
     def install_now(path, asset, relaunch):
         """dictado-nmo, on the main thread: still nothing busy? Then quit; the installer starts as we end."""
-        why = updater.blockers()
-        if why:
-            log.info("self-update: not now (%s)", "; ".join(why))
-            return
-        pending_install.append((path, asset, relaunch))
-        quit_app()
+        updater.start_install(path, asset, relaunch, pending_install, quit_app)
 
     def restart():
         """Settings were saved: come back with the new config (a clean re-exec)."""
