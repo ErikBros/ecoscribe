@@ -981,7 +981,12 @@ function updNowButton(b, n) {
 }
 function updInstalling(on, n) {  // the full-window Installing screen: no buttons, keys and clicks do nothing
   const o = $("#upd-installing");
-  if (on) $("#upd-installing-title").textContent = `Installing Ecoscribe ${n.version}`;
+  if (on) {
+    $("#upd-installing-title").textContent = `Installing Ecoscribe ${n.version}`;
+    $("#upd-installing-sub").textContent = n.waiting === "busy"  // a file job or a saving meeting goes first
+      ? "Ecoscribe finishes what it's working on first, then installs and opens again by itself."
+      : "Ecoscribe opens again by itself when it's done.";
+  }
   if (on === upd.installing) return;
   upd.installing = on;
   o.hidden = !on;

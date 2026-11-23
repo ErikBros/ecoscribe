@@ -311,6 +311,7 @@ def test_other_blockers_hold_a_request_only_until_they_clear(tmp_path, meetings,
     assert b.up.tick() == "waiting: busy" and b.installs == []
     st = b.state()
     assert st["install"] == "installing" and "blocked" not in st  # not a call: the Installing screen stays up
+    assert st["waiting"] == "busy"  # and says it waits for the work in progress
     b.meetings, b.busy = dict(IDLE), False
     assert b.up.tick() == "installing" and len(b.installs) == 1
 

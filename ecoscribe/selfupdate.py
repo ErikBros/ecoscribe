@@ -532,7 +532,8 @@ def home_state(state: dict, current: str, auto: bool, supported: bool | None = N
     """What Home's version row and the pop-up add (dictado-nmo, dictado-9zeo.1): {"install": "offer" |
     "downloading" | "ready" | "installing" | "failed", "pct", "pressed", "error", "retry_at", "ask", "blocked",
     "quit"}; {} where this platform can't update itself (the row keeps Download only).
-    ask: the pop-up is due (downloaded, Later not pressed, no press). blocked "call": a press waits on a call.
+    ask: the pop-up is due (downloaded, Later not pressed, no press). blocked "call": a press waits on a call;
+    waiting "busy": it waits behind the Installing screen for a job, a saving meeting or a dictation to end.
     quit: the last Quit couldn't install ("downloading" or "busy")."""
     a = state.get("asset")
     supported = SUPPORTED if supported is None else supported
@@ -555,8 +556,8 @@ def home_state(state: dict, current: str, auto: bool, supported: bool | None = N
         return {**out, "install": "offer"}
     d = state.get("downloaded")
     if isinstance(d, dict) and d.get("name") == a.get("name") and d.get("size") == a.get("size"):
-        if pressed and "blocked" not in out:
-            return {**out, "install": "installing"}
+        if pressed and "blocked" not in out:  # waiting "busy": a job or a saving meeting first (the screen says so)
+            return {**out, "install": "installing", **({"waiting": "busy"} if state.get("install_wait") == "busy" else {})}
         return {**out, "install": "ready", **({} if pressed or state.get("asked") == v else {"ask": True})}
     out.update(install="downloading", pct=int(state.get("update_progress") or 0))
     if pressed:

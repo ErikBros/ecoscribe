@@ -427,6 +427,9 @@ async function load(query) {
   const z = (sel) => Number((css.match(new RegExp(sel.replace(".", "\\.") + "\\s*\\{[^}]*z-index:\\s*(\\d+)")) || [])[1] || 0);
   const others = [".setup", ".spot-ring", ".spot-tip", ".i-tip", ".toast", ".upd-ask", ".r-drop", ".menu-pop"].map(z);
   check(z(".upd-installing") > Math.max(...others), "it lies above every other layer: " + z(".upd-installing") + " > " + Math.max(...others));
+  window.__updForce = { install: "installing", waiting: "busy" };  // a file job goes first
+  await window.__ecoscribe.updSync(); await sleep(20);
+  check(/finishes what it's working on first/.test(o.textContent) && !o.hidden, "a job first: the screen says it waits for it");
   window.__updForce = { install: "ready" };  // the install couldn't start: Home is back
   await window.__ecoscribe.updSync(); await sleep(20);
   check(o.hidden, "the screen leaves when the app reports ready again");
