@@ -65,3 +65,23 @@ def test_a_saved_old_call_end_wait_moves_to_10_s(tmp_path):
     assert config.load(p).meetings.grace_s == 10  # the old default, written by every Settings save
     p.write_text("[meetings]\ngrace_s = 30\n", encoding="utf-8")
     assert config.load(p).meetings.grace_s == 30  # a value the user chose stays
+
+
+def test_auto_tags_are_off_by_default_and_for_an_existing_config(tmp_path):
+    """dictado-ng5i.1: auto tags are opt-in. A new install and a config saved before the switch existed read off."""
+    assert config.load(None).meetings.auto_tags is False
+    p = tmp_path / "c.toml"
+    p.write_text('[meetings]\nmode = "prompt"\nspeakers = true\n', encoding="utf-8")
+    assert config.load(p).meetings.auto_tags is False
+
+
+def test_auto_tags_switch_saves_from_settings_and_survives_a_reload(tmp_path):
+    from ecoscribe.window import Api
+    p = tmp_path / "config.toml"
+    api = Api(data_dir=tmp_path / "data", config_path=p, signal_reload=lambda: True)
+    assert api.get_settings()["values"]["auto_tags"] is False
+    assert api.save_settings({"auto_tags": True})["ok"]
+    assert config.load(p).meetings.auto_tags is True
+    assert Api(data_dir=tmp_path / "data", config_path=p, signal_reload=lambda: True).get_settings()["values"]["auto_tags"] is True
+    assert api.save_settings({"auto_tags": False})["ok"]
+    assert config.load(p).meetings.auto_tags is False

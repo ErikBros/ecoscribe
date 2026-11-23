@@ -263,6 +263,7 @@ class Api:
                 "command_style_file": c.text.command_style_file,  # dictado-jq7p
                 "screen_names": c.text.screen_names,
                 "hold_to_talk": c.hotkey.hold_to_talk, "numpad_enter": c.hotkey.numpad_enter, "voice_memory": c.meetings.voice_memory,
+                "auto_tags": c.meetings.auto_tags,  # dictado-ng5i.1
                 "calendar_url": c.meetings.calendar_url, "my_name": c.meetings.my_name, "debug_log": c.ui.debug_log,
                 "update_check": c.ui.update_check, "auto_update": c.ui.auto_update, "theme": c.ui.theme,
                 "export_dir": str(self._export_dir()), "export_default": not c.ui.export_dir,
@@ -429,6 +430,7 @@ class Api:
                                          "screen_names": ("text", "screen_names"),
                                          "hold_to_talk": ("hotkey", "hold_to_talk"), "numpad_enter": ("hotkey", "numpad_enter"),
                                          "voice_memory": ("meetings", "voice_memory"),
+                                         "auto_tags": ("meetings", "auto_tags"),
                                          "debug_log": ("ui", "debug_log"), "update_check": ("ui", "update_check"),
                                          "auto_update": ("ui", "auto_update")}.items():
                 if key in values:
@@ -442,7 +444,7 @@ class Api:
                 self._startup.enable(cmd)
             elif not values["startup"]:
                 self._startup.disable()
-        if set(values) <= {"theme"}:  # the window applies it by itself: no restart (dictado-u9h)
+        if set(values) <= {"theme", "auto_tags"}:  # the window applies these by itself: no restart (dictado-u9h, ng5i.1)
             return {"ok": True, "restarting": False}
         restarting = bool(self._signal())
         return {"ok": True, "restarting": restarting}
