@@ -180,6 +180,39 @@ def test_owner_email_from_the_ical_copy(tmp_path):
     assert autotags.owner_email(tmp_path) == "me@ownco.com"
 
 
+# ---------- the switch (dictado-ng5i.1: auto tags are opt-in) ----------
+
+def app_config(monkeypatch, tmp_path, text):
+    """The config file the app reads by itself (paths.config_path) on Windows and macOS, pointed at tmp_path."""
+    home = tmp_path / "appdata"
+    (home / "ecoscribe").mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("APPDATA", str(home))
+    monkeypatch.setenv("ECOSCRIBE_DATA_DIR", str(home / "ecoscribe"))
+    p = home / "ecoscribe" / "config.toml"
+    if text is not None:
+        p.write_text(text, encoding="utf-8")
+    return p
+
+
+def test_auto_tags_are_off_without_a_config(monkeypatch, tmp_path):
+    p = app_config(monkeypatch, tmp_path, None)
+    assert autotags.enabled() is False and autotags.enabled(p) is False
+
+
+def test_auto_tags_are_on_when_the_config_says_so(monkeypatch, tmp_path):
+    p = app_config(monkeypatch, tmp_path, "[meetings]\nauto_tags = true\n")
+    assert autotags.enabled() is True and autotags.enabled(p) is True
+    p.write_text('[meetings]\nmode = "prompt"\n', encoding="utf-8")  # a config from before the switch
+    assert autotags.enabled() is False
+
+
+@pytest.mark.parametrize("text", ["[meetings\nauto_tags = tru", '[hotkey]\nkey = "ralt"\n[meetings]\nauto_tags = true\n',
+                                  '[meetings]\nauto_tags = "yes"\n'])
+def test_a_broken_config_reads_auto_tags_off(monkeypatch, tmp_path, text):
+    p = app_config(monkeypatch, tmp_path, text)
+    assert autotags.enabled() is False and autotags.enabled(p) is False
+
+
 # ---------- the window and a new meeting ----------
 
 @pytest.fixture

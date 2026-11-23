@@ -7,6 +7,10 @@ A rule tags the meetings already there when it is made, each new meeting when it
 saved (meetings.py, window.py), and catches up when the Meetings list loads. A tag the user took off a
 meeting by hand stays off it (`tags_removed` in its meta.json).
 
+All of it is opt-in (dictado-ng5i.1): the rules run, and the page offers and suggests, only while Settings >
+Meetings > Auto tags is on (`[meetings] auto_tags`, off by default and for a config from before the switch).
+`enabled()` is the one place that decides. Off keeps the rules (paused) and the tags meetings already have.
+
 The rules and the offers the user said No to live in <data dir>/autotags.json. Everything apart from
 load/save and the two helpers that write meta.json is pure, so the tests need no app.
 """
@@ -33,6 +37,19 @@ FREE_MAIL_NAMES = {"yahoo", "gmx", "hotmail", "outlook", "live"}  # yahoo.*, gmx
 # second-level labels under a country code: customer.co.uk is one company, not "co"
 _SECOND_LEVEL = {"co", "com", "org", "net", "ac", "gov", "edu", "ne", "or", "go", "gv", "ltd", "plc"}
 _lock = threading.Lock()
+
+
+# ---------- the switch ----------
+
+def enabled(config_path: Path | None = None) -> bool:
+    """Settings > Meetings > Auto tags: True only when the config says `auto_tags = true`. Off when the file is
+    missing, has no such key or can't be read. Never raises. config_path: the app's own config by default."""
+    try:
+        from . import config, paths
+        return config.load(Path(config_path) if config_path else paths.config_path()).meetings.auto_tags is True
+    except Exception:  # noqa: BLE001  a broken config never turns rules on
+        log.warning("auto tags: couldn't read the config, treated as off", exc_info=True)
+        return False
 
 
 # ---------- pure: names and matching ----------
