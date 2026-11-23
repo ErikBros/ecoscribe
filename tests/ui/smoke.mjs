@@ -307,7 +307,9 @@ async function load(query) {
   doc.querySelector("#new-more").click(); await sleep(20);  // a Settings card: Show me opens its tab (dictado-fnnr)
   [...doc.querySelectorAll("#new-list li")][5].querySelector(".new-show").click(); await sleep(200);
   check(!doc.querySelector("#page-ajustes").hidden && !doc.querySelector("#autotags").closest("[hidden]")
-    && /Your auto tags/.test(doc.querySelector(".spot-tip")?.textContent || ""), "Show me opens Settings on the Auto tags card");
+    && /Turn auto tags on here/.test(doc.querySelector(".spot-tip")?.textContent || ""), "Show me opens Settings on the Auto tags card");
+  check(doc.querySelector(".spot-ring") && doc.querySelector("#at-head")?.contains(doc.querySelector("#f-auto-tags")),
+    "and rings the switch row (dictado-ng5i.1: auto tags are off until turned on)");
   doc.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape" })); await sleep(20);
   const { window: w2, doc: d2 } = await load("page=inicio&new=1&tags=0");
   await sleep(50);
