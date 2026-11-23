@@ -1039,7 +1039,7 @@ function paintUpdateNote(n) {
     downloading: [`Getting Ecoscribe ${n.version}`, quit + dl],
     ready: [`Ecoscribe ${n.version} is ready to install`, quit + about],
     installing: [`Installing Ecoscribe ${n.version}`, "Ecoscribe opens again by itself when it's done."],
-    failed: [`Ecoscribe ${n.version} is out`, "Ecoscribe couldn't install it. Download it and run the installer."],
+    failed: [`Ecoscribe ${n.version} is out`, "It didn't install. Download it and run the installer."],
   }[step] || [`Ecoscribe ${n.version} is out`, `${brings}${have}`];
   box.dataset.step = step;
   $("#update-title").textContent = title;

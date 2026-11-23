@@ -437,7 +437,7 @@ async function load(query) {
   await window.__ecoscribe.updSync();
   window.__updForce = { install: "failed" };
   await window.__ecoscribe.updSync(); await sleep(20);
-  check(o.hidden && /couldn't install/.test(doc.querySelector("#update-sub").textContent), "and when it reports failed");
+  check(o.hidden && /didn't install/.test(doc.querySelector("#update-sub").textContent), "and when it reports failed");
   check(errors.length === 0, "no JS errors with the Installing screen: " + errors.join("; "));
   const { doc: opened } = await load("page=historial&update=installing");
   await sleep(50);
