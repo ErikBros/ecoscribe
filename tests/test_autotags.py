@@ -309,7 +309,7 @@ def test_the_domain_suggestion_and_its_rule(env):
     rules = api.autotag_rules()["rules"]
     assert rules == [{"kind": "domain", "match": "customer-a.com", "label": "", "tag": "Customer A"}]
     # removing the rule keeps the tags, and a new meeting no longer gets it
-    assert api.remove_autotag_rule("domain", "customer-a.com", "Customer A") == {"ok": True, "rules": []}
+    assert api.remove_autotag_rule("domain", "customer-a.com", "Customer A") == {"ok": True, "rules": [], "on": True}
     assert tags(a) == ["Customer A"] and tags(b) == ["Customer A"]
     d = make(root, "Call 3", 5, "Customer A sync", ["ana@customer-a.com"])
     assert autotags.apply_one(d, data) is None and tags(d) == []
@@ -382,3 +382,100 @@ def test_a_new_meeting_from_the_calendar_gets_no_auto_tag_while_off(monkeypatch,
                          start=datetime(2026, 10, 12, 9), end=datetime(2026, 10, 12, 10))
     d = meetings.Controller._create(ctl, "Meeting", "en", ev)
     assert tags(d) == []
+
+
+@pytest.fixture
+def env_off(tmp_path, monkeypatch):
+    """A config from before the switch (no auto_tags key) in both configs: auto tags read off."""
+    root = tmp_path / "transcripts"
+    cfg_path = tmp_path / "cfg" / "config.toml"
+    cfg_path.parent.mkdir()
+    cfg_path.write_text(f'[transcribe]\nroot = "{root.as_posix()}"\n[meetings]\nmode = "prompt"\n', encoding="utf-8")
+    app_config(monkeypatch, tmp_path, '[meetings]\nmode = "prompt"\n')
+    (tmp_path / "data").mkdir()
+    api = Api(data_dir=tmp_path / "data", config_path=cfg_path, copy=lambda t: None, signal_reload=lambda: True,
+              send_command=lambda d, cmd, args=None: {"ok": True})
+    return api, root, tmp_path / "data"
+
+
+def test_set_tags_off_saves_the_tag_but_makes_no_offer_and_on_offers_again(env_off):
+    api, root, _ = env_off
+    a = make(root, "Ops 1", 1, "Weekly ops")
+    make(root, "Ops 2", 2, "Weekly ops")
+    out = api.set_tags(a.name, ["Ops"])
+    assert out["ok"] and out["tags"] == ["Ops"] and out["offer"] is None
+    assert tags(a) == ["Ops"]
+    assert api.save_settings({"auto_tags": True})["ok"]
+    out = api.set_tags(a.name, ["Ops", "Hiring"])
+    assert out["tags"] == ["Ops", "Hiring"] and tags(a) == ["Ops", "Hiring"]
+    assert out["offer"] == {"title": "Weekly ops", "tag": "Hiring", "others": 1}
+
+
+def test_no_suggested_tag_on_a_meeting_page_while_off(env_off):
+    api, root, _ = env_off
+    a = make(root, "Call 1", 1, "Customer A sync", ["kim@ownco.com", "ana@customer-a.com", "bo@customer-a.com"])
+    make(root, "Ops", 2, "Weekly ops", ["kim@ownco.com", "lee@ownco.com"])
+    api.list_sessions()
+    assert api.get_session(a.name)["autotag"] is None and api.get_live(a.name)["autotag"] is None
+    assert api.save_settings({"auto_tags": True})["ok"]
+    sug = {"domain": "customer-a.com", "tag": "Customer A"}
+    assert api.get_session(a.name)["autotag"] == sug and api.get_live(a.name)["autotag"] == sug
+
+
+def test_list_sessions_off_leaves_past_meetings_and_turning_on_tags_them_at_once(env_off):
+    api, root, data = env_off
+    autotags.add_rule(data, "title", "Weekly ops", "Ops")  # a rule made on 1.29, before the switch
+    a = make(root, "Ops 1", 1, "Weekly ops")
+    b = make(root, "Ops 2", 2, "Planning")
+    api.list_sessions()
+    assert tags(a) == [] and tags(b) == []
+    assert api.save_settings({"auto_tags": True}) == {"ok": True, "restarting": False}
+    assert tags(a) == ["Ops"] and tags(b) == []  # without a restart or a list load
+
+
+def test_a_stale_page_cannot_make_a_rule_while_off(env_off):
+    api, root, data = env_off
+    autotags.add_rule(data, "title", "Planning", "Plans")
+    a = make(root, "Ops 1", 1, "Weekly ops", ["ana@customer-a.com"])
+    before = (data / autotags.STATE).read_bytes()
+    for out in (api.autotag_title(a.name, "Ops"), api.autotag_domain(a.name, "customer-a.com", "Customer A")):
+        assert out["ok"] is False and "Settings > Meetings" in out["error"]
+    assert (data / autotags.STATE).read_bytes() == before
+    assert tags(a) == []
+
+
+def test_turning_auto_tags_off_keeps_rules_and_tags(env_off):
+    api, root, data = env_off
+    a = make(root, "Ops 1", 1, "Weekly ops")
+    b = make(root, "Ops 2", 2, "Weekly ops")
+    api.save_settings({"auto_tags": True})
+    api.set_tags(a.name, ["Ops"])
+    assert api.autotag_title(a.name, "Ops")["ok"] and tags(b) == ["Ops"]
+    rule = {"kind": "title", "match": "weekly ops", "label": "Weekly ops", "tag": "Ops"}
+    assert api.autotag_rules() == {"rules": [rule], "on": True}
+    assert api.save_settings({"auto_tags": False})["ok"]
+    assert api.autotag_rules() == {"rules": [rule], "on": False}
+    assert tags(a) == ["Ops"] and tags(b) == ["Ops"]
+    c = make(root, "Ops 3", 3, "Weekly ops")
+    api.list_sessions()
+    assert tags(c) == []  # paused: kept, not applied
+
+
+def test_every_window_path_that_applies_or_proposes_a_tag_reads_the_switch():
+    """A new auto-tag path in the window written without the gate fails here: each method that applies a rule,
+    offers or suggests (autotags.apply_all/offer/suggestion) reads autotags.enabled, itself or in every caller.
+    apply_one reads it inside (test_apply_one_tags_a_new_meeting_only_while_auto_tags_are_on)."""
+    import ast
+    from pathlib import Path
+    tree = ast.parse((Path(autotags.__file__).parent / "window.py").read_text(encoding="utf-8"))
+    calls = {}  # method -> names it calls as autotags.x / self.x
+    for fn in ast.walk(tree):
+        if isinstance(fn, ast.FunctionDef):
+            calls[fn.name] = {n.func.attr for n in ast.walk(fn) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                              and isinstance(n.func.value, ast.Name) and n.func.value.id in ("autotags", "self")}
+    gated = {"apply_all", "offer", "suggestion"}
+    users = [f for f, c in calls.items() if c & gated]
+    assert users, "the window no longer calls the auto-tag functions: update this test"
+    for f in users:
+        callers = [g for g, c in calls.items() if f in c]
+        assert "enabled" in calls[f] or (callers and all("enabled" in calls[g] for g in callers)), f

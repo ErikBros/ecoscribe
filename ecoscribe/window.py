@@ -155,6 +155,7 @@ SLACK_APP, SLACK_WEB = "slack://open", "https://app.slack.com/client"
 REPLACE_BACKUP = "transcript.before-replace.json"  # dictado-9lo: the transcript before the Replace list, for Undo
 STALE_INSTALL_S = 5 * 60  # dictado-9zeo.1: Setup started this long ago, the app is gone and nothing came back: it failed
 BUSY = "It's still being written: try again when it has finished."
+AUTOTAGS_OFF = "Auto tags are off. Turn them on in Settings > Meetings."  # dictado-ng5i.1: a page opened before
 
 GCAL_DAY = "https://calendar.google.com/calendar/r/day"  # dictado-qxr: /yyyy/m/d, the day view
 MAILTO_MAX = 1800  # longer mailto: links get cut by Windows and some mail programs: copy the transcript instead
@@ -335,6 +336,7 @@ class Api:
 
     def save_settings(self, values: dict) -> dict:
         c = self._load()
+        was_auto_tags = c.meetings.auto_tags is True
         try:
             if "hotkey" in values:
                 try:
@@ -438,6 +440,11 @@ class Api:
         except ValueError as e:
             return {"ok": False, "error": f"invalid value: {e}"}
         tomlw.save(c, self._config_path)
+        if c.meetings.auto_tags and not was_auto_tags:  # dictado-ng5i.1: switched on, the rules tag past meetings now
+            try:
+                self._autotag_catch_up(sessions.list_sessions(self._root()))
+            except Exception:  # noqa: BLE001  the setting is saved; the next list load catches up
+                log.exception("auto tags: catch-up after switching on failed")
         if "startup" in values:
             cmd = self._startup.app_command()
             if values["startup"] and cmd:
@@ -696,7 +703,8 @@ class Api:
     def set_tags(self, name: str, tags: list) -> dict:
         """The meeting's own tags, replaced (dictado-4vms). A tag another meeting has in another case keeps
         that spelling, so one label never splits in two. dictado-fnnr: a tag an auto-tag rule gave it that the
-        user takes off stays off; a tag just added to a calendar meeting comes with `offer`, to tag the series."""
+        user takes off stays off; a tag just added to a calendar meeting comes with `offer`, to tag the series,
+        only while auto tags are on (dictado-ng5i.1)."""
         d = self._session(name)
         metas = sessions.list_sessions(self._root())
         known = [t for m in metas if Path(m["dir"]).name != d.name for t in sessions.tags_of(m)]
@@ -712,7 +720,7 @@ class Api:
         self._autotag_cache = None  # a tag's spelling may be new
         before = {t.casefold() for t in sessions.tags_of(old)}
         added = [t for t in clean if t.casefold() not in before]
-        offer = autotags.offer(m, added[-1], state, metas) if added else None
+        offer = autotags.offer(m, added[-1], state, metas) if added and autotags.enabled(self._config_path) else None
         return {"ok": True, "tags": clean, "offer": offer}
 
     # ---------------- auto tags (dictado-fnnr) ----------------
@@ -732,10 +740,10 @@ class Api:
 
     def _autotag_catch_up(self, metas) -> None:
         """The list loads: a meeting a rule matches but that lacks its tag gets it (a rule made while it was
-        recording, a calendar found later). Never fails the list."""
+        recording, a calendar found later), only while auto tags are on (dictado-ng5i.1). Never fails the list."""
         try:
             rules = autotags.load(self._data_dir)["rules"]
-            if rules and autotags.apply_all(metas, rules):
+            if rules and autotags.enabled(self._config_path) and autotags.apply_all(metas, rules):
                 self._autotag_cache = None
             if self._autotag_cache is None or time.monotonic() - self._autotag_cache[0] >= 60:
                 self._autotag_context(metas)
@@ -743,7 +751,8 @@ class Api:
             log.exception("auto tags: catch-up failed")
 
     def _autotag_suggestion(self, m: dict) -> dict | None:
-        if not (m.get("calendar") or {}).get("emails"):
+        """The meeting page's dashed suggested tag, only while auto tags are on (dictado-ng5i.1)."""
+        if not (m.get("calendar") or {}).get("emails") or not autotags.enabled(self._config_path):
             return None
         try:
             own, known = self._autotag_context()
@@ -760,6 +769,8 @@ class Api:
 
     def autotag_title(self, name: str, tag: str) -> dict:
         """Yes to the offer: every meeting of this calendar event gets `tag`, now and from now on."""
+        if not autotags.enabled(self._config_path):
+            return {"ok": False, "error": AUTOTAGS_OFF}
         d = self._session(name)
         title = (sessions.read_meta(d).get("calendar") or {}).get("title")
         if not autotags.title_key(title) or not sessions.clean_tag(tag):
@@ -769,6 +780,8 @@ class Api:
 
     def autotag_domain(self, name: str, domain: str, tag: str) -> dict:
         """The suggestion clicked: this meeting and every meeting with a guest from `domain` get `tag`."""
+        if not autotags.enabled(self._config_path):
+            return {"ok": False, "error": AUTOTAGS_OFF}
         d = self._session(name)
         tag = sessions.clean_tag(tag)
         if not tag or "." not in autotags.registrable(domain):
@@ -795,9 +808,10 @@ class Api:
         return {"ok": True}
 
     def autotag_rules(self) -> dict:
-        """Settings > Meetings > Auto tags."""
+        """Settings > Meetings > Auto tags. `on`: the switch (dictado-ng5i.1); while off the rules are paused."""
         return {"rules": [{k: r.get(k, "") for k in ("kind", "match", "label", "tag")}
-                          for r in autotags.load(self._data_dir)["rules"]]}
+                          for r in autotags.load(self._data_dir)["rules"]],
+                "on": autotags.enabled(self._config_path)}
 
     def remove_autotag_rule(self, kind: str, match: str, tag: str) -> dict:
         """The tags the rule already added stay on the meetings."""
