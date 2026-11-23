@@ -266,7 +266,7 @@ def test_tick_never_installs_without_request(tmp_path):
     for _ in range(30):  # half an hour of quiet minutes: still only the offer
         b.now += 60
         assert b.up.tick() in ("ready", "ask") and b.installs == []
-    assert not hasattr(selfupdate, "IDLE_S") and not hasattr(selfupdate, "input_idle_s")
+    assert not [n for n in dir(selfupdate) if "idle" in n.lower()]  # no idle install, no keyboard watch
 
 
 def test_installs_within_the_tick_after_a_request(tmp_path):
