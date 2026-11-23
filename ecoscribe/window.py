@@ -153,6 +153,7 @@ SLACK_APP, SLACK_WEB = "slack://open", "https://app.slack.com/client"
 
 
 REPLACE_BACKUP = "transcript.before-replace.json"  # dictado-9lo: the transcript before the Replace list, for Undo
+STALE_INSTALL_S = 5 * 60  # dictado-9zeo.1: Setup started this long ago, the app is gone and nothing came back: it failed
 BUSY = "It's still being written: try again when it has finished."
 
 GCAL_DAY = "https://calendar.google.com/calendar/r/day"  # dictado-qxr: /yyyy/m/d, the day view
@@ -1418,8 +1419,12 @@ class Api:
             updates._update(self._data_dir, quit_skipped=None)
         if out.get("install"):
             out["in_call"] = selfupdate.in_call(meetings.read_state(self._data_dir))
-        if out.get("install") == "installing" and not st.get("install_started") and not self.get_status()["alive"]:
-            out["install"] = "ready"  # nobody to install it (the app was quit): never an Installing screen that waits forever
+        if out.get("install") == "installing" and not self.get_status()["alive"]:
+            started = st.get("install_started")
+            if not started:
+                out["install"] = "ready"  # nobody to install it (the app was quit): never an Installing screen that waits forever
+            elif time.time() - float((started if isinstance(started, dict) else {}).get("at") or 0) > STALE_INSTALL_S:
+                out["install"] = "failed"  # Setup started minutes ago and nothing came back: it refused or failed
         return out
 
     def install_update_now(self, version: str = "") -> dict:

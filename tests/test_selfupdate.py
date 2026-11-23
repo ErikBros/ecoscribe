@@ -203,7 +203,7 @@ class _FullDisk(Server):
      "no connection"),
     (_raises(OSError(errno.EACCES, "[Errno 13] Permission denied: 'C:\\\\x'")), plenty, "failed"),
     (_raises(TimeoutError("timed out")), plenty, "too long"),
-    (_raises(urllib.error.HTTPError(URL, 404, "Not Found", {}, None)), plenty, "error 404"),
+    (_raises(urllib.error.HTTPError(URL, 404, "Not Found", {}, None)), plenty, "GitHub had a problem"),
     (_FullDisk(), plenty, "disk is full"),
     (Server(), lambda _: len(BLOB), "free disk space"),               # short of disk before it starts
     (Server(body=BLOB[:-1] + b"\x00"), plenty, "didn't match"),        # a bad checksum
@@ -741,3 +741,21 @@ def test_no_installing_screen_without_the_background_app(api, monkeypatch):
     assert api.update_notice()["install"] == "ready"
     monkeypatch.setattr("ecoscribe.window._pid_alive", lambda pid: True)
     assert api.update_notice()["install"] == "installing"
+
+
+def test_a_setup_that_never_came_back_leaves_the_installing_screen(api, monkeypatch):
+    """A Setup that started and then refused or failed: after a few minutes with the app gone, Home shows failed."""
+    import time as _t
+    updates._update(api._data_dir, downloaded={"version": "1.19.0", "name": NAME, "size": len(BLOB)}, install="1.19.0")
+    selfupdate.request_install(api._data_dir, "1.19.0")
+    monkeypatch.setattr("ecoscribe.window._pid_alive", lambda pid: False)
+    updates._update(api._data_dir, install_started={"version": "1.19.0", "at": _t.time()})
+    assert api.update_notice()["install"] == "installing"  # Setup is still at work
+    updates._update(api._data_dir, install_started={"version": "1.19.0", "at": _t.time() - 10 * 60})
+    assert api.update_notice()["install"] == "failed"
+
+
+def test_a_download_error_shows_no_status_code():
+    import urllib.error
+    e = urllib.error.HTTPError("https://github.com/x", 503, "Service Unavailable", {}, None)
+    assert selfupdate.why_stopped(e) == "GitHub had a problem"

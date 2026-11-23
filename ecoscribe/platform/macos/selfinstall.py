@@ -82,8 +82,8 @@ i=0
 while busy && [ $i -lt {WAIT_S} ]; do sleep 1; i=$((i+1)); done
 ok=0
 if busy; then echo "Ecoscribe still running after {WAIT_S} s: not installed"; else
-mnt=$(mktemp -d /tmp/ecoscribe-update.XXXXXX) || exit 1
-if hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$mnt" "$dmg"; then
+mnt=$(mktemp -d /tmp/ecoscribe-update.XXXXXX) || {{ echo "no temporary folder for the .dmg"; mnt=""; }}
+if [ -n "$mnt" ] && hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$mnt" "$dmg"; then
   new="$mnt/Ecoscribe.app"
   if codesign --verify --deep --strict -R="$req" "$new"; then
     rm -rf "$app.new" "$app.old"
@@ -95,7 +95,7 @@ if hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$mnt" "$dmg"; the
   fi
   hdiutil detach "$mnt" -quiet || hdiutil detach "$mnt" -force -quiet
 fi
-rmdir "$mnt" 2>/dev/null
+[ -n "$mnt" ] && rmdir "$mnt" 2>/dev/null
 fi
 if [ $ok = 1 ]; then echo "installed"; else
   echo "not installed"; [ -d "$app" ] || mv "$app.old" "$app"; rm -rf "$app.new"

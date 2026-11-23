@@ -162,7 +162,7 @@ def _host_ok(url: str) -> bool:
 def why_stopped(e: BaseException) -> str:
     """A download error in plain words for Home (never the exception's own text)."""
     if isinstance(e, urllib.error.HTTPError):
-        return f"GitHub answered with error {e.code}"
+        return "GitHub had a problem"
     if isinstance(e, TimeoutError):  # socket.timeout too
         return "GitHub took too long to answer"
     if isinstance(e, (urllib.error.URLError, ConnectionError)):

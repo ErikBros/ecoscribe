@@ -240,3 +240,10 @@ def test_install_now_swaps_behind_the_open_window_then_opens_home(tmp_path, same
     finally:
         if window.poll() is None:
             window.kill()
+
+
+def test_install_now_script_still_reopens_when_no_temp_folder():
+    """No temporary folder for the .dmg: the script goes on to the end step (old window ended, app reopened)."""
+    s = selfinstall.script(Path("/u/Ecoscribe-1.19.0.dmg"), Path("/Applications/Ecoscribe.app"), "req", Path("/u/l"), True)
+    assert "|| exit 1" not in s and '[ -n "$mnt" ] && hdiutil attach' in s
+    assert s.index("end_window\n") > s.index("mktemp")
