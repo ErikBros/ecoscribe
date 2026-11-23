@@ -651,3 +651,58 @@ def test_settings_switch_off_by_default_and_saved(api):
     assert api.save_settings({"auto_update": True})["ok"]
     assert api.get_settings()["values"]["auto_update"] is True
     assert api.update_notice()["install"] == "downloading"  # on: no need to ask on Home
+
+
+# ---------------- the press reaches the background app (dictado-9zeo.1) ----------------
+def test_the_press_reaches_the_watcher_main_wires_within_two_seconds(tmp_path, api):
+    """Criterion 4: the window writes the press; PressWatcher (started in __main__) hands it to the installer,
+    with the minute loop not running. Same object on Windows and the Mac (a file, no named event)."""
+    b = Box(api._data_dir)
+    b.up.tick()  # downloaded, checked
+    calls = []
+    b.up.install = lambda p, a, r: calls.append(time.monotonic())
+    w = selfupdate.PressWatcher(api._data_dir, b.up, every=0.2)
+    w.start()
+    try:
+        t0 = time.monotonic()
+        assert api.install_update_now("1.19.0")["ok"] is True
+        while not calls and time.monotonic() - t0 < 3:
+            time.sleep(0.05)
+    finally:
+        w.stop()
+    assert calls and calls[0] - t0 < 2.0
+    main = (Path(__file__).resolve().parent.parent / "ecoscribe" / "__main__.py").read_text(encoding="utf-8")
+    assert "selfupdate.PressWatcher(" in main
+
+
+def test_after_update_flag_opens_home_and_nothing_else_does():
+    """Criterion 16: only the start right after an Install now opens the window (on Home)."""
+    from ecoscribe import __main__ as entry
+    opened = []
+    assert entry.open_after_update(entry.parse(["--after-update"]), opened.append) and opened == ["inicio"]
+    for argv in ([], ["--restarted"], ["--restarted", "--after-crash", "x.txt"]):  # Run key / login item, watchdog
+        assert not entry.open_after_update(entry.parse(argv), opened.append)
+    assert opened == ["inicio"]
+    assert entry.again_args(["--config", "c.toml", "--after-update", "--restarted"]) == ["--config", "c.toml"]
+
+
+def test_the_flag_is_only_in_the_install_now_paths():
+    root = Path(__file__).resolve().parent.parent
+    main = (root / "ecoscribe" / "__main__.py").read_text(encoding="utf-8")
+    assert "open_after_update(args, ipc.open_ui)" in main
+    sup = (root / "ecoscribe" / "supervise.py").read_text(encoding="utf-8")
+    assert "after-update" not in sup and "after_update" not in sup  # a watchdog restart opens nothing
+
+
+def test_show_ui_keeps_an_open_window_on_its_page(monkeypatch):
+    """Criterion 2: the pop-up shows over the page the user is on; a closed window opens on Home."""
+    from ecoscribe import ipc
+    spawned, asked = [], []
+    monkeypatch.setattr(ipc, "spawn", spawned.append)
+    monkeypatch.setattr(ipc, "ask_page", asked.append)
+    monkeypatch.setattr(ipc, "focus_ui", lambda: True)
+    ipc.show_ui("inicio")
+    assert spawned == [] and asked == []  # focused only: the page (and unsaved Settings) stay
+    monkeypatch.setattr(ipc, "focus_ui", lambda: False)
+    ipc.show_ui("inicio")
+    assert spawned == [["--ui", "--page", "inicio"]]

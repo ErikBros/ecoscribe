@@ -31,6 +31,14 @@ def open_ui(page: str | None = None) -> None:
     spawn(["--ui"] + (["--page", page] if page else []))
 
 
+def show_ui(page: str) -> None:
+    """Open the window on `page`, or only bring it to the front when it's already open: its page stays as it is
+    (the update pop-up shows over whatever the user has open, unsaved Settings included; dictado-9zeo.1)."""
+    if focus_ui():
+        return
+    spawn(["--ui", "--page", page])
+
+
 def ask_page(page: str) -> None:
     """Tell the open window to show `page` (it checks every second): a notice's button, a box's Open."""
     from . import paths
