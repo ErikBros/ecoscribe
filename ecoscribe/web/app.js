@@ -1394,6 +1394,7 @@ async function saveRowTag(o) {
   if (r.rowTag === o) r.rowTag = null;  // out.offer (the series) is the meeting page's: never offered on the list
   r.tagsKey = null;  // the row's badges and the chips above the list count it at once
   await renderReuniones();
+  [...document.querySelectorAll("#r-list .r-row")].find((x) => x.dataset.name === o.name)?.focus({ preventScroll: true });  // the keyboard stays on the row
 }
 function closeRowTag() {  // back to + Tag; returns it
   const o = r.rowTag;

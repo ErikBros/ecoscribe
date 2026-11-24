@@ -852,6 +852,7 @@ async function load(query) {
   check(inputs() === 0 && badges(PLAN).at(-1) === "Customer A" && closed(),
     "Enter closes the input, the row shows the Customer A badge at once, the meeting stays closed: " + badges(PLAN));
   check(before === "2" && count("Customer A") === "3", `the Customer A chip counts it at once: ${before} -> ${count("Customer A")}`);
+  check(doc.activeElement === row(PLAN), "after Enter the keyboard stays on the row just tagged");
   chips().find((c) => label(c) === "Customer A").click(); await sleep(150);
   const hBefore = count("Hiring");
   open(KUND); await sleep(50); type(input(), "hiring"); key(input(), "Enter"); await sleep(150);
