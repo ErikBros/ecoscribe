@@ -1333,6 +1333,7 @@ async function renderReuniones() {
     for (const t of row.tags || []) {  // its tags, as small badges (dictado-4vms)
       const b = document.createElement("span"); b.className = "badge badge-tag"; b.textContent = t; meta.append(b);
     }
+    if ((row.tags || []).length < 10) meta.append(rowTagAdd(row));  // + Tag: tag it without opening it (dictado-ng5i.2)
     li.append(title, st, meta);
     li.onclick = () => openSession(row.name);
     li.onkeydown = (e) => { if (e.key === "Enter") openSession(row.name); };
@@ -1342,6 +1343,17 @@ async function renderReuniones() {
   $("#r-empty").hidden = out.items.length > 0;
   $("#r-empty-text").textContent = q && r.tag ? `Nothing tagged ${r.tag} matches "${q}".` : q ? `Nothing matches "${q}".`
     : r.tag ? `No meetings tagged ${r.tag}.` : "Your meetings and the audio you import will show up here.";
+}
+/* tagging from the list (dictado-ng5i.2): + Tag on a row turns into an input with the meeting page's suggestions; Enter
+   saves through set_tags (same storage and spelling rule), Escape or leaving the box closes without saving. It only adds:
+   removing stays on the meeting's page, and the list shows no suggested tag and no series offer. */
+function rowTagAdd(row) {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "r-row-tag-add"; b.textContent = "+ Tag"; b.title = "Add a tag";
+  b.setAttribute("aria-label", `Add a tag to ${row.title || "Untitled"}`);
+  b.onclick = (e) => { e.stopPropagation(); };  // the row itself opens the meeting
+  b.onkeydown = (e) => e.stopPropagation();  // Enter on the button clicks it, never opens the meeting
+  return b;
 }
 /* tags (dictado-4vms): the user's own labels, e.g. a customer or a recurring meeting. Above the list: All and every
    tag in use with how many meetings have it; one click shows only those, a second click (or All) shows all again. */
