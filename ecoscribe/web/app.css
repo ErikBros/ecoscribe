@@ -455,6 +455,12 @@ h3 { margin: 0; font: 700 var(--fs-lead)/1.3 var(--font-display); letter-spacing
 .at-row:first-child { border-top: 0; }
 .at-arrow { color: var(--ink-faint); }
 .at-empty, .at-note { margin: 4px 0 0; }
+/* dictado-ng5i.1: the opt-in switch on the title row; while off, rules made earlier stay listed, greyed */
+.at-head { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.at-head-text { max-width: 560px; }
+.at-head label { cursor: pointer; }
+.at-paused { margin: 0 0 4px; }
+.at-paused-rules .at-row .row-label { opacity: .5; }
 .btn-link { background: none; border: 0; padding: 0; font: 600 var(--fs-body) var(--font); color: var(--aegean); cursor: pointer; }
 .btn-link:hover { color: var(--aegean-hover); }
 .menu { position: relative; display: inline-block; }

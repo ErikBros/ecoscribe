@@ -20,6 +20,8 @@ SHOTS = {
     "inicio-novedades-version": "page=inicio&new=1&update=1",
     "inicio-novedades-abierto": "page=inicio&new=1&newopen=1", "inicio-novedades-abierto-oscuro": "page=inicio&new=1&newopen=1&theme=dark",
     "novedades-senala": "page=inicio&new=1&showme=1", "novedades-senala-oscuro": "page=inicio&new=1&showme=1&theme=dark",  # dictado-3zfe
+    # Show me on the Auto tags line rings the switch (dictado-ng5i.1: off until turned on)
+    "novedades-senala-etiquetas": "page=inicio&new=1&showme=2", "novedades-senala-etiquetas-oscuro": "page=inicio&new=1&showme=2&theme=dark",
     "inicio-version-fallo": "page=inicio&update=failed",  # Install now's steps (dictado-nmo, 9zeo.1)
     # dictado-9zeo.1: the pop-up when it's downloaded, the Installing screen, a call at the press, a stopped download
     "inicio-version-pregunta": "page=inicio&update=ask", "inicio-version-pregunta-oscuro": "page=inicio&update=ask&theme=dark",
@@ -65,12 +67,22 @@ SHOTS = {
     "reuniones-etiqueta": "page=reuniones&rtag=Customer%20A", "reuniones-etiqueta-oscuro": "page=reuniones&rtag=Customer%20A&theme=dark",
     "reuniones-sin-etiquetas": "page=reuniones&tags=0",
     "reunion-etiquetas": "page=reuniones/2026-10-05_0915_planering", "reunion-etiquetas-oscuro": "page=reuniones/2026-10-05_0915_planering&theme=dark",
-    # auto tags (dictado-fnnr): a tag just added offers the series, a customer tag suggested from the guests, the rules in Settings
-    "reunion-etiqueta-serie": "page=reuniones/2026-10-04_1600_kund&tags=0&offer=1",
-    "reunion-etiqueta-serie-oscuro": "page=reuniones/2026-10-04_1600_kund&tags=0&offer=1&theme=dark",
-    "reunion-etiqueta-sugerida": "page=reuniones/2026-10-04_1600_kund&tags=0",
-    "reunion-etiqueta-sugerida-oscuro": "page=reuniones/2026-10-04_1600_kund&tags=0&theme=dark",
+    # auto tags (dictado-fnnr): a tag just added offers the series, a customer tag suggested from the guests, the rules in Settings.
+    # Opt-in since dictado-ng5i.1: autotags=on switches the demo on (no rules), autotags=1 on with two rules, =paused off with them
+    "reunion-etiqueta-serie": "page=reuniones/2026-10-04_1600_kund&tags=0&autotags=on&offer=1",
+    "reunion-etiqueta-serie-oscuro": "page=reuniones/2026-10-04_1600_kund&tags=0&autotags=on&offer=1&theme=dark",
+    "reunion-etiqueta-sugerida": "page=reuniones/2026-10-04_1600_kund&tags=0&autotags=on",
+    "reunion-etiqueta-sugerida-oscuro": "page=reuniones/2026-10-04_1600_kund&tags=0&autotags=on&theme=dark",
     "ajustes-etiquetas-auto": "page=ajustes&sec=meetings&autotags=1",
+    # switched off (dictado-ng5i.1): no suggestion, no offer after a tag is added, the one-line card, the paused rules
+    "reunion-etiqueta-sin-auto": "page=reuniones/2026-10-04_1600_kund&tags=0",
+    "reunion-etiqueta-sin-auto-oscuro": "page=reuniones/2026-10-04_1600_kund&tags=0&theme=dark",
+    "reunion-etiqueta-sin-oferta": "page=reuniones/2026-10-04_1600_kund&tags=0&offer=1",
+    "reunion-etiqueta-sin-oferta-oscuro": "page=reuniones/2026-10-04_1600_kund&tags=0&offer=1&theme=dark",
+    "ajustes-etiquetas-apagadas": "page=ajustes&sec=meetings&autotags=off",
+    "ajustes-etiquetas-apagadas-oscuro": "page=ajustes&sec=meetings&autotags=off&theme=dark",
+    "ajustes-etiquetas-pausadas": "page=ajustes&sec=meetings&autotags=paused",
+    "ajustes-etiquetas-pausadas-oscuro": "page=ajustes&sec=meetings&autotags=paused&theme=dark",
     "historial-editar": "page=historial&hedit=1", "historial-aprender": "page=historial&learn=1",
     "insights": "page=insights&insights=1",
     # dark mode (dictado-u9h)
@@ -94,7 +106,7 @@ def shot(web: Path, query: str, out: Path, size=(980, 690), scale=1.0) -> Path:
     index = (Path(web) / "index.html").as_uri()
     subprocess.run([EDGE, "--headless=new", "--disable-gpu", "--hide-scrollbars",
                     f"--force-device-scale-factor={scale}", f"--window-size={size[0]},{size[1]}",
-                    "--virtual-time-budget=2500", f"--screenshot={out}", f"{index}?demo=1&{query}"],
+                    f"--virtual-time-budget={4500 if 'showme=' in query else 2500}", f"--screenshot={out}", f"{index}?demo=1&{query}"],
                    check=True, capture_output=True, timeout=60)
     return out
 

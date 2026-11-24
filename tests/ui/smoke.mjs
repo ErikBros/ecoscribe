@@ -306,8 +306,11 @@ async function load(query) {
   check(!doc.querySelector(".spot-ring") && !doc.querySelector(".spot-tip"), "any key or click takes the ring away");
   doc.querySelector("#new-more").click(); await sleep(20);  // a Settings card: Show me opens its tab (dictado-fnnr)
   [...doc.querySelectorAll("#new-list li")][5].querySelector(".new-show").click(); await sleep(200);
+  for (let i = 0; i < 40 && !doc.querySelector(".spot-tip"); i++) await sleep(50);  // Settings loads first: slower on a busy PC
   check(!doc.querySelector("#page-ajustes").hidden && !doc.querySelector("#autotags").closest("[hidden]")
-    && /Your auto tags/.test(doc.querySelector(".spot-tip")?.textContent || ""), "Show me opens Settings on the Auto tags card");
+    && /Turn auto tags on here/.test(doc.querySelector(".spot-tip")?.textContent || ""), "Show me opens Settings on the Auto tags card");
+  check(doc.querySelector(".spot-ring") && doc.querySelector("#at-head")?.contains(doc.querySelector("#f-auto-tags")),
+    "and rings the switch row (dictado-ng5i.1: auto tags are off until turned on)");
   doc.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape" })); await sleep(20);
   const { window: w2, doc: d2 } = await load("page=inicio&new=1&tags=0");
   await sleep(50);
@@ -699,7 +702,7 @@ async function load(query) {
   check(none.doc.querySelector("#r-tags").hidden, "no meeting has a tag: no chip row");
 }
 { // dictado-fnnr: auto tags. A tag added to a calendar meeting offers the series; a customer tag is suggested from the guests' domain
-  const { window, doc, errors } = await load("page=reuniones/2026-10-04_1600_kund&tags=0");
+  const { window, doc, errors } = await load("page=reuniones/2026-10-04_1600_kund&tags=0&autotags=on");
   await sleep(300);
   const offer = doc.querySelector("#r-tag-offer"), sug = doc.querySelector("#r-tag-suggest");
   const mine = () => [...doc.querySelectorAll("#r-d-taglist .r-d-tag")].map((c) => c.firstChild.textContent);
@@ -731,15 +734,15 @@ async function load(query) {
   const badges = [...doc.querySelectorAll('.r-row[data-name="2026-10-03_1000_fallo"] .badge-tag')].map((b) => b.textContent);
   check(JSON.stringify(badges) === JSON.stringify(["Roadmap", "Customer A"]), "the earlier meeting of the series got both: " + badges);
   check(errors.length === 0, "no JS errors with auto tags: " + errors.join("; "));
-  const x = await load("page=reuniones/2026-10-04_1600_kund&tags=0");
+  const x = await load("page=reuniones/2026-10-04_1600_kund&tags=0&autotags=on");
   await sleep(300);
   x.doc.querySelector("#r-tag-suggest-x").click(); await sleep(1300);
   check(x.doc.querySelector("#r-tag-suggest").hidden && JSON.stringify(x.window.__atDismissed) === JSON.stringify(["domain|customer-a.example"]),
     "× dismisses the suggestion for that domain, and the next poll keeps it hidden");
-  const own = await load("page=reuniones/2026-10-05_0915_planering&tags=0");
+  const own = await load("page=reuniones/2026-10-05_0915_planering&tags=0&autotags=on");
   await sleep(300);
   check(own.doc.querySelector("#r-tag-suggest").hidden, "only the user's own company in the call: no suggestion");
-  const shot = await load("page=reuniones/2026-10-04_1600_kund&tags=0&offer=1");
+  const shot = await load("page=reuniones/2026-10-04_1600_kund&tags=0&autotags=on&offer=1");
   await sleep(700);
   check(!shot.doc.querySelector("#r-tag-offer").hidden && shot.doc.querySelector("#r-tag-suggest").hidden, "?offer=1 shows the offer (the screenshot)");
 }
@@ -755,6 +758,62 @@ async function load(query) {
   check(rows().length === 0 && !doc.querySelector("#at-empty").hidden && doc.querySelector("#at-note").hidden, "no rules: one line says how they're made");
   check(doc.querySelector("#savebar").hidden, "removing a rule needs no Save");
   check(errors.length === 0, "no JS errors in Auto tags: " + errors.join("; "));
+}
+{ // dictado-ng5i.1: auto tags are opt-in. Off by default: the card is one line plus the switch, and no rule runs
+  const { window, doc, errors } = await load("page=ajustes&sec=meetings");
+  await sleep(200);
+  const sw = doc.querySelector("#f-auto-tags"), card = doc.querySelector("#autotags");
+  const shown = (sel) => { const el = doc.querySelector(sel); return !!el && !el.closest("[hidden]"); };
+  check(sw && sw.checked === false && sw.closest("#at-head"), "Auto tags: a switch on the card's title row, off by default");
+  check(shown("#at-off-text") && /^Off\./.test(doc.querySelector("#at-off-text").textContent) && !shown("#at-on-text")
+    && !shown("#at-empty") && !shown("#at-note") && !shown("#at-paused") && doc.querySelectorAll("#at-rows .at-row").length === 0,
+    "off with no rules: one short line, no explanation, no empty text, no note");
+  sw.click(); await sleep(50);
+  check(sw.checked && shown("#at-on-text") && !shown("#at-off-text") && shown("#at-empty") && card.classList.contains("at-on"),
+    "flipping it on shows today's card at once, without a reload");
+  check(!doc.querySelector("#savebar").hidden, "and shows the save bar");
+  let sent = null;
+  const api = window.__ecoscribe.api, orig = api.save_settings;
+  api.save_settings = async (x) => { sent = x; return orig(x); };
+  doc.querySelector("#save").click(); await sleep(150);
+  check(sent && sent.auto_tags === true && Object.keys(sent).length === 1, "Save sends the switch: " + JSON.stringify(sent));
+  check(doc.querySelector("#toast").textContent === "Saved.", "it needs no restart: " + doc.querySelector("#toast").textContent);
+  const back = await load("page=ajustes&sec=meetings&autotags=on");
+  await sleep(200);
+  check(back.doc.querySelector("#f-auto-tags").checked && !back.doc.querySelector("#at-on-text").closest("[hidden]"), "?autotags=on: switched on, no rules");
+  check(errors.length === 0, "no JS errors with the auto tags switch: " + errors.join("; "));
+}
+{ // dictado-ng5i.1: off with rules made earlier: listed greyed under a paused line, × still removes one
+  const { window, doc, errors } = await load("page=ajustes&sec=meetings&autotags=paused");
+  await sleep(200);
+  const rows = () => [...doc.querySelectorAll("#at-rows .at-row")];
+  const shown = (sel) => { const el = doc.querySelector(sel); return !!el && !el.closest("[hidden]"); };
+  check(!doc.querySelector("#f-auto-tags").checked && rows().length === 2 && doc.querySelector("#autotags").classList.contains("at-paused-rules"),
+    "the two rules stay listed while off, greyed");
+  check(shown("#at-paused") && /Paused while auto tags are off\. Your rules and tags are kept\./.test(doc.querySelector("#at-paused").textContent)
+    && !shown("#at-note") && !shown("#at-empty") && !shown("#at-on-text"), "with one muted line saying they are paused and kept");
+  rows()[1].querySelector(".vc-x").click(); await sleep(150);
+  check(rows().length === 1 && /tags it added stay/.test(doc.querySelector("#toast").textContent), "× still removes a paused rule");
+  rows()[0].querySelector(".vc-x").click(); await sleep(150);
+  check(rows().length === 0 && !shown("#at-paused") && !doc.querySelector("#autotags").classList.contains("at-paused-rules"), "the last one gone: back to one line");
+  check(errors.length === 0, "no JS errors with paused rules: " + errors.join("; "));
+}
+{ // dictado-ng5i.1: a meeting page while auto tags are off: no dashed suggestion, no offer after adding a tag; manual tags work
+  const { window, doc, errors } = await load("page=reuniones/2026-10-04_1600_kund&tags=0");
+  await sleep(300);
+  const mine = () => [...doc.querySelectorAll("#r-d-taglist .r-d-tag")].map((c) => c.firstChild.textContent);
+  check(doc.querySelector("#r-tag-suggest").hidden, "off: no + Add Customer A chip");
+  const add = doc.querySelector("#r-tag-add");
+  add.value = "Renewal"; add.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true })); await sleep(100);
+  check(doc.querySelector("#r-tag-offer").hidden && JSON.stringify(mine()) === JSON.stringify(["Renewal"]), "off: the tag is added by hand, no series offer");
+  doc.querySelector('#r-d-taglist .vc-x[aria-label="Remove the tag Renewal"]').click(); await sleep(100);
+  check(mine().length === 0, "off: removing a tag by hand works");
+  await sleep(1200);
+  check(doc.querySelector("#r-tag-suggest").hidden, "off: the next poll shows no suggestion either");
+  const shot = await load("page=reuniones/2026-10-04_1600_kund&tags=0&offer=1");
+  await sleep(700);
+  check(shot.doc.querySelector("#r-tag-offer").hidden && shot.doc.querySelector("#r-tag-suggest").hidden, "off with ?offer=1: no offer line (the screenshot)");
+  check(errors.length === 0, "no JS errors on a meeting with auto tags off: " + errors.join("; "));
 }
 { // t0u.30: notes during a call, kept while the live view polls
   const { window, doc } = await load("page=reuniones/2026-10-05_1400_retro");
