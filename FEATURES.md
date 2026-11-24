@@ -42,7 +42,7 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Personal calls: Signal / WhatsApp / Telegram / Discord, a title starting "p-", or a language listed in [personal]; automatic steps over meetings touch only these (dictado-qlj) | done | done (shared code) |
 | Meeting search: titles and what was said, ranked and grouped by call, case and accents ignored in every script (Greek too); the Meetings search box and the Claude app's search_meetings (dictado-8h8) | done | check on Mac (shared code, SQLite FTS5) |
 | Calls with a person: the Claude app's calls_with_person finds the calls where someone is a named speaker, a calendar guest or in the title (part of a name, accents ignored); list_meetings shows the guests (dictado-igs) | done | check on Mac (shared code) |
-| Share in Slack: the transcript .md copied as a file (named meeting · who spoke · how long, no notes, no summary) and Slack opened, to paste in a chat (dictado-pnuy) | done | check on Mac (shared code; Finder-style file copy) |
+| Share in Slack: the transcript .md copied as a file (named meeting · who spoke · how long, no notes, no summary) and Slack opened, to paste in a chat (dictado-pnuy) | done | done (shared code; Finder-style file copy; checked on a Mac: Slack opens and Cmd+V in a DM attaches the .md, dictado-9jts) |
 | Debrief my call: a prompt in the Claude app (debrief_call) that turns a call's to-dos into proposed tickets, made only after the user's OK, and drafts a follow-up to paste; never the mailbox or calendar (dictado-2mu) | done | check on Mac (shared code) |
 | Questions by tag in the Claude app: search_meetings (by words and by meaning), calls_with_person and Debrief my call take a tag; the Sum up a tag prompt (tag_digest) gives one tag's decisions, promises and open to-dos per meeting, newest first (dictado-rsk8) | done | check on Mac (shared code) |
 | Search by meaning for the Claude app: a search_meetings that finds no call is counted (never its words); from the first miss on (or [search] meaning = "on"), multilingual-e5-large int8 (0.55 GB, CPU, onnxruntime) indexes the calls in the background while nothing records, and an empty word search, or by_meaning, answers with the calls closest in meaning (dictado-2i1) | done | check on Mac (shared code; the int8 model on the Apple CPU not tried yet) |
@@ -80,7 +80,7 @@ Built once for both. "Check on Mac" = works in tests, still to be tried for real
 | Title bar matches the window's light or dark look | done (Windows 11 dark title bar) | done (the window's appearance, Aqua or Dark Aqua; checked on a Mac in Dark mode: Light in Settings gives a light title bar, Match macOS a dark one) (dictado-zkh) |
 | Which app gets the paste, read just before it (Style per app) | done (process name + window title) | done (bundle id + window title through Accessibility) |
 | Paste text where the cursor is | done (clipboard + Ctrl+V) | done (NSPasteboard + Cmd+V) |
-| Copy a file to paste in another app (Meetings > Share in Slack) | done (CF_HDROP, as Explorer copies) | done (file URLs, as Finder copies; check on a Mac) |
+| Copy a file to paste in another app (Meetings > Share in Slack) | done (CF_HDROP, as Explorer copies) | done (file URLs, as Finder copies; checked on a Mac with Slack, dictado-9jts) |
 | Names on your screen | done (UI Automation, one COM thread) | done (Accessibility API) |
 | Speech engine on the GPU | done (faster-whisper, CUDA) | done (mlx-whisper, Metal) |
 | Mic list in Settings | done | done |
