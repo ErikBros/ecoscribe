@@ -30,6 +30,7 @@ Only standard library: it runs under any python3 on Windows (WSL), macOS and Lin
 """
 from __future__ import annotations
 
+import ast
 import json
 import os
 import re
@@ -125,9 +126,53 @@ def allowed_pieces() -> set[str]:
     return out
 
 
+def invention_phrases() -> set[tuple[str, ...]]:
+    """Whisper's stock inventions on silence (ecoscribe/text.py _HALLUCINATION_PHRASES): the app writes them into
+    a dictation of silence, and the repo lists them, so they are public phrases, nobody's own speech (dictado-777t).
+    Each as words, and as the older list wrote it (punctuation dropped: "amaraorg")."""
+    if "inventions" not in _cache:
+        out: set[tuple[str, ...]] = set()
+        try:
+            tree = ast.parse((REPO / "ecoscribe" / "text.py").read_text(encoding="utf-8"))
+        except (OSError, SyntaxError):
+            tree = None
+        for node in ast.walk(tree) if tree else ():
+            if isinstance(node, ast.Assign) and any(getattr(t, "id", "") == "_HALLUCINATION_PHRASES"
+                                                     for t in node.targets):
+                for c in ast.walk(node.value):
+                    if isinstance(c, ast.Constant) and isinstance(c.value, str):
+                        for form in (words(c.value), re.sub(r"[^\w ]", "", c.value.lower()).split()):
+                            if form:
+                                out.add(tuple(form))
+        _cache["inventions"] = out
+    return _cache["inventions"]  # type: ignore[return-value]
+
+
+def is_invention_run(piece: str) -> bool:
+    """A piece made only of invention phrases back to back (the first may start, the last may end, mid-phrase):
+    the list in the code, in any layout, or Whisper's run of them on silence. Real speech beside one still counts."""
+    phrases = invention_phrases()
+    w = piece.split()
+    if not w or not set(w) <= {x for p in phrases for x in p}:
+        return False
+    todo, seen = [0], {0}
+    while todo:
+        pos = todo.pop()
+        for p in phrases:
+            for o in range(len(p)) if pos == 0 else (0,):
+                k = min(len(p) - o, len(w) - pos)
+                if tuple(w[pos:pos + k]) == p[o:o + k]:
+                    if pos + k == len(w):
+                        return True
+                    if pos + k not in seen:
+                        seen.add(pos + k)
+                        todo.append(pos + k)
+    return False
+
+
 def leaked(personal: list[str], outgoing: str, allowed: set[str]) -> list[str]:
     mine = set().union(*(pieces(t) for t in personal))
-    return sorted((pieces(outgoing) & mine) - allowed)
+    return sorted(p for p in (pieces(outgoing) & mine) - allowed if not is_invention_run(p))
 
 
 def hint(piece: str) -> str:
@@ -296,7 +341,7 @@ def public_words() -> str:
 
 def speech_hits(text: str) -> list[str]:
     """The 6-word pieces of a text that are the user's own dictations or meetings. Raises Unavailable."""
-    return sorted(pieces(text) & speech_pieces())
+    return sorted(p for p in pieces(text) & speech_pieces() if not is_invention_run(p))
 
 
 def ticket_copies(text: str) -> dict[str, list[str]]:
