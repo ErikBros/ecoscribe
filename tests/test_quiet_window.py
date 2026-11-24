@@ -105,7 +105,7 @@ def test_real_window_is_driven_without_focus_or_mouse(window):
     page, (watch, pid), tmp_path = window
     page.get_by_role("button", name="Settings").first.click()
     page.wait_for_selector("#settings", state="visible")
-    page.get_by_role("button", name="Languages and words").click()
+    page.get_by_role("button", name="Words", exact=True).click()
     words = page.locator("#f-vocabulary")
     words.fill("Quintavelle")
     assert page.locator("#savebar").is_visible()  # the real page reacted to typing

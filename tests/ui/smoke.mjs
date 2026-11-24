@@ -250,7 +250,7 @@ async function load(query) {
   check(doc.querySelector("#update-note").hidden, "no new-version notice when there's none");
   check(errors.length === 0, "no JS errors: " + errors.join("; "));
 }
-{ // dictado-2xpp: each Settings section ends with its guide; Help and setup opens all guides and this platform's troubleshooting
+{ // dictado-2xpp: each Settings section ends with its guide; General's Help card opens all guides and this platform's troubleshooting
   const { window, doc, errors } = await load("page=ajustes&sec=meetings");
   await sleep(50);
   const shown = [...doc.querySelectorAll(".guide-foot")].filter((p) => !p.hidden);
