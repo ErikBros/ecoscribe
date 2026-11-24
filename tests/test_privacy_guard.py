@@ -1,6 +1,7 @@
 """The privacy guard (tools/privacy_guard.py, dictado-05h) blocks personal text and paths before a commit
 or push. Invented text only: never a real dictation here."""
 import importlib.util
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -69,3 +70,44 @@ def test_gitleaks_rules_let_placeholders_and_fixtures_through(tmp_path):
         "tests/fixtures/hello.wav": "scripted test recording\n",
     })
     assert not found, found
+
+
+def test_wsl_finds_the_windows_app_folder_without_cmd_on_path(monkeypatch):
+    """A WSL session whose PATH has no Windows folders (a background job) still finds the app folder."""
+    seen = []
+
+    def fake_run(args, **kw):
+        seen.append(args[0])
+        out = "C:\\Users\\someone\\AppData\\Local" if args[0].endswith("cmd.exe") else "/mnt/c/Users/someone/AppData/Local"
+        return subprocess.CompletedProcess(args, 0, stdout=out + "\n", stderr="")
+
+    for var in ("ECOSCRIBE_PERSONAL_DIR", "LOCALAPPDATA"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setattr(guard.sys, "platform", "linux")
+    monkeypatch.setattr(guard.Path, "read_text", lambda self, **kw: "Linux microsoft-standard-WSL2")
+    monkeypatch.setattr(guard.shutil, "which", lambda name: None)
+    monkeypatch.setattr(guard.subprocess, "run", fake_run)
+    assert guard.data_dirs() == [Path("/mnt/c/Users/someone/AppData/Local/ecoscribe")]
+    assert seen[0] == guard.WIN_CMD
+
+
+def test_whisper_silence_inventions_are_not_personal_speech(tmp_path, monkeypatch):
+    """dictado-777t: the inventions list in ecoscribe/text.py (and its older layouts in the history) holds
+    the same stock phrases Whisper writes into a dictation on silence, so they are no one's own speech."""
+    said = ("Gracias. Gracias. Gracias. Gracias por ver el video. Thank you for watching! "
+            + SAID)
+    (tmp_path / "history.jsonl").write_text(json.dumps({"text": said}) + "\n", encoding="utf-8")
+    monkeypatch.setenv("ECOSCRIBE_PERSONAL_DIR", str(tmp_path))
+    monkeypatch.setattr(guard, "_cache", {})
+    # the list as an old commit wrote it, normalized, and as the current file writes it
+    old_list = '"subtitles by the amaraorg community", "you", "gracias", "gracias por ver el video",'
+    new_list = '"Gracias.", "Muchas gracias.", "Gracias por ver.", "Gracias por ver el video.",'
+    assert guard.speech_hits("gracias gracias gracias gracias por ver") == []
+    assert guard.speech_hits(old_list) == []
+    assert guard.speech_hits(new_list) == []
+    # real speech next to an invention is still caught
+    assert guard.speech_hits("watching the purple walrus ordered seven")
+    assert guard.speech_hits("walrus ordered seven lemon cakes for")
+    # the same skip in the commit, push and history checks
+    assert guard.leaked([said], old_list, set()) == []
+    assert guard.leaked([said], "watching the purple walrus ordered seven", set())

@@ -361,7 +361,7 @@ function demoApi() {
       return { ok: true, places: total(counts), pairs, empty: !settings.values.replacements.length, undo: !!segsBefore[n] };
     },
     apply_replacements: async (n) => {
-      if (!settings.values.replacements.length) return { ok: false, error: "Your Replace list is empty: add pairs in Settings › Languages and words." };
+      if (!settings.values.replacements.length) return { ok: false, error: "Your Replace list is empty: add pairs in Settings › Words." };
       const { segs, counts } = replaceIn(n), places = total(counts);
       if (places) { segsBefore[n] = segsFor(n); segsNow[n] = segs; }
       window.__replaced = places;

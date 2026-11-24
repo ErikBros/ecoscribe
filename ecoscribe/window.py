@@ -1109,7 +1109,7 @@ class Api:
         if self._busy(d, speakers=True):
             return {"ok": False, "error": BUSY}
         if not table:
-            return {"ok": False, "error": "Your Replace list is empty: add pairs in Settings › Languages and words."}
+            return {"ok": False, "error": "Your Replace list is empty: add pairs in Settings › Words."}
         places = sum(counts.values())
         if tr is None or not places:
             return {"ok": True, "places": 0}
