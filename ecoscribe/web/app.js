@@ -1371,12 +1371,26 @@ function openRowTag(row, btn) {
   input.onclick = (e) => e.stopPropagation();
   input.onkeydown = (e) => {
     e.stopPropagation();  // the row's own Enter opens the meeting
-    if (e.key === "Escape") { e.preventDefault(); closeRowTag()?.focus(); }
+    if (e.key === "Escape") { e.preventDefault(); closeRowTag()?.focus(); return; }
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    saveRowTag(o);
   };
   input.onblur = () => { if (r.rowTag === o) closeRowTag(); };  // leaving the box: closed, nothing saved
   r.rowTag = o;
   btn.replaceWith(input);
   input.focus();
+}
+async function saveRowTag(o) {
+  const v = o.input.value.trim();
+  if (!v || o.saving) return;
+  o.saving = true;
+  const out = await api.set_tags(o.name, [...o.tags, v]).catch((e) => ({ ok: false, error: String(e) }));
+  o.saving = false;
+  if (!out.ok) { toast(out.error || "Couldn't save the tag."); return; }  // the box stays open with the text
+  if (r.rowTag === o) r.rowTag = null;  // out.offer (the series) is the meeting page's: never offered on the list
+  r.tagsKey = null;  // the row's badges and the chips above the list count it at once
+  await renderReuniones();
 }
 function closeRowTag() {  // back to + Tag; returns it
   const o = r.rowTag;
