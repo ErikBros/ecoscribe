@@ -139,3 +139,20 @@ def test_bd_from_windows_python_runs_in_wsl():
     assert cmd[:5] == ["wsl.exe", "-d", "Ubuntu", "--cd", "/src/ecoscribe"]
     assert cmd[-3:] == ["bd", "dolt", "push"]
     assert record_install.bd_cmd(["dolt", "push"], platform="darwin") == ["bd", "dolt", "push"]
+
+
+def test_build_folder_found_from_wsl_without_cmd_on_path(monkeypatch):
+    """A WSL session whose PATH has no Windows folders (a background job) still finds the build folder."""
+    import subprocess
+    seen = []
+
+    def fake_run(args, **kw):
+        seen.append(args[0])
+        out = "C:\\Users\\someone" if args[0].endswith("cmd.exe") else "/mnt/c/Users/someone"
+        return subprocess.CompletedProcess(args, 0, stdout=out + "\n", stderr="")
+
+    monkeypatch.setattr(release.sys, "platform", "linux")
+    monkeypatch.setattr(release.shutil, "which", lambda name: None)
+    monkeypatch.setattr(release.subprocess, "run", fake_run)
+    assert release.windows_build_dir() == Path("/mnt/c/Users/someone/ecoscribe-build")
+    assert seen[0] == release.WIN_CMD

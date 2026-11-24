@@ -28,6 +28,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -55,12 +56,17 @@ def mac_ticket_title(version: str) -> str:
     return f"Mac download for v{version}"
 
 
+WIN_CMD = "/mnt/c/Windows/System32/cmd.exe"  # from WSL, when the Windows folders are not on PATH
+
+
 def windows_build_dir() -> Path | None:
     """%USERPROFILE%\\ecoscribe-build, seen from this Python (Windows, or WSL through wslpath)."""
     if sys.platform == "win32":
         return Path(os.environ.get("USERPROFILE", Path.home())) / "ecoscribe-build"
     try:
-        win = subprocess.run(["cmd.exe", "/c", "echo %USERPROFILE%"], capture_output=True, text=True,
+        # A session started without the Windows folders on PATH still finds cmd.exe at its usual place.
+        cmd = shutil.which("cmd.exe") or WIN_CMD
+        win = subprocess.run([cmd, "/c", "echo %USERPROFILE%"], capture_output=True, text=True,
                              timeout=10, cwd="/mnt/c").stdout.strip()
         unix = subprocess.run(["wslpath", "-u", win], capture_output=True, text=True, timeout=10).stdout.strip()
         return Path(unix) / "ecoscribe-build" if win and unix else None
