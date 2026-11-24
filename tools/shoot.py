@@ -83,6 +83,9 @@ SHOTS = {
     "ajustes-etiquetas-apagadas-oscuro": "page=ajustes&sec=meetings&autotags=off&theme=dark",
     "ajustes-etiquetas-pausadas": "page=ajustes&sec=meetings&autotags=paused",
     "ajustes-etiquetas-pausadas-oscuro": "page=ajustes&sec=meetings&autotags=paused&theme=dark",
+    # tagging from the list (dictado-ng5i.2): Client call's tag box open with text, + Tag shown on the row above as on hover
+    "reuniones-fila-abierta": "page=reuniones&rowtag=2026-10-04_1600_kund",
+    "reuniones-fila-abierta-oscuro": "page=reuniones&rowtag=2026-10-04_1600_kund&theme=dark",
     "historial-editar": "page=historial&hedit=1", "historial-aprender": "page=historial&learn=1",
     "insights": "page=insights&insights=1",
     # dark mode (dictado-u9h)

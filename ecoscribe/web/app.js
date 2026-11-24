@@ -1272,7 +1272,7 @@ const R_STATUS = {
   running: "Transcribing", downloading: "Downloading model", done: "Ready", failed: "Failed",
 };
 const r = { open: null, next: 0, timer: null, status: null, segs: 0, busy: false, speakers: null, names: {},
-  tag: params.get("rtag") || "", tagsKey: null, tags: [], tagsShown: null, offer: null, suggest: null, suggestRaw: null, suggestKey: null, suggestGone: new Set() };  // ?rtag=: a demo shot with a tag picked
+  tag: params.get("rtag") || "", rowTag: null, tagsKey: null, tags: [], tagsShown: null, offer: null, suggest: null, suggestRaw: null, suggestKey: null, suggestGone: new Set() };  // ?rtag=: a demo shot with a tag picked
 const ACTIVE = new Set(["recording", "finalizing", "stopping", "queued", "new", "running", "downloading"]);
 function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
 function rLang() { return $("#r-lang").value || R_LANGS[0][0]; }
@@ -1301,6 +1301,9 @@ async function renderReuniones() {
   $("#r-list-view").hidden = false; $("#r-detail-view").hidden = true;
   let out;
   try { out = await api.list_sessions($("#r-search").value, r.tag); } catch (e) { return; }
+  const o = r.rowTag;  // a row's tag box is open (dictado-ng5i.2): keep it with its text, caret and focus; repaint once it closes
+  if (o && o.input.isConnected && (document.activeElement === o.input || !document.hasFocus())) return;
+  if (o) closeRowTag();
   const inUse = out.tags || [];
   if (r.tag && !inUse.some((t) => same(t.name, r.tag))) { r.tag = ""; return renderReuniones(); }  // its last meeting lost the tag
   paintTagFilter(inUse);
@@ -1333,6 +1336,7 @@ async function renderReuniones() {
     for (const t of row.tags || []) {  // its tags, as small badges (dictado-4vms)
       const b = document.createElement("span"); b.className = "badge badge-tag"; b.textContent = t; meta.append(b);
     }
+    if ((row.tags || []).length < 10) meta.append(rowTagAdd(row));  // + Tag: tag it without opening it (dictado-ng5i.2)
     li.append(title, st, meta);
     li.onclick = () => openSession(row.name);
     li.onkeydown = (e) => { if (e.key === "Enter") openSession(row.name); };
@@ -1342,6 +1346,64 @@ async function renderReuniones() {
   $("#r-empty").hidden = out.items.length > 0;
   $("#r-empty-text").textContent = q && r.tag ? `Nothing tagged ${r.tag} matches "${q}".` : q ? `Nothing matches "${q}".`
     : r.tag ? `No meetings tagged ${r.tag}.` : "Your meetings and the audio you import will show up here.";
+}
+/* tagging from the list (dictado-ng5i.2): + Tag on a row turns into an input with the meeting page's suggestions; Enter
+   saves through set_tags (same storage and spelling rule), Escape or leaving the box closes without saving. It only adds:
+   removing stays on the meeting's page, and the list shows no suggested tag and no series offer. */
+function rowTagAdd(row) {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "r-row-tag-add"; b.textContent = "+ Tag"; b.title = "Add a tag";
+  b.setAttribute("aria-label", `Add a tag to ${row.title || "Untitled"}`);
+  b.onclick = (e) => { e.stopPropagation(); openRowTag(row, b); };  // the row itself opens the meeting
+  b.onkeydown = (e) => e.stopPropagation();  // Enter on the button clicks it, never opens the meeting
+  return b;
+}
+function openRowTag(row, btn) {
+  closeRowTag();  // one open at a time
+  const tags = row.tags || [], known = $("#r-row-tag-known");
+  known.textContent = "";
+  for (const t of r.tags) {  // the tags in use it doesn't have yet, as on the meeting's page; never a suggested one
+    if (tags.some((y) => same(y, t.name))) continue;
+    const o = document.createElement("option"); o.value = t.name; known.append(o);
+  }
+  const input = document.createElement("input");
+  input.className = "vc-add r-row-tag-input"; input.maxLength = 40; input.autocomplete = "off"; input.spellcheck = false;
+  input.placeholder = "Tag"; input.setAttribute("list", "r-row-tag-known");
+  input.setAttribute("aria-label", `Add a tag to ${row.title || "Untitled"}`);
+  const o = { name: row.name, row, tags, input };
+  input.onclick = (e) => e.stopPropagation();
+  input.onkeydown = (e) => {
+    e.stopPropagation();  // the row's own Enter opens the meeting
+    if (e.key === "Escape") { e.preventDefault(); closeRowTag()?.focus(); return; }
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    saveRowTag(o);
+  };
+  input.onblur = () => { if (r.rowTag === o) closeRowTag(); };  // leaving the box: closed, nothing saved
+  r.rowTag = o;
+  btn.replaceWith(input);
+  input.focus({ preventScroll: true });  // the row was in view to be clicked: the list keeps still
+}
+async function saveRowTag(o) {
+  const v = o.input.value.trim();
+  if (!v || o.saving) return;
+  o.saving = true;
+  const out = await api.set_tags(o.name, [...o.tags, v]).catch((e) => ({ ok: false, error: String(e) }));
+  o.saving = false;
+  if (!out.ok) { toast(out.error || "Couldn't save the tag."); return; }  // the box stays open with the text
+  if (r.rowTag === o) r.rowTag = null;  // out.offer (the series) is the meeting page's: never offered on the list
+  r.tagsKey = null;  // the row's badges and the chips above the list count it at once
+  await renderReuniones();
+  [...document.querySelectorAll("#r-list .r-row")].find((x) => x.dataset.name === o.name)?.focus({ preventScroll: true });  // the keyboard stays on the row
+}
+function closeRowTag() {  // back to + Tag; returns it
+  const o = r.rowTag;
+  if (!o) return null;
+  r.rowTag = null;
+  if (!o.input.isConnected) return null;
+  const b = rowTagAdd(o.row);
+  o.input.replaceWith(b);
+  return b;
 }
 /* tags (dictado-4vms): the user's own labels, e.g. a customer or a recurring meeting. Above the list: All and every
    tag in use with how many meetings have it; one click shows only those, a second click (or All) shows all again. */
@@ -1507,6 +1569,7 @@ function renameSpeaker(el) {
   input.onclick = (e) => e.stopPropagation();
 }
 async function openSession(name) {
+  closeRowTag();
   r.open = name; r.next = 0; r.status = null; r.segs = 0; r.speakers = null; r.names = {}; r.tagsShown = null;
   $("#r-tag-add").value = "";
   r.offer = null; paintOffer(); paintSuggest(null);
@@ -3187,6 +3250,13 @@ async function boot() {
   if (params.get("demo") === "1" && params.get("offer") === "1") setTimeout(() => {  // screenshot: a tag just added offers the series (dictado-fnnr)
     const add = $("#r-tag-add"); add.value = params.get("offertag") || "Customer A";
     add.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  }, 400);
+  if (params.get("demo") === "1" && params.get("rowtag")) setTimeout(() => {  // screenshot: a row's tag box open with text, + Tag shown on the row above (dictado-ng5i.2)
+    const rows = $$("#r-list .r-row"), i = rows.findIndex((li) => li.dataset.name === params.get("rowtag"));
+    if (i < 0) return;
+    (rows[i - 1] || rows[i + 1])?.classList.add("shot-hover");
+    rows[i].querySelector(".r-row-tag-add")?.click();
+    const input = $(".r-row-tag-input"); if (input) input.value = params.get("rowtagtext") || "Renewal";
   }, 400);
   if (params.get("demo") === "1" && ["1", "on", "off", "paused"].includes(params.get("autotags")) && page === "ajustes") setTimeout(() => $("#at-rows")?.closest(".card")?.scrollIntoView?.({ block: "center" }), 300);  // screenshot
   if (params.get("demo") === "1" && params.get("retrymenu") === "1") setTimeout(() => $(".h-retry button")?.click(), 300);  // screenshot
