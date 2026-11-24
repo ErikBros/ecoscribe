@@ -18,7 +18,8 @@ def _config_without_after_hook() -> None:
     never their [transcribe] after_transcribe: that is the user's own program, and it would run on
     test files and change them under the test. Windows: a copy of config.toml without that line,
     in APPDATA for this run and every process it starts. (macOS keeps config and models in one
-    folder; ticket dictado-t6c.)"""
+    folder; ticket dictado-t6c.) The dictation timing tests pin their worker's [whisper] and [text]
+    on top of this copy (tests/engine_cfg.py, dictado-i8bw): the user's languages pick the model."""
     if MAC or os.environ.get("ECOSCRIBE_TEST_APPDATA"):
         return
     import re

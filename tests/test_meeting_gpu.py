@@ -62,14 +62,16 @@ def test_dictation_latency_unchanged_during_a_job(tmp_path):
     """Criterion 6 (amended by the user 2026-10-02): within +200 ms (median) while a 60-min file job runs.
     Measured +180..195 ms; it is GPU contention, process priority does not help.
     dictado-2ta / 2so: next to the installed app's GPU work, or other apps keeping the GPU busy, it
-    measures them, not this: skipped, with why."""
+    measures them, not this: skipped, with why.
+    dictado-i8bw: the worker reads a pinned config (tests/engine_cfg.py): the default dictation model
+    (turbo), never large-v3 because a dictation language needs it (that measured ~1.15 s base)."""
     from tests.gpu_busy import why_busy
     busy = why_busy()
     if busy:
         pytest.skip(f"{busy}: latency can't be measured next to it")
-    from ecoscribe.config import TextCfg, WhisperCfg
-    from ecoscribe.engine_proc import EngineProxy
-    e = EngineProxy(WhisperCfg(on_demand=True), TextCfg(), check_s=None)
+    from ecoscribe.engine import dictation_model
+    from tests.engine_cfg import pinned_proxy
+    e = pinned_proxy(tmp_path)
     clip = read_wav(FIX / "en_long.wav")
     e.transcribe(clip)  # cold start out of the way
 
@@ -90,7 +92,7 @@ def test_dictation_latency_unchanged_during_a_job(tmp_path):
     finally:
         job.kill()
         e.close()
-    print(f"LATENCY base_ms={base:.0f} busy_ms={busy:.0f} delta_ms={busy - base:.0f}")
+    print(f"LATENCY model={dictation_model(e.cfg)[0]} base_ms={base:.0f} busy_ms={busy:.0f} delta_ms={busy - base:.0f}")
     assert busy - base <= 200
 
 
