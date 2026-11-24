@@ -815,6 +815,111 @@ async function load(query) {
   check(shot.doc.querySelector("#r-tag-offer").hidden && shot.doc.querySelector("#r-tag-suggest").hidden, "off with ?offer=1: no offer line (the screenshot)");
   check(errors.length === 0, "no JS errors on a meeting with auto tags off: " + errors.join("; "));
 }
+{ // dictado-ng5i.2: tag a meeting straight from the Meetings list. Each row has + Tag; Enter saves, Escape or leaving closes
+  const { window, doc, errors } = await load("page=reuniones");
+  const api = window.__ecoscribe.api;
+  const row = (n) => doc.querySelector(`.r-row[data-name="${n}"]`);
+  const chips = () => [...doc.querySelectorAll("#r-tags .r-tag")];
+  const label = (c) => c.childNodes[0].textContent;
+  const count = (t) => chips().find((c) => label(c) === t)?.querySelector("b").textContent ?? "none";
+  const badges = (n) => [...(row(n)?.querySelectorAll(".badge-tag") || [])].map((b) => b.textContent);
+  const opts = () => [...doc.querySelectorAll("#r-row-tag-known option")].map((o) => o.value);
+  const input = () => doc.querySelector(".r-row-tag-input");
+  const inputs = () => doc.querySelectorAll(".r-row-tag-input").length;
+  const key = (el, k) => el?.dispatchEvent(new window.KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
+  const type = (el, v) => { if (!el) return; el.value = v; el.setSelectionRange(v.length, v.length); el.dispatchEvent(new window.Event("input", { bubbles: true })); };
+  const open = (n) => row(n)?.querySelector(".r-row-tag-add")?.click();
+  const closed = () => doc.querySelector("#r-detail-view").hidden;
+  const KUND = "2026-10-04_1600_kund", PLAN = "2026-10-05_0915_planering";
+  const items = (await api.list_sessions("", "")).items;
+  const lacking = items.filter((x) => { const b = row(x.name)?.querySelector(".r-row-tag-add");
+    return !(b && b.tagName === "BUTTON" && b.type === "button" && b.tabIndex >= 0 && !b.disabled && b.textContent === "+ Tag"
+      && b.getAttribute("aria-label") === `Add a tag to ${x.title}`); }).map((x) => x.name);
+  check(items.length === 5 && lacking.length === 0, `every row has a + Tag button (aria-label "Add a tag to <title>"), statuses ${items.map((x) => x.status).join(", ")}; missing on: ${lacking}`);
+  open(KUND); await sleep(50);
+  check(closed() && input() && doc.activeElement === input() && row(KUND).contains(input()) && !row(KUND).querySelector(".r-row-tag-add"),
+    "clicking + Tag on Client call opens a focused input on that row, the meeting stays closed");
+  check(input()?.maxLength === 40 && input()?.placeholder === "Tag" && input()?.getAttribute("list") === "r-row-tag-known"
+    && input()?.getAttribute("aria-label") === "Add a tag to Client call", "the input: placeholder Tag, 40 characters at most, the row's suggestions");
+  check(JSON.stringify(opts()) === JSON.stringify(["Weekly ops", "Hiring"]), "it suggests the tags in use the row lacks, as the meeting page does: " + opts());
+  open(PLAN); await sleep(50);
+  check(inputs() === 1 && row(PLAN).contains(input()) && row(KUND).querySelector(".r-row-tag-add") && JSON.stringify(opts()) === JSON.stringify(["Customer A"]),
+    "opening a second row closes the first: one input, on Planering vecka 41, suggesting " + opts());
+  const before = count("Customer A");
+  type(input(), "customer a"); key(input(), "Enter"); await sleep(150);
+  check(JSON.stringify(window.__tags) === JSON.stringify(["Weekly ops", "Hiring", "Customer A"]),
+    "Planering vecka 41, typed 'customer a': saved in another meeting's spelling: " + JSON.stringify(window.__tags));
+  check(inputs() === 0 && badges(PLAN).at(-1) === "Customer A" && closed(),
+    "Enter closes the input, the row shows the Customer A badge at once, the meeting stays closed: " + badges(PLAN));
+  check(before === "2" && count("Customer A") === "3", `the Customer A chip counts it at once: ${before} -> ${count("Customer A")}`);
+  chips().find((c) => label(c) === "Customer A").click(); await sleep(150);
+  const hBefore = count("Hiring");
+  open(KUND); await sleep(50); type(input(), "hiring"); key(input(), "Enter"); await sleep(150);
+  check(row(KUND) && badges(KUND).at(-1) === "Hiring" && count("Hiring") === "2" && hBefore === "1" && closed() && inputs() === 0,
+    `with the Customer A chip picked: Client call, typed 'hiring': row stays, badge Hiring, Hiring chip ${hBefore} -> ${count("Hiring")}`);
+  chips()[0].click(); await sleep(150);
+  const s = doc.querySelector("#r-search");
+  s.value = "client"; s.dispatchEvent(new window.Event("input")); await sleep(250);
+  const wBefore = count("Weekly ops");
+  open(KUND); await sleep(50); type(input(), "weekly OPS"); key(input(), "Enter"); await sleep(150);
+  check(row(KUND) && badges(KUND).at(-1) === "Weekly ops" && wBefore === "2" && count("Weekly ops") === "3" && closed(),
+    `with 'client' in the search box: Client call, typed 'weekly OPS': row stays, badge Weekly ops, chip ${wBefore} -> ${count("Weekly ops")}`);
+  open(KUND); await sleep(50);
+  let el = input(); type(el, "abc"); await sleep(1300);
+  check(el && input() === el && el.value === "abc" && doc.activeElement === el && el.selectionStart === 3 && row(KUND)?.contains(el),
+    "with text in the search box, the open input survives the 1-second repaint: text, focus and caret kept");
+  key(el, "Escape"); await sleep(50);
+  s.value = ""; s.dispatchEvent(new window.Event("input")); await sleep(250);
+  open(PLAN); await sleep(50);
+  el = input(); type(el, "abc"); await sleep(1300);
+  check(el && input() === el && el.value === "abc" && doc.activeElement === el && el.selectionStart === 3 && row(PLAN)?.contains(el),
+    "the open input survives the 1-second repaint: text, focus and caret kept");
+  let saved = JSON.stringify(window.__tags);
+  row("2026-10-05_1130_podcast").dataset.mark = "1";
+  key(el, "Escape"); await sleep(50);
+  check(el && inputs() === 0 && JSON.stringify(window.__tags) === saved && row(PLAN).querySelector(".r-row-tag-add") && closed(), "Escape closes it and saves nothing");
+  await sleep(1300);
+  check(!doc.querySelector(".r-row[data-mark]") && row("2026-10-05_1130_podcast"), "once closed, the list repaints every second again (a marked row was rebuilt)");
+  open(PLAN); await sleep(50); type(input(), "Draft"); let was = !!input(); input()?.blur(); await sleep(50);
+  check(was && inputs() === 0 && JSON.stringify(window.__tags) === saved && !badges(PLAN).includes("Draft"), "leaving the input with text typed closes it and saves nothing");
+  open(PLAN); await sleep(50); was = !!input(); input()?.blur(); await sleep(50);
+  check(was && inputs() === 0 && JSON.stringify(window.__tags) === saved, "leaving the empty input closes it and saves nothing");
+  const orig = api.set_tags;
+  api.set_tags = async () => ({ ok: false, error: "x" });
+  open(PLAN); await sleep(50); type(input(), "Boom"); key(input(), "Enter"); await sleep(150);
+  check(doc.querySelector("#toast").textContent === "x" && !doc.querySelector("#toast").hidden && input()?.value === "Boom" && row(PLAN).contains(input()),
+    "a failed save shows the error in a toast and keeps the input open with the text");
+  api.set_tags = orig;
+  key(input(), "Escape"); await sleep(50);
+  row(KUND).click(); await sleep(250);
+  const mine = [...doc.querySelectorAll("#r-d-taglist .r-d-tag")].map((c) => c.firstChild.textContent);
+  check(!closed() && JSON.stringify(mine) === JSON.stringify(["Customer A", "Hiring", "Weekly ops"]), "the meeting's page shows the tags saved from the list: " + mine);
+  check(errors.length === 0, "no JS errors tagging from the list: " + errors.join("; "));
+  const ten = await load("page=reuniones"), TEN = ["Weekly ops", "Hiring", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"];
+  await ten.window.__ecoscribe.api.set_tags(PLAN, TEN); await sleep(1300);
+  const tenRow = ten.doc.querySelector(`.r-row[data-name="${PLAN}"]`);
+  check(tenRow.querySelectorAll(".badge-tag").length === 10 && !tenRow.querySelector(".r-row-tag-add") && ten.doc.querySelectorAll(".r-row .r-row-tag-add").length === 4,
+    "a row with 10 tags (Planering vecka 41, made with set_tags) has no + Tag; the other 4 rows keep theirs");
+  for (const q of ["page=reuniones&tags=0", "page=reuniones&tags=0&autotags=on"]) {
+    const x = await load(q), xr = (n) => x.doc.querySelector(`.r-row[data-name="${n}"]`);
+    const xo = () => [...x.doc.querySelectorAll("#r-row-tag-known option")].map((o) => o.value);
+    check(x.doc.querySelector("#r-tags").hidden, `${q}: no tag yet, no chip row`);
+    xr(KUND).querySelector(".r-row-tag-add")?.click(); await sleep(50);
+    check(x.doc.querySelector(".r-row-tag-input") && xo().length === 0, `${q}: Client call's input suggests nothing (no tag in use, no domain suggestion): ${xo()}`);
+    const xi = x.doc.querySelector(".r-row-tag-input");
+    if (xi) xi.value = "Renewal"; xi?.dispatchEvent(new x.window.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })); await sleep(150);
+    const xc = [...x.doc.querySelectorAll("#r-tags .r-tag")];
+    check(!x.doc.querySelector("#r-tags").hidden && JSON.stringify(xc.map((c) => c.childNodes[0].textContent)) === JSON.stringify(["All", "Renewal"])
+      && xc[1].querySelector("b").textContent === "1" && JSON.stringify([...xr(KUND).querySelectorAll(".badge-tag")].map((b) => b.textContent)) === '["Renewal"]',
+      `${q}: the first tag saved from a row shows the chip row at once: All, Renewal 1`);
+    check(xi && x.doc.querySelector("#r-tag-offer").hidden && !x.doc.querySelector('#r-list [class*="suggest"], #r-list .r-tag-offer')
+      && ![...x.doc.querySelectorAll("#r-list *")].some((e) => /^\+ Add /.test(e.textContent) || /Tag every/.test(e.textContent)),
+      `${q}: no series offer and no dashed suggestion on the list`);
+    xr(PLAN).querySelector(".r-row-tag-add")?.click(); await sleep(50);
+    check(JSON.stringify(xo()) === '["Renewal"]', `${q}: another row suggests only the tag in use, never Customer A: ${xo()}`);
+    check(x.errors.length === 0, `${q}: no JS errors: ` + x.errors.join("; "));
+  }
+}
 { // t0u.30: notes during a call, kept while the live view polls
   const { window, doc } = await load("page=reuniones/2026-10-05_1400_retro");
   await sleep(200);
