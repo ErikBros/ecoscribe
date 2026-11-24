@@ -120,7 +120,10 @@ Label meetings to find them again, for example by customer or by a meeting that 
 - **Add a tag:** on a meeting's page, type in **Add tag** under the title and press Enter. Tags you already use are
   suggested as you type. A tag that another meeting has in another case keeps that spelling, so one label never splits
   in two. Up to 10 tags per meeting, 40 characters each.
-- **Remove a tag:** the × on it.
+- **Add a tag from the list:** without opening the meeting, point at it in the Meetings list (or Tab to it), click
+  **+ Tag**, type and press Enter. The same suggestions and spelling apply, and the tag shows on the row and in the
+  chips at once. Escape, or clicking elsewhere, closes the box without saving. A meeting with 10 tags shows no **+ Tag**.
+- **Remove a tag:** the × on it, on the meeting's page.
 - **Show one tag's meetings:** the chips above the Meetings list show **All** and every tag in use with how many
   meetings have it. Click a tag to see only those meetings; click it again, or **All**, to see every meeting. It works
   together with the search box. The chips appear once a meeting has a tag.
@@ -136,16 +139,16 @@ Auto tags are off until you turn them on: the switch on **Settings > Meetings > 
 meeting's page makes no offer and suggests no tag, and no rule tags a meeting. Tags you add by hand work either way.
 Turning them on tags past meetings with the rules you already have, at once.
 
-- **A meeting that repeats:** when you add a tag to a meeting from a calendar event, a line under the tags asks
-  *Tag every "Weekly ops" meeting with Weekly ops?* and says how many earlier ones it would tag too. **Yes** tags them
-  now and every new meeting with that event title from then on (case and spacing don't matter). **No** doesn't ask
-  again for that tag and title.
+- **A meeting that repeats:** when you add a tag on the page of a meeting from a calendar event, a line under the tags
+  asks *Tag every "Weekly ops" meeting with Weekly ops?* and says how many earlier ones it would tag too. **Yes** tags
+  them now and every new meeting with that event title from then on (case and spacing don't matter). **No** doesn't
+  ask again for that tag and title.
 - **A customer:** a meeting with guests from another company suggests a tag named after their email domain, as a
-  dashed chip next to the tags: guests from customer-a.com suggest **+ Customer A**. Click it to tag this meeting and
-  every meeting, past and new, with someone from that domain. The × on it stops suggesting that domain. Your own
-  company is never suggested (Ecoscribe takes it from your calendar address, or else from the domain in most of your
-  meetings), and neither are personal addresses like Gmail or Outlook.com. If you already use the tag in another
-  spelling, the suggestion uses yours.
+  dashed chip next to the tags on its page: guests from customer-a.com suggest **+ Customer A**. Click it to tag this
+  meeting and every meeting, past and new, with someone from that domain. The × on it stops suggesting that domain.
+  Your own company is never suggested (Ecoscribe takes it from your calendar address, or else from the domain in most
+  of your meetings), and neither are personal addresses like Gmail or Outlook.com. If you already use the tag in
+  another spelling, the suggestion uses yours.
 - **Taking one off:** removing an auto tag from one meeting with its × keeps it off that meeting; the rule doesn't
   put it back.
 - **Your rules:** **Settings > Meetings > Auto tags** lists them. The × removes a rule; the tags it already added stay
