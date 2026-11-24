@@ -1301,6 +1301,9 @@ async function renderReuniones() {
   $("#r-list-view").hidden = false; $("#r-detail-view").hidden = true;
   let out;
   try { out = await api.list_sessions($("#r-search").value, r.tag); } catch (e) { return; }
+  const o = r.rowTag;  // a row's tag box is open (dictado-ng5i.2): keep it with its text, caret and focus; repaint once it closes
+  if (o && o.input.isConnected && (document.activeElement === o.input || !document.hasFocus())) return;
+  if (o) closeRowTag();
   const inUse = out.tags || [];
   if (r.tag && !inUse.some((t) => same(t.name, r.tag))) { r.tag = ""; return renderReuniones(); }  // its last meeting lost the tag
   paintTagFilter(inUse);
@@ -1565,6 +1568,7 @@ function renameSpeaker(el) {
   input.onclick = (e) => e.stopPropagation();
 }
 async function openSession(name) {
+  closeRowTag();
   r.open = name; r.next = 0; r.status = null; r.segs = 0; r.speakers = null; r.names = {}; r.tagsShown = null;
   $("#r-tag-add").value = "";
   r.offer = null; paintOffer(); paintSuggest(null);
