@@ -1272,7 +1272,7 @@ const R_STATUS = {
   running: "Transcribing", downloading: "Downloading model", done: "Ready", failed: "Failed",
 };
 const r = { open: null, next: 0, timer: null, status: null, segs: 0, busy: false, speakers: null, names: {},
-  tag: params.get("rtag") || "", tagsKey: null, tags: [], tagsShown: null, offer: null, suggest: null, suggestRaw: null, suggestKey: null, suggestGone: new Set() };  // ?rtag=: a demo shot with a tag picked
+  tag: params.get("rtag") || "", rowTag: null, tagsKey: null, tags: [], tagsShown: null, offer: null, suggest: null, suggestRaw: null, suggestKey: null, suggestGone: new Set() };  // ?rtag=: a demo shot with a tag picked
 const ACTIVE = new Set(["recording", "finalizing", "stopping", "queued", "new", "running", "downloading"]);
 function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
 function rLang() { return $("#r-lang").value || R_LANGS[0][0]; }
@@ -1351,8 +1351,40 @@ function rowTagAdd(row) {
   const b = document.createElement("button");
   b.type = "button"; b.className = "r-row-tag-add"; b.textContent = "+ Tag"; b.title = "Add a tag";
   b.setAttribute("aria-label", `Add a tag to ${row.title || "Untitled"}`);
-  b.onclick = (e) => { e.stopPropagation(); };  // the row itself opens the meeting
+  b.onclick = (e) => { e.stopPropagation(); openRowTag(row, b); };  // the row itself opens the meeting
   b.onkeydown = (e) => e.stopPropagation();  // Enter on the button clicks it, never opens the meeting
+  return b;
+}
+function openRowTag(row, btn) {
+  closeRowTag();  // one open at a time
+  const tags = row.tags || [], known = $("#r-row-tag-known");
+  known.textContent = "";
+  for (const t of r.tags) {  // the tags in use it doesn't have yet, as on the meeting's page; never a suggested one
+    if (tags.some((y) => same(y, t.name))) continue;
+    const o = document.createElement("option"); o.value = t.name; known.append(o);
+  }
+  const input = document.createElement("input");
+  input.className = "vc-add r-row-tag-input"; input.maxLength = 40; input.autocomplete = "off"; input.spellcheck = false;
+  input.placeholder = "Tag"; input.setAttribute("list", "r-row-tag-known");
+  input.setAttribute("aria-label", `Add a tag to ${row.title || "Untitled"}`);
+  const o = { name: row.name, row, tags, input };
+  input.onclick = (e) => e.stopPropagation();
+  input.onkeydown = (e) => {
+    e.stopPropagation();  // the row's own Enter opens the meeting
+    if (e.key === "Escape") { e.preventDefault(); closeRowTag()?.focus(); }
+  };
+  input.onblur = () => { if (r.rowTag === o) closeRowTag(); };  // leaving the box: closed, nothing saved
+  r.rowTag = o;
+  btn.replaceWith(input);
+  input.focus();
+}
+function closeRowTag() {  // back to + Tag; returns it
+  const o = r.rowTag;
+  if (!o) return null;
+  r.rowTag = null;
+  if (!o.input.isConnected) return null;
+  const b = rowTagAdd(o.row);
+  o.input.replaceWith(b);
   return b;
 }
 /* tags (dictado-4vms): the user's own labels, e.g. a customer or a recurring meeting. Above the list: All and every
