@@ -919,6 +919,12 @@ async function load(query) {
     check(JSON.stringify(xo()) === '["Renewal"]', `${q}: another row suggests only the tag in use, never Customer A: ${xo()}`);
     check(x.errors.length === 0, `${q}: no JS errors: ` + x.errors.join("; "));
   }
+  const shot = await load("page=reuniones&rowtag=2026-10-04_1600_kund");
+  await sleep(1500);
+  const si = shot.doc.querySelector(".r-row-tag-input"), above = shot.doc.querySelector(`.r-row[data-name="${PLAN}"]`);
+  check(si && si.closest(".r-row")?.dataset.name === KUND && si.value === "Renewal" && shot.doc.activeElement === si
+    && above.classList.contains("shot-hover") && above.querySelector(".r-row-tag-add") && shot.errors.length === 0,
+    "?rowtag= opens that row's tag box with text and shows + Tag on the row above (the screenshot)");
 }
 { // t0u.30: notes during a call, kept while the live view polls
   const { window, doc } = await load("page=reuniones/2026-10-05_1400_retro");

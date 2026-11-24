@@ -1382,7 +1382,7 @@ function openRowTag(row, btn) {
   input.onblur = () => { if (r.rowTag === o) closeRowTag(); };  // leaving the box: closed, nothing saved
   r.rowTag = o;
   btn.replaceWith(input);
-  input.focus();
+  input.focus({ preventScroll: true });  // the row was in view to be clicked: the list keeps still
 }
 async function saveRowTag(o) {
   const v = o.input.value.trim();
@@ -3249,6 +3249,13 @@ async function boot() {
   if (params.get("demo") === "1" && params.get("offer") === "1") setTimeout(() => {  // screenshot: a tag just added offers the series (dictado-fnnr)
     const add = $("#r-tag-add"); add.value = params.get("offertag") || "Customer A";
     add.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  }, 400);
+  if (params.get("demo") === "1" && params.get("rowtag")) setTimeout(() => {  // screenshot: a row's tag box open with text, + Tag shown on the row above (dictado-ng5i.2)
+    const rows = $$("#r-list .r-row"), i = rows.findIndex((li) => li.dataset.name === params.get("rowtag"));
+    if (i < 0) return;
+    (rows[i - 1] || rows[i + 1])?.classList.add("shot-hover");
+    rows[i].querySelector(".r-row-tag-add")?.click();
+    const input = $(".r-row-tag-input"); if (input) input.value = params.get("rowtagtext") || "Renewal";
   }, 400);
   if (params.get("demo") === "1" && ["1", "on", "off", "paused"].includes(params.get("autotags")) && page === "ajustes") setTimeout(() => $("#at-rows")?.closest(".card")?.scrollIntoView?.({ block: "center" }), 300);  // screenshot
   if (params.get("demo") === "1" && params.get("retrymenu") === "1") setTimeout(() => $(".h-retry button")?.click(), 300);  // screenshot
