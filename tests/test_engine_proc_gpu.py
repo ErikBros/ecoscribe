@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 
 from ecoscribe.audio import read_wav
-from ecoscribe.config import TextCfg, WhisperCfg
-from ecoscribe.engine_proc import EngineProxy
+from ecoscribe.config import WhisperCfg
+from tests.engine_cfg import pinned_proxy
 
 pytestmark = pytest.mark.gpu
 FIX = Path(__file__).parent / "fixtures"
@@ -35,10 +35,11 @@ def vram_mb():
     return int(out.strip().splitlines()[0])
 
 
-def test_cold_start_dictation_then_idle_exit_frees_vram():
+def test_cold_start_dictation_then_idle_exit_frees_vram(tmp_path):
     before = vram_mb()
     t = [0.0]
-    e = EngineProxy(WhisperCfg(on_demand=True, idle_exit_s=600), TextCfg(), check_s=None, clock=lambda: t[0])
+    # the default dictation model, whatever the user's languages pick (tests/engine_cfg.py, dictado-i8bw)
+    e = pinned_proxy(tmp_path, whisper=WhisperCfg(on_demand=True, idle_exit_s=600), clock=lambda: t[0])
     t0 = time.monotonic()
     e.warm()  # the tap
     time.sleep(1.5)  # the user talks
