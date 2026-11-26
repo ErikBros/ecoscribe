@@ -381,10 +381,36 @@ def test_clarity_is_saved_after_the_paste_when_insights_is_on(tmp_path):
     app, out = make(tmp_path, eng=eng)
     app.cfg.ui.insights = True
     app.on_action("toggle"); app.on_action("toggle")
-    assert wait(lambda: (tmp_path / "h.jsonl").exists())
-    h = json.loads((tmp_path / "h.jsonl").read_text(encoding="utf-8").splitlines()[0])
+    hist = tmp_path / "h.jsonl"  # the line comes first, its clarity right after (dictado-h1vn.1)
+    assert wait(lambda: hist.exists() and "clarity" in hist.read_text(encoding="utf-8"))
+    h = json.loads(hist.read_text(encoding="utf-8").splitlines()[0])
     assert out == ["text 1 "] and eng.scored == ["en"]
     assert h["clarity"] == 67 and h["heard"] == 3 and h["unsure"] == ["Tromsø"] and h["speech_s"] == 1.0
+    app.shutdown()
+
+
+def test_the_history_line_does_not_wait_for_the_clarity_pass(tmp_path):
+    """dictado-h1vn.1: a long dictation's clarity pass can take a minute; History shows it at once."""
+    release = threading.Event()
+
+    class Slow(ScoringEngine):
+        def word_confidence(self, audio, lang=None, words=None):
+            release.wait(5)
+            return super().word_confidence(audio, lang, words)
+    app, out = make(tmp_path, eng=Slow())
+    app.cfg.ui.insights = True
+    hist = tmp_path / "h.jsonl"
+    app.on_action("toggle"); app.on_action("toggle")
+    try:
+        assert wait(lambda: hist.exists() and hist.read_text(encoding="utf-8").strip(), 2.0)
+        h = json.loads(hist.read_text(encoding="utf-8").splitlines()[0])
+        assert h["text"] and h["id"] and "clarity" not in h  # there before the pass returns
+    finally:
+        release.set()
+    assert wait(lambda: "clarity" in hist.read_text(encoding="utf-8"))
+    lines = hist.read_text(encoding="utf-8").splitlines()
+    h2 = json.loads(lines[0])
+    assert len(lines) == 1 and h2["id"] == h["id"] and h2["clarity"] == 67 and h2["unsure"] == ["Tromsø"]
     app.shutdown()
 
 
