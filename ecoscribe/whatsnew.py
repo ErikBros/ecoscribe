@@ -24,6 +24,18 @@ FIRST_CARD = "1.28.0"  # the first version with this card: a copy without whatsn
 MAX_LINES = 6  # a card, not the release page: the rest is behind "All release notes"
 
 NOTES: dict[str, list[dict]] = {
+    "1.30.0": [
+        {"title": "Install updates when you choose", "text": "once a new version has downloaded, Ecoscribe asks to "
+         "install it now or later. Later keeps an Install now button on Home. The new version opens by itself."},
+        {"title": "Tag a meeting from the list", "text": "+ Tag on a row adds a tag without opening the meeting.",
+         "show": {"page": "reuniones", "y": 0.2, "spots": [  # dictado-ng5i.2: + Tag shows on a row under the pointer
+             ["#r-list > li", "Point at a meeting and click + Tag to tag it right here."]]}},
+        {"title": "History shows a dictation at once", "text": "a long dictation appears in History right after it's "
+         "pasted, instead of a while later."},
+        {"title": "Auto tags are off until you turn them on", "text": "switch them on in Settings > Meetings.",
+         "show": {"page": "ajustes", "card": "autotags", "y": 0.75, "spots": [  # dictado-ng5i.1: the opt-in switch
+             ["#at-head", "Turn auto tags on here."]]}},
+    ],
     "1.29.0": [
         {"title": "Auto tags", "text": "tag one recurring meeting and Ecoscribe offers to tag every one; a meeting "
          "with people from another company suggests that company's tag. Off until you turn it on in Settings > Meetings.",
