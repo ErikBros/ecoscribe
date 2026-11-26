@@ -25,14 +25,14 @@ MAX_LINES = 6  # a card, not the release page: the rest is behind "All release n
 
 NOTES: dict[str, list[dict]] = {
     "1.30.0": [
-        {"title": "Install updates when you choose", "text": "once a new version has downloaded, Ecoscribe asks to "
-         "install it now or later. Later keeps an Install now button on Home. The new version opens by itself."},
+        {"title": "Install updates when you choose", "text": "Install now on Home gets the new version and installs it "
+         "at once, then Ecoscribe opens again by itself. With Download by itself on, a pop-up asks Install now or Later."},
         {"title": "Tag a meeting from the list", "text": "+ Tag on a row adds a tag without opening the meeting.",
          "show": {"page": "reuniones", "y": 0.2, "spots": [  # dictado-ng5i.2: + Tag shows on a row under the pointer
              ["#r-list .r-row", "Point at a meeting and click + Tag to tag it right here."]]}},
-        {"title": "History shows a dictation at once", "text": "a long dictation appears in History right after it's "
-         "pasted, instead of a while later."},
-        {"title": "Auto tags are off until you turn them on", "text": "switch them on in Settings > Meetings.",
+        {"title": "History shows a dictation at once", "text": "with Insights on, a long dictation appears in History "
+         "right after it's pasted, instead of a while later."},
+        {"title": "Auto tags are off until you turn them on", "text": "rules you made are kept. Switch them on in Settings > Meetings.",
          "show": {"page": "ajustes", "card": "autotags", "y": 0.75, "spots": [  # dictado-ng5i.1: the opt-in switch
              ["#at-head", "Turn auto tags on here."]]}},
     ],
