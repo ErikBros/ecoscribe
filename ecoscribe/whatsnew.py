@@ -29,7 +29,7 @@ NOTES: dict[str, list[dict]] = {
          "install it now or later. Later keeps an Install now button on Home. The new version opens by itself."},
         {"title": "Tag a meeting from the list", "text": "+ Tag on a row adds a tag without opening the meeting.",
          "show": {"page": "reuniones", "y": 0.2, "spots": [  # dictado-ng5i.2: + Tag shows on a row under the pointer
-             ["#r-list > li", "Point at a meeting and click + Tag to tag it right here."]]}},
+             ["#r-list .r-row", "Point at a meeting and click + Tag to tag it right here."]]}},
         {"title": "History shows a dictation at once", "text": "a long dictation appears in History right after it's "
          "pasted, instead of a while later."},
         {"title": "Auto tags are off until you turn them on", "text": "switch them on in Settings > Meetings.",

@@ -312,6 +312,14 @@ async function load(query) {
   check(doc.querySelector(".spot-ring") && doc.querySelector("#at-head")?.contains(doc.querySelector("#f-auto-tags")),
     "and rings the switch row (dictado-ng5i.1: auto tags are off until turned on)");
   doc.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape" })); await sleep(20);
+  doc.querySelector("#new-more").click(); await sleep(20);  // dictado-9zeo.4: a spot the page redraws after Show me picked it
+  doc.querySelector("#new-list li .new-show").click(); await sleep(150);
+  const spot = doc.querySelector("#r-tags"), redrawn = spot.cloneNode(true);
+  redrawn.getBoundingClientRect = () => ({ left: 100, top: 200, right: 500, bottom: 260, width: 400, height: 60 });
+  spot.replaceWith(redrawn); window.dispatchEvent(new window.Event("scroll")); await sleep(20);
+  check(doc.querySelector(".spot-ring")?.style.left === "94px" && doc.querySelector(".spot-ring")?.style.top === "194px",
+    "a spot the page redrew: the ring finds the new one instead of following the old one off screen");
+  doc.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape" })); await sleep(20);
   const { window: w2, doc: d2 } = await load("page=inicio&new=1&tags=0");
   await sleep(50);
   d2.querySelector("#new-more").click(); d2.querySelector(".new-show").click(); await sleep(150);
