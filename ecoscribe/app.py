@@ -343,9 +343,12 @@ class App:
                 with self._lock:
                     self._pending -= 1
                     self._refresh_ui()
-            if done:  # pasted, the pill idle: now the history line, with clarity when Insights is on
+            if done:  # pasted, the pill idle: the history line now, its clarity when Insights is on
                 res, audio, dr, words, to = done
-                self._history(res, audio, dr, scored=self._clarity(res, audio, words), to=to)
+                rid = self._history(res, audio, dr, to=to)  # dictado-h1vn.1: History never waits for clarity
+                scored = self._clarity(res, audio, words)
+                if scored and rid:
+                    self._add_scores(rid, scored)
 
     def _clarity(self, res, audio, words) -> dict | None:
         """dictado-9jc.1: how clearly this dictation was heard, from a second look after the paste. Only
@@ -724,10 +727,18 @@ class App:
             tmp.write_text("\n".join(out) + "\n", encoding="utf-8")
             os.replace(tmp, self.history_path)
 
-    def _history(self, res, audio, dr, recovered: bool = False, scored: dict | None = None,
-                 to: str | None = None) -> None:
+    def _add_scores(self, rid: str, scored: dict) -> None:
+        """clarity, heard, unsure onto a line already written (dictado-h1vn.1)."""
+        from . import histfile
+        try:
+            with self._lock:
+                histfile.merge(self.history_path, rid, scored)
+        except OSError:
+            log.exception("history clarity write failed")
+
+    def _history(self, res, audio, dr, recovered: bool = False, to: str | None = None) -> str | None:
         if not self.history_path:
-            return
+            return None
         rid = self._new_id()
         rec = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "text": res.text,
                "lang": res.lang, "audio_s": round(len(audio) / SR, 2), "speech_s": round(res.speech_s, 2),
@@ -737,14 +748,13 @@ class App:
             rec["recovered"] = True
         if to:
             rec["to"] = to  # people / ai / other (dictado-9jc.2)
-        if scored:
-            rec.update(scored)  # clarity, heard, unsure (dictado-9jc.1)
         try:
             with self._lock, open(self.history_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
         except OSError:
             log.exception("history write failed")
         self._keep_audio(rid, audio)
+        return rid
 
 
 def _mic_label(name: str) -> str:

@@ -63,3 +63,13 @@ def edit(path: Path, rid: str | None, ts: str | None, text: str) -> bool:
             rec.pop(k, None)
         return rec
     return _rewrite(path, rid, ts, change)
+
+
+def merge(path: Path, rid: str, fields: dict) -> bool:
+    """Add fields to the dictation with this id (dictado-h1vn.1: its clarity, after the line went in)."""
+    def change(rec):
+        if rec.get("edited") or rec.get("retried"):
+            return rec  # the scores were about the text before the edit or retry
+        rec.update(fields)
+        return rec
+    return _rewrite(path, rid, None, change)
