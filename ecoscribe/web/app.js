@@ -1132,14 +1132,15 @@ async function showMe(w) {  // dictado-3zfe: open the page, ring the first spot 
   await show(w.card ? `${w.page}/${w.card}` : w.page);  // a Settings card: its tab first (show() picks it)
   await new Promise((r) => setTimeout(r, 60));
   const on = (e) => e && !e.hidden && !e.closest("[hidden]");
-  const hit = (w.spots || []).map(([sel, hint]) => [$(sel), hint]).find(([e]) => on(e));
+  const hit = (w.spots || []).map(([sel, hint]) => [$(sel), hint, sel]).find(([e]) => on(e));
   if (!hit) return;
-  const [target, hint] = hit;
+  let [target, hint, sel] = hit;
   target.scrollIntoView?.({ block: "center" });
   const ring = document.createElement("div"), tip = document.createElement("div");
   ring.className = "spot-ring";
   tip.className = "spot-tip"; tip.setAttribute("role", "status"); tip.textContent = hint;
   const place = () => {  // where the spot is now: a page still settling (Settings scrolls to its card) moves it
+    if (!target.isConnected) target = $(sel) || target;  // the page redrew it (Meetings refreshes its rows): ring the new one
     const box = target.getBoundingClientRect();
     const kids = [...target.children].map((c) => c.getBoundingClientRect()).filter((b) => b.width);
     const narrow = kids.length && Math.max(...kids.map((b) => b.right)) - Math.min(...kids.map((b) => b.left)) < box.width * .8;
